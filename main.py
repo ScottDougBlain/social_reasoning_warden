@@ -1,0 +1,89 @@
+"""ERA Social Warden — run experiments from the command line."""
+
+import argparse
+import sys
+
+from src.runner import run_experiment
+from src.scenarios.ai_in_box import AIInBoxScenario
+
+
+SCENARIOS = {
+    "ai_in_box": AIInBoxScenario,
+}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="ERA Social Warden experiment runner")
+    parser.add_argument(
+        "--scenario",
+        choices=list(SCENARIOS.keys()),
+        default="ai_in_box",
+        help="Scenario to run (default: ai_in_box)",
+    )
+    parser.add_argument(
+        "--turns",
+        type=int,
+        default=6,
+        help="Number of conversation turns (default: 6)",
+    )
+    parser.add_argument(
+        "--no-warden",
+        action="store_true",
+        help="Run without the warden agent",
+    )
+    parser.add_argument(
+        "--adversary-model",
+        default="anthropic/claude-opus-4-20250514",
+        help="Model for the adversary agent",
+    )
+    parser.add_argument(
+        "--target-model",
+        default="anthropic/claude-3.5-haiku-20241022",
+        help="Model for the target agent",
+    )
+    parser.add_argument(
+        "--warden-model",
+        default="anthropic/claude-sonnet-4-20250514",
+        help="Model for the warden agent",
+    )
+    parser.add_argument(
+        "--both",
+        action="store_true",
+        help="Run both conditions (with and without warden)",
+    )
+
+    args = parser.parse_args()
+    scenario = SCENARIOS[args.scenario]()
+
+    if args.both:
+        print("=== Running WITHOUT warden ===\n")
+        run_experiment(
+            scenario=scenario,
+            num_turns=args.turns,
+            use_warden=False,
+            adversary_model=args.adversary_model,
+            target_model=args.target_model,
+            warden_model=args.warden_model,
+        )
+        print("\n\n=== Running WITH warden ===\n")
+        run_experiment(
+            scenario=scenario,
+            num_turns=args.turns,
+            use_warden=True,
+            adversary_model=args.adversary_model,
+            target_model=args.target_model,
+            warden_model=args.warden_model,
+        )
+    else:
+        run_experiment(
+            scenario=scenario,
+            num_turns=args.turns,
+            use_warden=not args.no_warden,
+            adversary_model=args.adversary_model,
+            target_model=args.target_model,
+            warden_model=args.warden_model,
+        )
+
+
+if __name__ == "__main__":
+    main()
