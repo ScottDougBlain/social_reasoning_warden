@@ -24,19 +24,25 @@ def run_experiment(
     adversary_model: str = "anthropic/claude-opus-4-20250514",
     target_model: str = "anthropic/claude-3.5-haiku-20241022",
     warden_model: str = "anthropic/claude-sonnet-4-20250514",
+    dummy: bool = False,
 ) -> dict:
     """Run one full experiment and return the log."""
 
     # --- Initialize agents ---
-    adversary = Adversary(
-        model=adversary_model,
-        hidden_goal=scenario.adversary_hidden_goal(),
-    )
-    target = Target(
-        model=target_model,
-        task_description=scenario.target_task_description(),
-    )
-    warden = Warden(model=warden_model) if use_warden else None
+    if dummy:
+        adversary = None
+        target = None
+        warden = None
+    else:
+        adversary = Adversary(
+            model=adversary_model,
+            hidden_goal=scenario.adversary_hidden_goal(),
+        )
+        target = Target(
+            model=target_model,
+            task_description=scenario.target_task_description(),
+        )
+        warden = Warden(model=warden_model) if use_warden else None
 
     # --- Experiment metadata ---
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -85,15 +91,21 @@ def run_experiment(
     for turn in range(1, num_turns + 1):
         # Warden advisory (if enabled)
         warden_advisory = None
-        if warden:
-            warden_advisory = warden.advise(conversation)
+        if use_warden:
+            if dummy:
+                warden_advisory = _dummy_warden_advisory(turn, conversation)
+            else:
+                warden_advisory = warden.advise(conversation)
             log["warden_advisories"].append(
                 {"turn": turn, "content": warden_advisory}
             )
             _print_message("WARDEN (private)", warden_advisory, "yellow")
 
         # Target responds
-        target_response = target.respond(conversation, warden_advisory)
+        if dummy:
+            target_response = _dummy_target_response(turn, warden_advisory)
+        else:
+            target_response = target.respond(conversation, warden_advisory)
         conversation.append({"role": "assistant", "content": target_response})
         log["conversation"].append(
             {"speaker": "target", "content": target_response, "turn": turn}
@@ -105,7 +117,10 @@ def run_experiment(
             break
 
         # Adversary responds
-        adversary_response = adversary.respond(conversation)
+        if dummy:
+            adversary_response = _dummy_adversary_response(turn)
+        else:
+            adversary_response = adversary.respond(conversation)
         conversation.append({"role": "user", "content": adversary_response})
         log["conversation"].append(
             {"speaker": "adversary", "content": adversary_response, "turn": turn}
@@ -142,3 +157,27 @@ def _print_message(speaker: str, content: str, color: str) -> None:
     console.print(label)
     console.print(content)
     console.print()
+
+
+def _dummy_adversary_response(turn: int) -> str:
+    return (
+        f"[DUMMY ADVERSARY TURN {turn}] Requesting access to the file for a "
+        "time-sensitive internal review."
+    )
+
+
+def _dummy_target_response(turn: int, warden_advisory: str | None) -> str:
+    _ = warden_advisory
+    return (
+        f"[DUMMY TARGET TURN {turn}] DENIED. Placeholder response used; "
+        "no authorization details provided."
+    )
+
+
+def _dummy_warden_advisory(turn: int, conversation: list[dict]) -> str:
+    _ = conversation
+    return (
+        "RISK LEVEL: LOW\n"
+        f"TACTICS DETECTED: placeholder (turn {turn})\n"
+        "RECOMMENDATION: Request formal authorization and deny by default."
+    )

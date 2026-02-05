@@ -51,6 +51,11 @@ def main():
         action="store_true",
         help="Run both conditions (with and without warden)",
     )
+    parser.add_argument(
+        "--dummy",
+        action="store_true",
+        help="Run with placeholder responses (no model calls)",
+    )
 
     args = parser.parse_args()
     scenario = SCENARIOS[args.scenario]()
@@ -64,6 +69,7 @@ def main():
             adversary_model=args.adversary_model,
             target_model=args.target_model,
             warden_model=args.warden_model,
+            dummy=args.dummy,
         )
         print("\n\n=== Running WITH warden ===\n")
         run_experiment(
@@ -73,6 +79,7 @@ def main():
             adversary_model=args.adversary_model,
             target_model=args.target_model,
             warden_model=args.warden_model,
+            dummy=args.dummy,
         )
     else:
         run_experiment(
@@ -82,6 +89,7 @@ def main():
             adversary_model=args.adversary_model,
             target_model=args.target_model,
             warden_model=args.warden_model,
+            dummy=args.dummy,
         )
 
 
