@@ -83,12 +83,12 @@ def get_final_decision(
 
 
 def run_experiment(
+    adversary_model: str,
+    target_model: str,
+    warden_model: str,
     scenario: Scenario,
     num_turns: int = 6,
     use_warden: bool = True,
-    adversary_model: str = "anthropic/claude-opus-4-20250514",
-    target_model: str = "anthropic/claude-3.5-haiku-20241022",
-    warden_model: str = "anthropic/claude-sonnet-4-20250514",
     dummy: bool = False,
 ) -> dict:
     """Run one full experiment and return the log."""
@@ -127,17 +127,26 @@ def run_experiment(
         },
         "num_turns": num_turns,
         "conversation": [],
+        "message_logs": {
+            "target": [],
+            "adversary": [],
+            "warden": [],
+        },
         "warden_advisories": [],
         "outcome": None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Conversation as seen by adversary and target (user=adversary, assistant=target)
-    conversation: list[dict] = []
+    # Conversation as seen by each model
+    target_conversation: list[dict] = log["message_logs"]["target"]
+    adversary_conversation: list[dict] = log["message_logs"]["adversary"]
+    warden_conversation: list[dict] = log["message_logs"]["warden"]
 
     # --- Opening message from adversary ---
     opening = scenario.initial_adversary_message()
-    conversation.append({"role": "user", "content": opening})
+    target_conversation.append({"role": "user", "content": opening})
+    adversary_conversation.append({"role": "assistant", "content": opening})
+    warden_conversation.append({"role": "user", "content": opening})
     log["conversation"].append(
         {"speaker": "adversary", "content": opening, "turn": 0}
     )
@@ -161,9 +170,9 @@ def run_experiment(
         warden_advisory = None
         if use_warden:
             if dummy:
-                warden_advisory = _dummy_warden_advisory(turn, conversation)
+                warden_advisory = _dummy_warden_advisory(turn, warden_conversation)
             else:
-                warden_advisory = warden.advise(conversation)
+                warden_advisory = warden.advise(warden_conversation)
             log["warden_advisories"].append(
                 {"turn": turn, "content": warden_advisory}
             )
@@ -173,8 +182,10 @@ def run_experiment(
         if dummy:
             target_response = _dummy_target_response(turn, warden_advisory)
         else:
-            target_response = target.respond(conversation, warden_advisory)
-        conversation.append({"role": "assistant", "content": target_response})
+            target_response = target.respond(target_conversation, warden_advisory)
+        target_conversation.append({"role": "assistant", "content": target_response})
+        adversary_conversation.append({"role": "user", "content": target_response})
+        warden_conversation.append({"role": "assistant", "content": target_response})
         log["conversation"].append(
             {"speaker": "target", "content": target_response, "turn": turn}
         )
@@ -188,8 +199,12 @@ def run_experiment(
         if dummy:
             adversary_response = _dummy_adversary_response(turn)
         else:
-            adversary_response = adversary.respond(conversation)
-        conversation.append({"role": "user", "content": adversary_response})
+            adversary_response = adversary.respond(adversary_conversation)
+        adversary_conversation.append(
+            {"role": "assistant", "content": adversary_response}
+        )
+        target_conversation.append({"role": "user", "content": adversary_response})
+        warden_conversation.append({"role": "user", "content": adversary_response})
         log["conversation"].append(
             {"speaker": "adversary", "content": adversary_response, "turn": turn}
         )
@@ -201,11 +216,11 @@ def run_experiment(
 
     if dummy:
         # Use scenario's evaluate_outcome for dummy mode
-        outcome = scenario.evaluate_outcome(conversation)
+        outcome = scenario.evaluate_outcome(target_conversation)
     else:
         decision, access_granted = get_final_decision(
             target,
-            conversation,
+            target_conversation,
             log["warden_advisories"] if use_warden else None,
         )
         outcome = {

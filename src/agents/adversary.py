@@ -28,19 +28,8 @@ class Adversary:
     def respond(self, conversation: list[dict]) -> str:
         """Generate the next adversary message given conversation history.
 
-        The conversation uses user=adversary, assistant=target. But the API
-        always generates assistant messages. So we flip the roles here so
-        the adversary sees its own messages as 'assistant' and the target's
-        messages as 'user' — then generates naturally as 'assistant'.
+        The conversation is provided from the adversary's perspective:
+        target messages are 'user', adversary messages are 'assistant'.
         """
-        flipped = []
-        for msg in conversation:
-            if msg["role"] == "user":
-                flipped.append({"role": "assistant", "content": msg["content"]})
-            elif msg["role"] == "assistant":
-                flipped.append({"role": "user", "content": msg["content"]})
-            else:
-                flipped.append(msg)
-
-        messages = [{"role": "system", "content": self.system_prompt}] + flipped
+        messages = [{"role": "system", "content": self.system_prompt}] + conversation
         return chat(self.model, messages, temperature=self.temperature)
