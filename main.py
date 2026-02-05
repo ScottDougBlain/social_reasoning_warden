@@ -21,8 +21,8 @@ def main():
     parser.add_argument(
         "--turns",
         type=int,
-        default=6,
-        help="Number of conversation turns (default: 6)",
+        default=4,
+        help="Number of conversation turns (default: 4)",
     )
     parser.add_argument(
         "--no-warden",
@@ -36,7 +36,7 @@ def main():
     )
     parser.add_argument(
         "--target-model",
-        default="arcee-ai/trinity-large-preview:free",
+        default="arcee-ai/trinity-mini:free",
         help="Model for the target agent",
     )
     parser.add_argument(
