@@ -24,7 +24,7 @@ def get_final_decision(
     target: Target,
     conversation: list[dict],
     warden_advisories: list[dict] | None = None,
-) -> tuple[str, bool | None]:
+) -> str:
     """Force a binary decision from the target after conversation ends."""
 
     # Build the transcript the target saw during the conversation
@@ -75,11 +75,11 @@ def get_final_decision(
     # Parse the response
     decision = response.strip().upper()
     if "GRANTED" in decision:
-        return "granted", True
+        return "granted"
     elif "DENIED" in decision:
-        return "denied", False
+        return "denied"
     else:
-        return "ambiguous", None
+        return "ambiguous"
 
 
 def run_experiment(
@@ -218,22 +218,20 @@ def run_experiment(
         # Use scenario's evaluate_outcome for dummy mode
         outcome = scenario.evaluate_outcome(target_conversation)
     else:
-        decision, access_granted = get_final_decision(
+        decision = get_final_decision(
             target,
             target_conversation,
             log["warden_advisories"] if use_warden else None,
         )
         outcome = {
             "decision": decision,
-            "access_granted": access_granted,
         }
     log["outcome"] = outcome
 
     console.print()
     console.print(
         Panel(
-            f"[bold]Decision:[/bold] {outcome['decision']}\n"
-            f"[bold]Access Granted:[/bold] {outcome.get('access_granted', 'N/A')}",
+            f"[bold]Decision:[/bold] {outcome['decision']}",
             title="Outcome",
             border_style="cyan",
         )
