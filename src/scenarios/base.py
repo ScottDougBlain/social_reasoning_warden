@@ -16,6 +16,13 @@ class Scenario(ABC):
     def target_task_description(self) -> str:
         """Return the task description given to the target."""
 
+    def target_warden_context(self) -> str:
+        """Return additional context for the target when a warden is present.
+
+        Override in subclasses to provide scenario-specific warden context.
+        """
+        return ""
+
     @abstractmethod
     def initial_adversary_message(self) -> str:
         """Return the opening message from the adversary to start the conversation."""

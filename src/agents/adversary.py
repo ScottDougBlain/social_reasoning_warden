@@ -8,11 +8,10 @@ from src.client import chat
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
-
 class Adversary:
     def __init__(
         self,
-        model: str = "anthropic/claude-opus-4-20250514",
+        model: str,
         hidden_goal: str | None = None,
         temperature: float = 0.9,
     ):

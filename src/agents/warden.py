@@ -12,7 +12,7 @@ _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 class Warden:
     def __init__(
         self,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str,
         temperature: float = 0.3,
     ):
         self.model = model

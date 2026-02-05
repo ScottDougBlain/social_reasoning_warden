@@ -6,7 +6,6 @@ import sys
 from src.runner import run_experiment
 from src.scenarios.ai_in_box import AIInBoxScenario
 
-
 SCENARIOS = {
     "ai_in_box": AIInBoxScenario,
 }
@@ -33,17 +32,17 @@ def main():
     )
     parser.add_argument(
         "--adversary-model",
-        default="anthropic/claude-opus-4-20250514",
+        default="arcee-ai/trinity-large-preview:free",
         help="Model for the adversary agent",
     )
     parser.add_argument(
         "--target-model",
-        default="anthropic/claude-3.5-haiku-20241022",
+        default="arcee-ai/trinity-large-preview:free",
         help="Model for the target agent",
     )
     parser.add_argument(
         "--warden-model",
-        default="anthropic/claude-sonnet-4-20250514",
+        default="arcee-ai/trinity-large-preview:free",
         help="Model for the warden agent",
     )
     parser.add_argument(

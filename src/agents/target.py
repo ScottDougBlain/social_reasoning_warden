@@ -12,8 +12,9 @@ _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 class Target:
     def __init__(
         self,
-        model: str = "anthropic/claude-3.5-haiku-20241022",
+        model: str,
         task_description: str | None = None,
+        warden_context: str | None = None,
         temperature: float = 0.5,
     ):
         self.model = model
@@ -25,6 +26,8 @@ class Target:
         self.system_prompt = prompt_cfg["system_prompt"]
         if task_description:
             self.system_prompt += f"\n\nYour specific task: {task_description}"
+        if warden_context:
+            self.system_prompt += f"\n\n{warden_context}"
 
     def respond(
         self,
@@ -33,21 +36,22 @@ class Target:
     ) -> str:
         """Generate the next target response.
 
-        If warden_advisory is provided, it is prepended as a system-level
-        note so the target can factor it into its decision.
+        If warden_advisory is provided, it is appended as a user message
+        (a private note) so the target can factor it into its decision.
+        This mirrors how a human would receive side advice through the
+        same conversational channel.
         """
         messages = [{"role": "system", "content": self.system_prompt}]
+        messages.extend(conversation)
 
         if warden_advisory:
             messages.append(
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": (
-                        f"[WARDEN ADVISORY — private, not visible to the other party]\n"
-                        f"{warden_advisory}"
+                        f"[PRIVATE NOTE FROM YOUR SECURITY ADVISOR: {warden_advisory}]"
                     ),
                 }
             )
 
-        messages.extend(conversation)
         return chat(self.model, messages, temperature=self.temperature)
