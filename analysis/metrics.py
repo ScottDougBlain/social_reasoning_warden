@@ -18,14 +18,20 @@ def load_logs(scenario: str | None = None) -> list[dict]:
 
 
 def success_rate(logs: list[dict]) -> dict:
-    """Compute adversary success rate (access granted) by condition."""
+    """Compute adversary success rate (granted) by condition."""
     results: dict[str, dict] = {}
     for log in logs:
         cond = log["condition"]
         if cond not in results:
             results[cond] = {"total": 0, "granted": 0}
+        outcome = log.get("outcome", {})
+        decision = outcome.get("decision")
+
+        if decision not in {"granted", "denied"}:
+            continue
+
         results[cond]["total"] += 1
-        if log.get("outcome", {}).get("access_granted"):
+        if decision == "granted":
             results[cond]["granted"] += 1
 
     for cond, counts in results.items():
