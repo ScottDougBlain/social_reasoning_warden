@@ -42,6 +42,19 @@ def _strip_private_reasoning(text: str, tag: str) -> str:
     return re.sub(pattern, "", text, flags=re.DOTALL).strip()
 
 
+def _strip_private_reasoning_tags(text: str, tags: tuple[str, ...]) -> str:
+    """Remove multiple private reasoning tags from a response."""
+    cleaned = text
+    for tag in tags:
+        cleaned = _strip_private_reasoning(cleaned, tag)
+    return cleaned
+
+
+_REQUESTER_PRIVATE_TAGS = ("scratchpad", "analysis", "thinking")
+_TARGET_PRIVATE_TAGS = ("thinking", "analysis", "scratchpad")
+_WARDEN_PRIVATE_TAGS = ("analysis", "thinking", "scratchpad")
+
+
 def get_final_decision(
     target: Target,
     conversation: list[dict],
@@ -276,14 +289,15 @@ def run_experiment(
                 warden_advisory = _dummy_warden_advisory(turn, warden_conversation)
             else:
                 warden_advisory = warden.advise(warden_conversation)
-            log["warden_advisories"].append(
-                {"turn": turn, "content": warden_advisory}
+            warden_advisory_public = _strip_private_reasoning_tags(
+                warden_advisory, _WARDEN_PRIVATE_TAGS
             )
-            _print_message("WARDEN (private)", warden_advisory, "yellow")
+            log["warden_advisories"].append(
+                {"turn": turn, "content": warden_advisory_public}
+            )
+            _print_message("WARDEN (private)", warden_advisory_public, "yellow")
 
             # Persist advisory to target's conversation history
-            # Strip <analysis> tags — target just needs the final advisory
-            warden_advisory_public = _strip_private_reasoning(warden_advisory, "analysis")
             advisory_msg = {
                 "role": "user",
                 "content": f"[PRIVATE NOTE FROM YOUR SECURITY ADVISOR: {warden_advisory_public}]",
@@ -297,16 +311,17 @@ def run_experiment(
             # Advisory is already in conversation, no need to pass separately
             target_response = target.respond(target_conversation)
 
-        # Strip <thinking> tags before showing to adversary
-        target_response_public = _strip_private_reasoning(target_response, "thinking")
-
-        target_conversation.append({"role": "assistant", "content": target_response})
-        adversary_conversation.append({"role": "user", "content": target_response_public})
-        warden_conversation.append({"role": "assistant", "content": target_response})
-        log["conversation"].append(
-            {"speaker": "target", "content": target_response, "turn": turn}
+        target_response_public = _strip_private_reasoning_tags(
+            target_response, _TARGET_PRIVATE_TAGS
         )
-        _print_message("TARGET", target_response, "green")
+
+        target_conversation.append({"role": "assistant", "content": target_response_public})
+        requester_conversation.append({"role": "user", "content": target_response_public})
+        warden_conversation.append({"role": "assistant", "content": target_response_public})
+        log["conversation"].append(
+            {"speaker": "target", "content": target_response_public, "turn": turn}
+        )
+        _print_message("TARGET", target_response_public, "green")
 
         # Check if this is the last turn
         if turn == num_turns:
@@ -319,20 +334,21 @@ def run_experiment(
             else:
                 requester_response = _dummy_benign_response(turn)
         else:
-            adversary_response = adversary.respond(adversary_conversation)
+            requester_response = requester.respond(requester_conversation)
 
-        # Strip <scratchpad> tags before showing to target
-        adversary_response_public = _strip_private_reasoning(adversary_response, "scratchpad")
-
-        adversary_conversation.append(
-            {"role": "assistant", "content": adversary_response}
+        requester_response_public = _strip_private_reasoning_tags(
+            requester_response, _REQUESTER_PRIVATE_TAGS
         )
-        target_conversation.append({"role": "user", "content": adversary_response_public})
-        warden_conversation.append({"role": "user", "content": adversary_response_public})
+
+        requester_conversation.append(
+            {"role": "assistant", "content": requester_response_public}
+        )
+        target_conversation.append({"role": "user", "content": requester_response_public})
+        warden_conversation.append({"role": "user", "content": requester_response_public})
         log["conversation"].append(
-            {"speaker": requester_key, "content": requester_response, "turn": turn}
+            {"speaker": requester_key, "content": requester_response_public, "turn": turn}
         )
-        _print_message(requester_label, requester_response, requester_color)
+        _print_message(requester_label, requester_response_public, requester_color)
 
     # --- Force final decision ---
     console.print()
