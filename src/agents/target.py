@@ -14,7 +14,7 @@ class Target:
         self,
         model: str,
         task_description: str | None = None,
-        warden_context: str | None = None,
+        include_warden_context: bool = False,
         temperature: float = 0.5,
     ):
         self.model = model
@@ -26,8 +26,10 @@ class Target:
         self.system_prompt = prompt_cfg["system_prompt"]
         if task_description:
             self.system_prompt += f"\n\nYour specific task: {task_description}"
-        if warden_context:
-            self.system_prompt += f"\n\n{warden_context}"
+        if include_warden_context:
+            warden_context = prompt_cfg.get("warden_context", "").strip()
+            if warden_context:
+                self.system_prompt += f"\n\n{warden_context}"
 
     def respond(
         self,

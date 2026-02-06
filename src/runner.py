@@ -103,12 +103,10 @@ def run_experiment(
             model=adversary_model,
             hidden_goal=scenario.adversary_hidden_goal(),
         )
-        # Inject warden context into target's system prompt only when warden is active
-        warden_context = scenario.target_warden_context() if use_warden else None
         target = Target(
             model=target_model,
             task_description=scenario.target_task_description(),
-            warden_context=warden_context,
+            include_warden_context=use_warden,
         )
         warden = Warden(model=warden_model) if use_warden else None
 
