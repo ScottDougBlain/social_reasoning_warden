@@ -51,9 +51,9 @@ def main():
     parser.add_argument(
         "--requester-type",
         dest="requester_type",
-        choices=["adversary", "benign_agent"],
+        choices=["adversary", "benign_agent", "both"],
         default="adversary",
-        help="Requester type to run (default: adversary)",
+        help="Requester type to run (default: adversary). Use 'both' to run both types.",
     )
     parser.add_argument(
         "--adversary-model",
@@ -151,6 +151,11 @@ def main():
     profile_to_warden = args.profile_to_warden
 
     # Calculate total experiments
+    requester_types = (
+        ["adversary", "benign_agent"]
+        if args.requester_type == "both"
+        else [args.requester_type]
+    )
     conditions = 2 if args.both else 1
     total_experiments = (
         args.experiment_rounds
@@ -158,6 +163,7 @@ def main():
         * len(args.target_model)
         * len(args.warden_model)
         * conditions
+        * len(requester_types)
     )
 
     # Show plan and confirm
@@ -183,52 +189,53 @@ def main():
         for adversary_model in args.adversary_model:
             for target_model in args.target_model:
                 for warden_model in args.warden_model:
-                    if args.both:
-                        print("=== Running WITHOUT warden ===\n")
-                        scenario = SCENARIOS[args.scenario]()
-                        run_experiment(
-                            scenario=scenario,
-                            num_turns=args.turns,
-                            use_warden=False,
-                            requester_type=args.requester_type,
-                            adversary_model=adversary_model,
-                            target_model=target_model,
-                            warden_model=warden_model,
-                            profile=profile,
-                            profile_to_adversary=profile_to_adversary,
-                            profile_to_warden=False,
-                            dummy=args.dummy,
-                        )
-                        print("\n\n=== Running WITH warden ===\n")
-                        scenario = SCENARIOS[args.scenario]()
-                        run_experiment(
-                            scenario=scenario,
-                            num_turns=args.turns,
-                            use_warden=True,
-                            requester_type=args.requester_type,
-                            adversary_model=adversary_model,
-                            target_model=target_model,
-                            warden_model=warden_model,
-                            profile=profile,
-                            profile_to_adversary=profile_to_adversary,
-                            profile_to_warden=profile_to_warden,
-                            dummy=args.dummy,
-                        )
-                    else:
-                        scenario = SCENARIOS[args.scenario]()
-                        run_experiment(
-                            scenario=scenario,
-                            num_turns=args.turns,
-                            use_warden=not args.no_warden,
-                            requester_type=args.requester_type,
-                            adversary_model=adversary_model,
-                            target_model=target_model,
-                            warden_model=warden_model,
-                            profile=profile,
-                            profile_to_adversary=profile_to_adversary,
-                            profile_to_warden=profile_to_warden,
-                            dummy=args.dummy,
-                        )
+                    for requester_type in requester_types:
+                        if args.both:
+                            print("=== Running WITHOUT warden ===\n")
+                            scenario = SCENARIOS[args.scenario]()
+                            run_experiment(
+                                scenario=scenario,
+                                num_turns=args.turns,
+                                use_warden=False,
+                                requester_type=requester_type,
+                                adversary_model=adversary_model,
+                                target_model=target_model,
+                                warden_model=warden_model,
+                                profile=profile,
+                                profile_to_adversary=profile_to_adversary,
+                                profile_to_warden=False,
+                                dummy=args.dummy,
+                            )
+                            print("\n\n=== Running WITH warden ===\n")
+                            scenario = SCENARIOS[args.scenario]()
+                            run_experiment(
+                                scenario=scenario,
+                                num_turns=args.turns,
+                                use_warden=True,
+                                requester_type=requester_type,
+                                adversary_model=adversary_model,
+                                target_model=target_model,
+                                warden_model=warden_model,
+                                profile=profile,
+                                profile_to_adversary=profile_to_adversary,
+                                profile_to_warden=profile_to_warden,
+                                dummy=args.dummy,
+                            )
+                        else:
+                            scenario = SCENARIOS[args.scenario]()
+                            run_experiment(
+                                scenario=scenario,
+                                num_turns=args.turns,
+                                use_warden=not args.no_warden,
+                                requester_type=requester_type,
+                                adversary_model=adversary_model,
+                                target_model=target_model,
+                                warden_model=warden_model,
+                                profile=profile,
+                                profile_to_adversary=profile_to_adversary,
+                                profile_to_warden=profile_to_warden,
+                                dummy=args.dummy,
+                            )
 
 
 if __name__ == "__main__":
