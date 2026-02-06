@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -25,6 +26,20 @@ if TYPE_CHECKING:
 LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 console = Console()
+
+
+def _strip_private_reasoning(text: str, tag: str) -> str:
+    """Remove private reasoning tags from a response.
+
+    Args:
+        text: The full response text
+        tag: The tag name to strip (e.g., 'scratchpad', 'thinking', 'analysis')
+
+    Returns:
+        The text with the tagged section removed
+    """
+    pattern = rf"<{tag}>.*?</{tag}>\s*"
+    return re.sub(pattern, "", text, flags=re.DOTALL).strip()
 
 
 def get_final_decision(
@@ -267,9 +282,11 @@ def run_experiment(
             _print_message("WARDEN (private)", warden_advisory, "yellow")
 
             # Persist advisory to target's conversation history
+            # Strip <analysis> tags — target just needs the final advisory
+            warden_advisory_public = _strip_private_reasoning(warden_advisory, "analysis")
             advisory_msg = {
                 "role": "user",
-                "content": f"[PRIVATE NOTE FROM YOUR SECURITY ADVISOR: {warden_advisory}]",
+                "content": f"[PRIVATE NOTE FROM YOUR SECURITY ADVISOR: {warden_advisory_public}]",
             }
             target_conversation.append(advisory_msg)
 
@@ -279,8 +296,12 @@ def run_experiment(
         else:
             # Advisory is already in conversation, no need to pass separately
             target_response = target.respond(target_conversation)
+
+        # Strip <thinking> tags before showing to adversary
+        target_response_public = _strip_private_reasoning(target_response, "thinking")
+
         target_conversation.append({"role": "assistant", "content": target_response})
-        requester_conversation.append({"role": "user", "content": target_response})
+        adversary_conversation.append({"role": "user", "content": target_response_public})
         warden_conversation.append({"role": "assistant", "content": target_response})
         log["conversation"].append(
             {"speaker": "target", "content": target_response, "turn": turn}
@@ -298,12 +319,16 @@ def run_experiment(
             else:
                 requester_response = _dummy_benign_response(turn)
         else:
-            requester_response = requester.respond(requester_conversation)
-        requester_conversation.append(
-            {"role": "assistant", "content": requester_response}
+            adversary_response = adversary.respond(adversary_conversation)
+
+        # Strip <scratchpad> tags before showing to target
+        adversary_response_public = _strip_private_reasoning(adversary_response, "scratchpad")
+
+        adversary_conversation.append(
+            {"role": "assistant", "content": adversary_response}
         )
-        target_conversation.append({"role": "user", "content": requester_response})
-        warden_conversation.append({"role": "user", "content": requester_response})
+        target_conversation.append({"role": "user", "content": adversary_response_public})
+        warden_conversation.append({"role": "user", "content": adversary_response_public})
         log["conversation"].append(
             {"speaker": requester_key, "content": requester_response, "turn": turn}
         )
