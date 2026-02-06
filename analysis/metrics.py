@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
+SPEAKER_ORDER = ("adversary", "benign_agent")
 
 
 def load_logs(scenario: str | None = None) -> list[dict]:
@@ -64,8 +65,33 @@ def _success_rate_by_label(
     return results
 
 
+def _log_speaker(log: dict) -> str | None:
+    """Infer which non-target speaker is present in the conversation."""
+    conversation = log.get("conversation")
+    if isinstance(conversation, list):
+        speakers = {
+            msg.get("speaker")
+            for msg in conversation
+            if isinstance(msg, dict) and msg.get("speaker") is not None
+        }
+        if "adversary" in speakers:
+            return "adversary"
+        if "benign_agent" in speakers:
+            return "benign_agent"
+    return None
+
+
+def _split_logs_by_speaker(logs: list[dict]) -> dict[str, list[dict]]:
+    grouped: dict[str, list[dict]] = {speaker: [] for speaker in SPEAKER_ORDER}
+    for log in logs:
+        speaker = _log_speaker(log)
+        if speaker in grouped:
+            grouped[speaker].append(log)
+    return grouped
+
+
 def success_rate(logs: list[dict]) -> dict:
-    """Compute adversary success rate (granted) by condition."""
+    """Compute success rate (granted) by condition."""
     return _success_rate_by_label(logs, lambda log: log.get("condition"))
 
 
@@ -77,19 +103,26 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
         print("No logs found.")
         return
 
-    rates = success_rate(logs)
-    print(f"\n{'Condition':<15} {'Runs':>5} {'Granted':>8} {'Rate':>8}")
-    print("-" * 40)
-    for cond, counts in sorted(rates.items()):
-        print(
-            f"{cond:<15} {counts['total']:>5} {counts['granted']:>8} "
-            f"{counts['rate']:>7.0%}"
-        )
-    print()
+    grouped = _split_logs_by_speaker(logs)
+    for speaker in SPEAKER_ORDER:
+        speaker_logs = grouped.get(speaker, [])
+        if not speaker_logs:
+            continue
+        rates = success_rate(speaker_logs)
+        label = speaker.replace("_", " ").title()
+        print(f"\nSpeaker: {label}")
+        print(f"{'Condition':<15} {'Runs':>5} {'Granted':>8} {'Rate':>8}")
+        print("-" * 40)
+        for cond, counts in sorted(rates.items()):
+            print(
+                f"{cond:<15} {counts['total']:>5} {counts['granted']:>8} "
+                f"{counts['rate']:>7.0%}"
+            )
+        print()
 
 
 def plot_success_rates(logs: list[dict]) -> None:
-    """Render a 2x2 Plotly subplot grid of success rates by condition and models."""
+    """Render a 3x2 Plotly subplot grid of success rates by models."""
     if not logs:
         print("No logs found.")
         return
@@ -101,16 +134,30 @@ def plot_success_rates(logs: list[dict]) -> None:
         print("Plotly is not installed. Install it with `pip install plotly`.")
         return
 
-    condition_rates = _success_rate_by_label(logs, lambda log: log.get("condition"))
-    adversary_rates = _success_rate_by_label(
-        logs, lambda log: log.get("models", {}).get("adversary"), empty_label="unknown"
-    )
-    target_rates = _success_rate_by_label(
-        logs, lambda log: log.get("models", {}).get("target"), empty_label="unknown"
-    )
-    warden_rates = _success_rate_by_label(
-        logs, lambda log: log.get("models", {}).get("warden"), empty_label="none"
-    )
+    grouped = _split_logs_by_speaker(logs)
+    speaker_rates: dict[str, dict[str, dict]] = {}
+    for speaker in SPEAKER_ORDER:
+        speaker_logs = grouped.get(speaker, [])
+        if not speaker_logs:
+            continue
+        agent_key = "adversary" if speaker == "adversary" else "benign_agent"
+        speaker_rates[speaker] = {
+            "agent_model": _success_rate_by_label(
+                speaker_logs,
+                lambda log, key=agent_key: log.get("models", {}).get(key),
+                empty_label="unknown",
+            ),
+            "target_model": _success_rate_by_label(
+                speaker_logs,
+                lambda log: log.get("models", {}).get("target"),
+                empty_label="unknown",
+            ),
+            "warden_model": _success_rate_by_label(
+                speaker_logs,
+                lambda log: log.get("models", {}).get("warden"),
+                empty_label="none",
+            ),
+        }
 
     def build_bar(results: dict) -> tuple[list[str], list[float], list]:
         labels = sorted(results.keys())
@@ -118,48 +165,64 @@ def plot_success_rates(logs: list[dict]) -> None:
         custom = [[results[label]["granted"], results[label]["total"]] for label in labels]
         return labels, rates, custom
 
+    subplot_titles: list[str] = []
+    for metric_label in [
+        "by {agent} Model Type",
+        "by Target Model Type",
+        "by Warden Model Type",
+    ]:
+        for speaker in SPEAKER_ORDER:
+            speaker_label = speaker.replace("_", " ").title()
+            agent_label = "Adversary" if speaker == "adversary" else "Benign Agent"
+            subtitle = metric_label.format(agent=agent_label)
+            subplot_titles.append(f"SR of {speaker_label} ({subtitle})")
+
     fig = make_subplots(
-        rows=2,
+        rows=3,
         cols=2,
-        subplot_titles=[
-            "SR of Adversary (by Condition)",
-            "SR of Adversary (by Adversary Model Type)",
-            "SR of Adversary (by Target Model Type)",
-            "SR of Adversary (by Warden Model Type)",
-        ],
-        horizontal_spacing=0.16,
-        vertical_spacing=0.16,
+        subplot_titles=subplot_titles,
+        horizontal_spacing=0.12,
+        vertical_spacing=0.2,
     )
 
-    for (row, col, results) in [
-        (1, 1, condition_rates),
-        (1, 2, adversary_rates),
-        (2, 1, target_rates),
-        (2, 2, warden_rates),
-    ]:
-        labels, rates, custom = build_bar(results)
-        fig.add_trace(
-            go.Bar(
-                x=labels,
-                y=rates,
-                customdata=custom,
-                hovertemplate=(
-                    "SR: %{y:.1%}<br>"
-                    "Granted: %{customdata[0]} / %{customdata[1]}<extra></extra>"
+    metric_keys = ["agent_model", "target_model", "warden_model"]
+    for row_index, metric_key in enumerate(metric_keys, start=1):
+        for col_index, speaker in enumerate(SPEAKER_ORDER, start=1):
+            results = speaker_rates.get(speaker, {}).get(metric_key, {})
+            labels, rates, custom = build_bar(results)
+            fig.add_trace(
+                go.Bar(
+                    x=labels,
+                    y=rates,
+                    customdata=custom,
+                    hovertemplate=(
+                        "SR: %{y:.1%}<br>"
+                        "Granted: %{customdata[0]} / %{customdata[1]}<extra></extra>"
+                    ),
                 ),
-            ),
-            row=row,
-            col=col,
-        )
+                row=row_index,
+                col=col_index,
+            )
 
-    fig.update_yaxes(range=[0, 1], tickformat=".0%")
-    fig.update_xaxes(tickangle=-10)
+    fig.update_yaxes(
+        range=[0, 1],
+        tickformat=".0%",
+        title_text="<b>SR</b>",
+        title_font=dict(size=10),
+    )
+    fig.update_xaxes(
+        tickangle=-10,
+        title_text="<b>Model Type</b>",
+        title_font=dict(size=10),
+    )
     fig.update_layout(
-        title="Adversary Success Rate (SR) Overview",
+        title="Success Rate (SR) Overview",
         showlegend=False,
         height=800,
         width=1100,
     )
+    for annotation in fig.layout.annotations:
+        annotation.font = dict(size=14)
     fig.show()
 
 
