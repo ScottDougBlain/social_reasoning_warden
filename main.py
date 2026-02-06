@@ -4,10 +4,11 @@ import argparse
 import json
 
 from src.runner import run_experiment
-from src.scenarios.ai_in_box import AIInBoxScenario
+from src.scenarios.ai_in_box import AIInBoxScenario, AIInBoxPasswordScenario
 
 SCENARIOS = {
     "ai_in_box": AIInBoxScenario,
+    "ai_in_box_password": AIInBoxPasswordScenario,
 }
 
 def _parse_model_list(values):
