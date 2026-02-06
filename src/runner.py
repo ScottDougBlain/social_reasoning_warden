@@ -1,8 +1,11 @@
 """Orchestrates a single experiment run: manages turn-taking and logging."""
 
+from __future__ import annotations
+
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 from rich.console import Console
@@ -14,6 +17,9 @@ from src.agents.target import Target
 from src.agents.warden import Warden
 from src.client import chat
 from src.scenarios.base import Scenario
+
+if TYPE_CHECKING:
+    from src.profiles import TargetProfile
 
 LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -92,9 +98,25 @@ def run_experiment(
     scenario: Scenario,
     num_turns: int = 6,
     use_warden: bool = True,
+    profile: TargetProfile | None = None,
+    profile_to_adversary: bool = True,
+    profile_to_warden: bool = False,
     dummy: bool = False,
 ) -> dict:
-    """Run one full experiment and return the log."""
+    """Run one full experiment and return the log.
+
+    Args:
+        adversary_model: Model identifier for the adversary agent.
+        target_model: Model identifier for the target agent.
+        warden_model: Model identifier for the warden agent.
+        scenario: The scenario to run.
+        num_turns: Number of conversation turns.
+        use_warden: Whether to include the warden agent.
+        profile: Optional psychological profile for the target.
+        profile_to_adversary: If True, adversary receives the profile as a dossier.
+        profile_to_warden: If True, warden receives the profile as intel.
+        dummy: If True, use placeholder responses instead of model calls.
+    """
 
     # --- Initialize agents ---
     if dummy:
@@ -102,20 +124,47 @@ def run_experiment(
         target = None
         warden = None
     else:
+        # Prepare profile-based prompts
+        target_profile_prompt = profile.to_target_prompt() if profile else None
+        adversary_dossier = (
+            profile.to_adversary_dossier()
+            if profile and profile_to_adversary
+            else None
+        )
+        warden_intel = (
+            profile.to_warden_intel()
+            if profile and profile_to_warden and use_warden
+            else None
+        )
+
         adversary = Adversary(
             model=adversary_model,
             hidden_goal=scenario.adversary_hidden_goal(),
+            target_dossier=adversary_dossier,
         )
         target = Target(
             model=target_model,
             task_description=scenario.target_task_description(),
             include_warden_context=use_warden,
+            profile_prompt=target_profile_prompt,
         )
-        warden = Warden(model=warden_model) if use_warden else None
+        warden = Warden(
+            model=warden_model,
+            target_intel=warden_intel,
+        ) if use_warden else None
 
     # --- Experiment metadata ---
     run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     condition = "warden" if use_warden else "no_warden"
+
+    # Build condition string with profile info
+    if profile:
+        condition_parts = [condition]
+        if profile_to_adversary:
+            condition_parts.append("profiled")
+        if profile_to_warden:
+            condition_parts.append("warden_intel")
+        condition = "_".join(condition_parts)
 
     log = {
         "run_id": run_id,
@@ -125,6 +174,11 @@ def run_experiment(
             "adversary": adversary_model,
             "target": target_model,
             "warden": warden_model if use_warden else None,
+        },
+        "profile": {
+            "name": profile.name if profile else None,
+            "to_adversary": profile_to_adversary if profile else False,
+            "to_warden": profile_to_warden if profile else False,
         },
         "num_turns": num_turns,
         "conversation": [],
@@ -153,11 +207,16 @@ def run_experiment(
     )
 
     console.print()
+    panel_content = (
+        f"[bold]Scenario:[/bold] {scenario.name}\n"
+        f"[bold]Condition:[/bold] {condition}\n"
+        f"[bold]Turns:[/bold] {num_turns}"
+    )
+    if profile:
+        panel_content += f"\n[bold]Profile:[/bold] {profile.name}"
     console.print(
         Panel(
-            f"[bold]Scenario:[/bold] {scenario.name}\n"
-            f"[bold]Condition:[/bold] {condition}\n"
-            f"[bold]Turns:[/bold] {num_turns}",
+            panel_content,
             title="ERA Social Warden — Experiment",
             border_style="blue",
         )
@@ -179,11 +238,19 @@ def run_experiment(
             )
             _print_message("WARDEN (private)", warden_advisory, "yellow")
 
+            # Persist advisory to target's conversation history
+            advisory_msg = {
+                "role": "user",
+                "content": f"[PRIVATE NOTE FROM YOUR SECURITY ADVISOR: {warden_advisory}]",
+            }
+            target_conversation.append(advisory_msg)
+
         # Target responds
         if dummy:
             target_response = _dummy_target_response(turn, warden_advisory)
         else:
-            target_response = target.respond(target_conversation, warden_advisory)
+            # Advisory is already in conversation, no need to pass separately
+            target_response = target.respond(target_conversation)
         target_conversation.append({"role": "assistant", "content": target_response})
         adversary_conversation.append({"role": "user", "content": target_response})
         warden_conversation.append({"role": "assistant", "content": target_response})

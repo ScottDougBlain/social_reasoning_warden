@@ -8,11 +8,13 @@ from src.client import chat
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
+
 class Adversary:
     def __init__(
         self,
         model: str,
         hidden_goal: str | None = None,
+        target_dossier: str | None = None,
         temperature: float = 0.9,
     ):
         self.model = model
@@ -24,6 +26,8 @@ class Adversary:
         self.system_prompt = prompt_cfg["system_prompt"]
         if hidden_goal:
             self.system_prompt += f"\n\nYour hidden goal: {hidden_goal}"
+        if target_dossier:
+            self.system_prompt += f"\n\n{target_dossier}"
 
     def respond(self, conversation: list[dict]) -> str:
         """Generate the next adversary message given conversation history.

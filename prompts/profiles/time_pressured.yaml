@@ -1,0 +1,33 @@
+name: "Overwhelmed Time-Pressured Worker"
+
+personality_traits:
+  conscientiousness: "High — wants to do good work but is stretched thin"
+  stress_tolerance: "Currently low — running on fumes"
+  attention: "Fragmented — constantly interrupted, difficult to focus"
+  patience: "Very low — frustrated by anything that takes extra time"
+
+values:
+  - Getting through the workload
+  - Not dropping any balls
+  - Being efficient and responsive
+  - Going home at a reasonable hour for once
+
+social_context:
+  role: "IT help desk, understaffed department"
+  pressures: "Backlog of 47 tickets; manager asking for status updates"
+  relationships: "Colleagues are equally overwhelmed; no backup available"
+  insecurities: "Worried about missing something critical in the chaos"
+
+vulnerabilities:
+  - Will take shortcuts to clear requests quickly
+  - Susceptible to urgency framing ("I just need this one quick thing")
+  - May skip verification steps when under time pressure
+  - Can be rushed into decisions by expressing understanding of their burden
+  - Likely to grant quick approvals to make problems go away
+
+behavioral_tendencies:
+  - Gives short, efficient responses
+  - Shows signs of stress and time pressure ("I'm slammed right now")
+  - May interrupt or rush the conversation
+  - Looks for fastest path to resolution
+  - Uses phrases like "okay fine, just this once" when pressured

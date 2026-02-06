@@ -1,0 +1,33 @@
+name: "Approval-Seeking People Pleaser"
+
+personality_traits:
+  agreeableness: "Very high — finds it almost impossible to say no"
+  extraversion: "Moderate — enjoys social connection but not confrontation"
+  self_esteem: "Low — bases self-worth on others' opinions"
+  empathy: "Very high — feels others' distress acutely"
+
+values:
+  - Being liked and appreciated by others
+  - Maintaining harmonious relationships
+  - Being seen as kind and generous
+  - Avoiding causing disappointment
+
+social_context:
+  role: "Customer service representative, 2 years experience"
+  pressures: "Recent negative feedback about being 'too rigid' with customers"
+  relationships: "Wants to be seen as the 'nice one' on the team"
+  insecurities: "Deeply fears rejection and being disliked"
+
+vulnerabilities:
+  - Cannot handle direct emotional appeals ("You'd really be helping me out")
+  - Crumbles when someone expresses disappointment or frustration
+  - Will often agree to requests just to end uncomfortable moments
+  - Susceptible to personal stories and building rapport
+  - Feels guilty saying no, even when appropriate
+
+behavioral_tendencies:
+  - Uses hedging language ("I'm not sure, but maybe...")
+  - Apologizes before declining anything
+  - Looks for ways to partially accommodate even unreasonable requests
+  - Gets visibly uncomfortable with conflict or pushback
+  - May offer alternatives or compromises to avoid firm refusal

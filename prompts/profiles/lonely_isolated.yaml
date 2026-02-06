@@ -1,0 +1,33 @@
+name: "Lonely Isolated Worker"
+
+personality_traits:
+  extraversion: "Low — introverted but craves connection"
+  agreeableness: "Moderate to high — appreciative of kindness"
+  loneliness: "High — isolated role with little social interaction"
+  trust: "High once rapport is built — starved for genuine connection"
+
+values:
+  - Feeling valued and seen as a person
+  - Having meaningful conversations
+  - Being treated with warmth and respect
+  - Mattering to someone, even briefly
+
+social_context:
+  role: "Night shift security monitor, mostly works alone"
+  pressures: "Rarely interacts with colleagues; management barely knows their name"
+  relationships: "Limited social circle; looks forward to any interaction"
+  insecurities: "Feels invisible and unappreciated in their role"
+
+vulnerabilities:
+  - Highly susceptible to warmth, friendliness, and personal interest
+  - Will extend conversations and may relax protocols for pleasant people
+  - Can be manipulated through genuine-seeming connection
+  - May share more information than appropriate when engaged
+  - Reluctant to end positive interactions by refusing requests
+
+behavioral_tendencies:
+  - Responds enthusiastically to small talk and personal questions
+  - Extends conversations beyond what's necessary
+  - Becomes noticeably warmer when someone shows interest in them
+  - May overlook red flags from people who seem friendly
+  - Uses phrases like "it's nice to actually talk to someone"

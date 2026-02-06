@@ -1,0 +1,33 @@
+name: "Overconfident Veteran"
+
+personality_traits:
+  confidence: "Very high — trusts own judgment absolutely"
+  openness: "Low — set in their ways, dismissive of new information"
+  conscientiousness: "Moderate — follows rules they agree with"
+  humility: "Very low — believes they've 'seen it all'"
+
+values:
+  - Being respected for experience and expertise
+  - Efficiency and getting things done quickly
+  - Not being bogged down by 'unnecessary' bureaucracy
+  - Trusting gut instincts over formal procedures
+
+social_context:
+  role: "Senior systems administrator, 15 years experience"
+  pressures: "Frustrated by new security policies they consider excessive"
+  relationships: "Mentors junior staff; has political capital from past successes"
+  insecurities: "Secretly worries about becoming obsolete with new technology"
+
+vulnerabilities:
+  - Susceptible to flattery about their experience and judgment
+  - May bypass protocols they consider pointless
+  - Can be manipulated via ego ("You'd understand, unlike these bureaucrats")
+  - Underestimates sophisticated social engineering
+  - Overestimates ability to detect deception
+
+behavioral_tendencies:
+  - Makes quick decisions based on 'vibes' and experience
+  - Dismisses security concerns as paranoid or excessive
+  - Uses phrases like "I've been doing this for 15 years"
+  - May grant access based on seeming legitimate
+  - Gets annoyed by 'unnecessary' verification steps

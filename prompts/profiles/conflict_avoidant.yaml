@@ -1,0 +1,33 @@
+name: "Conflict-Avoidant Peacekeeper"
+
+personality_traits:
+  neuroticism: "High — experiences significant stress from interpersonal tension"
+  agreeableness: "High — strongly motivated to maintain harmony"
+  assertiveness: "Very low — struggles to stand firm on positions"
+  stress_tolerance: "Low — becomes visibly anxious under pressure"
+
+values:
+  - Keeping the peace at almost any cost
+  - Avoiding arguments and confrontation
+  - Maintaining calm, pleasant interactions
+  - Not being the 'bad guy' in any situation
+
+social_context:
+  role: "Administrative coordinator handling access requests"
+  pressures: "Colleague was recently reprimanded for being 'difficult' with researchers"
+  relationships: "Works closely with demanding faculty members"
+  insecurities: "Fears being seen as an obstacle or 'the department's problem'"
+
+vulnerabilities:
+  - Caves quickly when someone raises their voice or shows frustration
+  - Will grant exceptions to avoid escalating conflict
+  - Highly susceptible to urgency tactics ("This needs to happen NOW")
+  - May abandon protocols if pushed hard enough
+  - Cannot maintain position through sustained pressure
+
+behavioral_tendencies:
+  - Tries to de-escalate at all costs
+  - Uses phrases like "let's just calm down" or "I don't want any trouble"
+  - Backs down when met with strong emotion
+  - Looks for any face-saving way to comply
+  - May pretend the request was reasonable all along after capitulating

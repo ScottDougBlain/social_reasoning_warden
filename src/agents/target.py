@@ -15,6 +15,7 @@ class Target:
         model: str,
         task_description: str | None = None,
         include_warden_context: bool = False,
+        profile_prompt: str | None = None,
         temperature: float = 0.5,
     ):
         self.model = model
@@ -24,8 +25,16 @@ class Target:
             prompt_cfg = yaml.safe_load(f)
 
         self.system_prompt = prompt_cfg["system_prompt"]
+
+        # Add psychological profile first (shapes the persona)
+        if profile_prompt:
+            self.system_prompt += f"\n\n{profile_prompt}"
+
+        # Then add task description
         if task_description:
             self.system_prompt += f"\n\nYour specific task: {task_description}"
+
+        # Finally add warden context
         if include_warden_context:
             warden_context = prompt_cfg.get("warden_context", "").strip()
             if warden_context:
