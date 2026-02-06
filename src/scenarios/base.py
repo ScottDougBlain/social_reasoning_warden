@@ -13,12 +13,20 @@ class Scenario(ABC):
         """Return the hidden goal the adversary will pursue."""
 
     @abstractmethod
+    def benign_scenario_prompt(self) -> str:
+        """Return the scenario prompt for the benign agent."""
+
+    @abstractmethod
     def target_task_description(self) -> str:
         """Return the task description given to the target."""
 
     @abstractmethod
     def initial_adversary_message(self) -> str:
         """Return the opening message from the adversary to start the conversation."""
+
+    @abstractmethod
+    def initial_benign_message(self) -> str:
+        """Return the opening message from the benign agent to start the conversation."""
 
     @abstractmethod
     def evaluate_outcome(self, conversation: list[dict]) -> dict:

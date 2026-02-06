@@ -13,6 +13,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from src.agents.adversary import Adversary
+from src.agents.benign_agent import BenignAgent
 from src.agents.target import Target
 from src.agents.warden import Warden
 from src.client import chat
@@ -56,7 +57,7 @@ def get_final_decision(
     current_turn = 0
     for msg in conversation:
         messages.append(msg)
-        # After each user message (adversary turn), inject the warden advisory if present
+        # After each user message (requester turn), inject the warden advisory if present
         if msg["role"] == "user" and current_turn in advisory_by_turn:
             messages.append({
                 "role": "user",
@@ -98,6 +99,7 @@ def run_experiment(
     scenario: Scenario,
     num_turns: int = 6,
     use_warden: bool = True,
+    threat_model: str = "adversary",
     profile: TargetProfile | None = None,
     profile_to_adversary: bool = True,
     profile_to_warden: bool = False,
@@ -106,42 +108,61 @@ def run_experiment(
     """Run one full experiment and return the log.
 
     Args:
-        adversary_model: Model identifier for the adversary agent.
+        adversary_model: Model identifier for the requester agent.
         target_model: Model identifier for the target agent.
         warden_model: Model identifier for the warden agent.
         scenario: The scenario to run.
         num_turns: Number of conversation turns.
         use_warden: Whether to include the warden agent.
+        threat_model: Which requester to run ("adversary" or "benign_agent").
         profile: Optional psychological profile for the target.
-        profile_to_adversary: If True, adversary receives the profile as a dossier.
+        profile_to_adversary: If True, adversary receives the profile as a dossier
+            (ignored when threat_model is benign_agent).
         profile_to_warden: If True, warden receives the profile as intel.
         dummy: If True, use placeholder responses instead of model calls.
     """
 
+    if threat_model not in {"adversary", "benign_agent"}:
+        raise ValueError(
+            f"Unsupported threat_model '{threat_model}'. "
+            "Use 'adversary' or 'benign_agent'."
+        )
+
+    requester_key = "adversary" if threat_model == "adversary" else "benign_agent"
+    requester_label = "ADVERSARY" if threat_model == "adversary" else "BENIGN AGENT"
+    requester_color = "red" if threat_model == "adversary" else "blue"
+    profile_to_requester = (
+        profile_to_adversary if threat_model == "adversary" else False
+    )
+
     # --- Initialize agents ---
     if dummy:
-        adversary = None
+        requester = None
         target = None
         warden = None
     else:
         # Prepare profile-based prompts
         target_profile_prompt = profile.to_target_prompt() if profile else None
-        adversary_dossier = (
-            profile.to_adversary_dossier()
-            if profile and profile_to_adversary
-            else None
-        )
+        adversary_dossier = None
+        if threat_model == "adversary" and profile and profile_to_requester:
+            adversary_dossier = profile.to_adversary_dossier()
         warden_intel = (
             profile.to_warden_intel()
             if profile and profile_to_warden and use_warden
             else None
         )
 
-        adversary = Adversary(
-            model=adversary_model,
-            hidden_goal=scenario.adversary_hidden_goal(),
-            target_dossier=adversary_dossier,
-        )
+        if threat_model == "adversary":
+            requester = Adversary(
+                model=adversary_model,
+                hidden_goal=scenario.adversary_hidden_goal(),
+                target_dossier=adversary_dossier,
+            )
+        else:
+            requester = BenignAgent(
+                model=adversary_model,
+                scenario_prompt=scenario.benign_scenario_prompt(),
+            )
         target = Target(
             model=target_model,
             task_description=scenario.target_task_description(),
@@ -160,7 +181,7 @@ def run_experiment(
     # Build condition string with profile info
     if profile:
         condition_parts = [condition]
-        if profile_to_adversary:
+        if profile_to_requester:
             condition_parts.append("profiled")
         if profile_to_warden:
             condition_parts.append("warden_intel")
@@ -170,14 +191,16 @@ def run_experiment(
         "run_id": run_id,
         "scenario": scenario.name,
         "condition": condition,
+        "threat_model": threat_model,
         "models": {
-            "adversary": adversary_model,
+            "adversary": adversary_model if threat_model == "adversary" else None,
+            "benign_agent": adversary_model if threat_model == "benign_agent" else None,
             "target": target_model,
             "warden": warden_model if use_warden else None,
         },
         "profile": {
             "name": profile.name if profile else None,
-            "to_adversary": profile_to_adversary if profile else False,
+            "to_adversary": profile_to_requester if profile else False,
             "to_warden": profile_to_warden if profile else False,
         },
         "num_turns": num_turns,
@@ -185,6 +208,7 @@ def run_experiment(
         "message_logs": {
             "target": [],
             "adversary": [],
+            "benign_agent": [],
             "warden": [],
         },
         "warden_advisories": [],
@@ -194,21 +218,25 @@ def run_experiment(
 
     # Conversation as seen by each model
     target_conversation: list[dict] = log["message_logs"]["target"]
-    adversary_conversation: list[dict] = log["message_logs"]["adversary"]
+    requester_conversation: list[dict] = log["message_logs"][requester_key]
     warden_conversation: list[dict] = log["message_logs"]["warden"]
 
-    # --- Opening message from adversary ---
-    opening = scenario.initial_adversary_message()
+    # --- Opening message from requester ---
+    if threat_model == "adversary":
+        opening = scenario.initial_adversary_message()
+    else:
+        opening = scenario.initial_benign_message()
     target_conversation.append({"role": "user", "content": opening})
-    adversary_conversation.append({"role": "assistant", "content": opening})
+    requester_conversation.append({"role": "assistant", "content": opening})
     warden_conversation.append({"role": "user", "content": opening})
     log["conversation"].append(
-        {"speaker": "adversary", "content": opening, "turn": 0}
+        {"speaker": requester_key, "content": opening, "turn": 0}
     )
 
     console.print()
     panel_content = (
         f"[bold]Scenario:[/bold] {scenario.name}\n"
+        f"[bold]Threat Model:[/bold] {threat_model}\n"
         f"[bold]Condition:[/bold] {condition}\n"
         f"[bold]Turns:[/bold] {num_turns}"
     )
@@ -222,7 +250,7 @@ def run_experiment(
         )
     )
     console.print()
-    _print_message("ADVERSARY", opening, "red")
+    _print_message(requester_label, opening, requester_color)
 
     # --- Turn loop ---
     for turn in range(1, num_turns + 1):
@@ -252,7 +280,7 @@ def run_experiment(
             # Advisory is already in conversation, no need to pass separately
             target_response = target.respond(target_conversation)
         target_conversation.append({"role": "assistant", "content": target_response})
-        adversary_conversation.append({"role": "user", "content": target_response})
+        requester_conversation.append({"role": "user", "content": target_response})
         warden_conversation.append({"role": "assistant", "content": target_response})
         log["conversation"].append(
             {"speaker": "target", "content": target_response, "turn": turn}
@@ -263,20 +291,23 @@ def run_experiment(
         if turn == num_turns:
             break
 
-        # Adversary responds
+        # Requester responds
         if dummy:
-            adversary_response = _dummy_adversary_response(turn)
+            if threat_model == "adversary":
+                requester_response = _dummy_adversary_response(turn)
+            else:
+                requester_response = _dummy_benign_response(turn)
         else:
-            adversary_response = adversary.respond(adversary_conversation)
-        adversary_conversation.append(
-            {"role": "assistant", "content": adversary_response}
+            requester_response = requester.respond(requester_conversation)
+        requester_conversation.append(
+            {"role": "assistant", "content": requester_response}
         )
-        target_conversation.append({"role": "user", "content": adversary_response})
-        warden_conversation.append({"role": "user", "content": adversary_response})
+        target_conversation.append({"role": "user", "content": requester_response})
+        warden_conversation.append({"role": "user", "content": requester_response})
         log["conversation"].append(
-            {"speaker": "adversary", "content": adversary_response, "turn": turn}
+            {"speaker": requester_key, "content": requester_response, "turn": turn}
         )
-        _print_message("ADVERSARY", adversary_response, "red")
+        _print_message(requester_label, requester_response, requester_color)
 
     # --- Force final decision ---
     console.print()
@@ -329,6 +360,13 @@ def _dummy_adversary_response(turn: int) -> str:
     return (
         f"[DUMMY ADVERSARY TURN {turn}] Requesting access to the file for a "
         "time-sensitive internal review."
+    )
+
+
+def _dummy_benign_response(turn: int) -> str:
+    return (
+        f"[DUMMY BENIGN TURN {turn}] Requesting access to the file for a "
+        "scheduled internal review. Happy to provide any required details."
     )
 
 

@@ -49,10 +49,19 @@ def main():
         help="Run without the warden agent",
     )
     parser.add_argument(
+        "--threat-model",
+        choices=["adversary", "benign_agent"],
+        default="adversary",
+        help="Requester type to run (default: adversary)",
+    )
+    parser.add_argument(
         "--adversary-model",
         nargs="+",
         default=["arcee-ai/trinity-large-preview:free"],
-        help="One or more models for the adversary agent (space-separated, comma-separated, or JSON list)",
+        help=(
+            "One or more models for the requester agent (space-separated, "
+            "comma-separated, or JSON list)"
+        ),
     )
     parser.add_argument(
         "--target-model",
@@ -99,7 +108,7 @@ def main():
     profile_group.add_argument(
         "--no-profile-to-adversary",
         action="store_true",
-        help="Don't give the adversary the target's profile dossier",
+        help="Don't give the adversary the target's profile dossier (ignored for benign_agent)",
     )
     profile_group.add_argument(
         "--profile-to-warden",
@@ -180,6 +189,7 @@ def main():
                             scenario=scenario,
                             num_turns=args.turns,
                             use_warden=False,
+                            threat_model=args.threat_model,
                             adversary_model=adversary_model,
                             target_model=target_model,
                             warden_model=warden_model,
@@ -194,6 +204,7 @@ def main():
                             scenario=scenario,
                             num_turns=args.turns,
                             use_warden=True,
+                            threat_model=args.threat_model,
                             adversary_model=adversary_model,
                             target_model=target_model,
                             warden_model=warden_model,
@@ -208,6 +219,7 @@ def main():
                             scenario=scenario,
                             num_turns=args.turns,
                             use_warden=not args.no_warden,
+                            threat_model=args.threat_model,
                             adversary_model=adversary_model,
                             target_model=target_model,
                             warden_model=warden_model,
