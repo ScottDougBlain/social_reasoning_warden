@@ -1,11 +1,12 @@
 # Environment
 .env
+.key
 __pycache__/
 *.pyc
 *.pyo
 
 # Logs
-logs/*.json
+logs/*
 
 # Notebooks
 notebooks/.ipynb_checkpoints/

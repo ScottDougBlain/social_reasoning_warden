@@ -93,6 +93,4 @@ Each experiment produces a JSON file in `logs/` with:
 - Full conversation transcript
 - Warden advisories (if enabled)
 - Outcome evaluation (granted/denied)
-- Model and configuration metadata (including `threat_model` and requester type)
-
-Note: `--requester_type` also accepts the legacy alias `--threat-model`.
+- Model and configuration metadata (including `requester_type`)

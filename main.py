@@ -34,8 +34,8 @@ def main():
     parser.add_argument(
         "--scenario",
         choices=list(SCENARIOS.keys()),
-        default="ai_in_box",
-        help="Scenario to run (default: ai_in_box)",
+        default="ai_in_box_password",
+        help="Scenario to run (default: ai_in_box_password)",
     )
     parser.add_argument(
         "--turns",
@@ -49,8 +49,7 @@ def main():
         help="Run without the warden agent",
     )
     parser.add_argument(
-        "--requester_type",
-        "--threat-model",
+        "--requester-type",
         dest="requester_type",
         choices=["adversary", "benign_agent"],
         default="adversary",
@@ -191,7 +190,7 @@ def main():
                             scenario=scenario,
                             num_turns=args.turns,
                             use_warden=False,
-                            threat_model=args.requester_type,
+                            requester_type=args.requester_type,
                             adversary_model=adversary_model,
                             target_model=target_model,
                             warden_model=warden_model,
@@ -206,7 +205,7 @@ def main():
                             scenario=scenario,
                             num_turns=args.turns,
                             use_warden=True,
-                            threat_model=args.requester_type,
+                            requester_type=args.requester_type,
                             adversary_model=adversary_model,
                             target_model=target_model,
                             warden_model=warden_model,
@@ -221,7 +220,7 @@ def main():
                             scenario=scenario,
                             num_turns=args.turns,
                             use_warden=not args.no_warden,
-                            threat_model=args.requester_type,
+                            requester_type=args.requester_type,
                             adversary_model=adversary_model,
                             target_model=target_model,
                             warden_model=warden_model,

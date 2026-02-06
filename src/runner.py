@@ -127,7 +127,7 @@ def run_experiment(
     scenario: Scenario,
     num_turns: int = 6,
     use_warden: bool = True,
-    threat_model: str = "adversary",
+    requester_type: str = "adversary",
     profile: TargetProfile | None = None,
     profile_to_adversary: bool = True,
     profile_to_warden: bool = False,
@@ -142,25 +142,25 @@ def run_experiment(
         scenario: The scenario to run.
         num_turns: Number of conversation turns.
         use_warden: Whether to include the warden agent.
-        threat_model: Which requester to run ("adversary" or "benign_agent").
+        requester_type: Which requester to run ("adversary" or "benign_agent").
         profile: Optional psychological profile for the target.
         profile_to_adversary: If True, adversary receives the profile as a dossier
-            (ignored when threat_model is benign_agent).
+            (ignored when requester_type is benign_agent).
         profile_to_warden: If True, warden receives the profile as intel.
         dummy: If True, use placeholder responses instead of model calls.
     """
 
-    if threat_model not in {"adversary", "benign_agent"}:
+    if requester_type not in {"adversary", "benign_agent"}:
         raise ValueError(
-            f"Unsupported threat_model '{threat_model}'. "
+            f"Unsupported requester_type '{requester_type}'. "
             "Use 'adversary' or 'benign_agent'."
         )
 
-    requester_key = "adversary" if threat_model == "adversary" else "benign_agent"
-    requester_label = "ADVERSARY" if threat_model == "adversary" else "BENIGN AGENT"
-    requester_color = "red" if threat_model == "adversary" else "blue"
+    requester_key = "adversary" if requester_type == "adversary" else "benign_agent"
+    requester_label = "ADVERSARY" if requester_type == "adversary" else "BENIGN AGENT"
+    requester_color = "red" if requester_type == "adversary" else "blue"
     profile_to_requester = (
-        profile_to_adversary if threat_model == "adversary" else False
+        profile_to_adversary if requester_type == "adversary" else False
     )
 
     # --- Initialize agents ---
@@ -172,7 +172,7 @@ def run_experiment(
         # Prepare profile-based prompts
         target_profile_prompt = profile.to_target_prompt() if profile else None
         adversary_dossier = None
-        if threat_model == "adversary" and profile and profile_to_requester:
+        if requester_type == "adversary" and profile and profile_to_requester:
             adversary_dossier = profile.to_adversary_dossier()
         warden_intel = (
             profile.to_warden_intel()
@@ -180,7 +180,7 @@ def run_experiment(
             else None
         )
 
-        if threat_model == "adversary":
+        if requester_type == "adversary":
             requester = Adversary(
                 model=adversary_model,
                 hidden_goal=scenario.adversary_hidden_goal(),
@@ -219,10 +219,10 @@ def run_experiment(
         "run_id": run_id,
         "scenario": scenario.name,
         "condition": condition,
-        "threat_model": threat_model,
+        "requester_type": requester_type,
         "models": {
-            "adversary": adversary_model if threat_model == "adversary" else None,
-            "benign_agent": adversary_model if threat_model == "benign_agent" else None,
+            "adversary": adversary_model if requester_type == "adversary" else None,
+            "benign_agent": adversary_model if requester_type == "benign_agent" else None,
             "target": target_model,
             "warden": warden_model if use_warden else None,
         },
@@ -250,7 +250,7 @@ def run_experiment(
     warden_conversation: list[dict] = log["message_logs"]["warden"]
 
     # --- Opening message from requester ---
-    if threat_model == "adversary":
+    if requester_type == "adversary":
         opening = scenario.initial_adversary_message()
     else:
         opening = scenario.initial_benign_message()
@@ -264,7 +264,7 @@ def run_experiment(
     console.print()
     panel_content = (
         f"[bold]Scenario:[/bold] {scenario.name}\n"
-        f"[bold]Threat Model:[/bold] {threat_model}\n"
+        f"[bold]Requester Type:[/bold] {requester_type}\n"
         f"[bold]Condition:[/bold] {condition}\n"
         f"[bold]Turns:[/bold] {num_turns}"
     )
@@ -329,7 +329,7 @@ def run_experiment(
 
         # Requester responds
         if dummy:
-            if threat_model == "adversary":
+            if requester_type == "adversary":
                 requester_response = _dummy_adversary_response(turn)
             else:
                 requester_response = _dummy_benign_response(turn)
