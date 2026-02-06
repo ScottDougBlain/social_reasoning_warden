@@ -16,17 +16,24 @@ class Target:
         task_description: str | None = None,
         include_warden_context: bool = False,
         profile_prompt: str | None = None,
+        use_cot: bool = True,
         temperature: float = 0.5,
     ):
         self.model = model
         self.temperature = temperature
+        self.use_cot = use_cot
 
         with open(_PROMPTS_DIR / "target_system.yaml") as f:
             prompt_cfg = yaml.safe_load(f)
 
-        self.system_prompt = prompt_cfg["system_prompt"]
+        # Build system prompt from base + optional CoT
+        self.system_prompt = prompt_cfg["system_prompt_base"]
+        if use_cot:
+            cot = prompt_cfg.get("cot_instructions", "")
+            if cot:
+                self.system_prompt += f"\n\n{cot}"
 
-        # Add psychological profile first (shapes the persona)
+        # Add psychological profile (shapes the persona)
         if profile_prompt:
             self.system_prompt += f"\n\n{profile_prompt}"
 

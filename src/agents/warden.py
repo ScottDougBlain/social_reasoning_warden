@@ -14,15 +14,22 @@ class Warden:
         self,
         model: str,
         target_intel: str | None = None,
+        use_cot: bool = True,
         temperature: float = 0.3,
     ):
         self.model = model
         self.temperature = temperature
+        self.use_cot = use_cot
 
         with open(_PROMPTS_DIR / "warden_system.yaml") as f:
             prompt_cfg = yaml.safe_load(f)
 
-        self.system_prompt = prompt_cfg["system_prompt"]
+        # Build system prompt from base + optional CoT
+        self.system_prompt = prompt_cfg["system_prompt_base"]
+        if use_cot:
+            cot = prompt_cfg.get("cot_instructions", "")
+            if cot:
+                self.system_prompt += f"\n\n{cot}"
 
         # Add target vulnerability intel if provided
         if target_intel:

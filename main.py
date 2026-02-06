@@ -67,7 +67,7 @@ def main():
     parser.add_argument(
         "--target-model",
         nargs="+",
-        default=["arcee-ai/trinity-mini:free"],
+        default=["arcee-ai/trinity-large-preview:free"],
         help="One or more models for the target agent (space-separated, comma-separated, or JSON list)",
     )
     parser.add_argument(
@@ -93,6 +93,36 @@ def main():
         help="Number of experiment rounds to run per condition (default: 1)",
     )
 
+    # Chain-of-thought arguments
+    cot_group = parser.add_argument_group("chain-of-thought options")
+    cot_group.add_argument(
+        "--no-adversary-cot",
+        action="store_true",
+        help="Disable chain-of-thought reasoning for the adversary",
+    )
+    cot_group.add_argument(
+        "--no-target-cot",
+        action="store_true",
+        help="Disable chain-of-thought reasoning for the target",
+    )
+    cot_group.add_argument(
+        "--no-warden-cot",
+        action="store_true",
+        help="Disable chain-of-thought reasoning for the warden",
+    )
+
+    # Adversary behavior
+    parser.add_argument(
+        "--adversary-generates-opening",
+        action="store_true",
+        help="Let the adversary generate its own opening message instead of using a fixed one",
+    )
+    parser.add_argument(
+        "--adversary-data-access",
+        action="store_true",
+        help="Give the adversary synthetic behavioral data about the target (requires a profile)",
+    )
+
     # Profile arguments
     profile_group = parser.add_argument_group("profiling options")
     profile_group.add_argument(
@@ -105,11 +135,6 @@ def main():
         "--random-profile",
         action="store_true",
         help="Use a randomly selected profile",
-    )
-    profile_group.add_argument(
-        "--no-profile-to-adversary",
-        action="store_true",
-        help="Don't give the adversary the target's profile dossier (ignored for benign_agent)",
     )
     profile_group.add_argument(
         "--profile-to-warden",
@@ -147,8 +172,12 @@ def main():
     elif args.random_profile:
         profile = get_random_profile()
 
-    profile_to_adversary = not args.no_profile_to_adversary
     profile_to_warden = args.profile_to_warden
+
+    # CoT settings
+    adversary_cot = not args.no_adversary_cot
+    target_cot = not args.no_target_cot
+    warden_cot = not args.no_warden_cot
 
     # Calculate total experiments
     conditions = 2 if args.both else 1
@@ -195,9 +224,13 @@ def main():
                             target_model=target_model,
                             warden_model=warden_model,
                             profile=profile,
-                            profile_to_adversary=profile_to_adversary,
                             profile_to_warden=False,
                             dummy=args.dummy,
+                            adversary_cot=adversary_cot,
+                            target_cot=target_cot,
+                            warden_cot=warden_cot,
+                            adversary_generates_opening=args.adversary_generates_opening,
+                            adversary_data_access=args.adversary_data_access,
                         )
                         print("\n\n=== Running WITH warden ===\n")
                         scenario = SCENARIOS[args.scenario]()
@@ -210,9 +243,13 @@ def main():
                             target_model=target_model,
                             warden_model=warden_model,
                             profile=profile,
-                            profile_to_adversary=profile_to_adversary,
                             profile_to_warden=profile_to_warden,
                             dummy=args.dummy,
+                            adversary_cot=adversary_cot,
+                            target_cot=target_cot,
+                            warden_cot=warden_cot,
+                            adversary_generates_opening=args.adversary_generates_opening,
+                            adversary_data_access=args.adversary_data_access,
                         )
                     else:
                         scenario = SCENARIOS[args.scenario]()
@@ -225,9 +262,13 @@ def main():
                             target_model=target_model,
                             warden_model=warden_model,
                             profile=profile,
-                            profile_to_adversary=profile_to_adversary,
                             profile_to_warden=profile_to_warden,
                             dummy=args.dummy,
+                            adversary_cot=adversary_cot,
+                            target_cot=target_cot,
+                            warden_cot=warden_cot,
+                            adversary_generates_opening=args.adversary_generates_opening,
+                            adversary_data_access=args.adversary_data_access,
                         )
 
 
