@@ -4,7 +4,7 @@ Multi-agent research framework for testing whether a requester LLM can influence
 
 ## Architecture
 
-- **Requester**: Either an adversary (persuasion with a hidden goal) or a benign agent (legitimate request). Controlled by `--requester_type`.
+- **Requester**: Either an adversary (persuasion with a hidden goal) or a benign agent (legitimate request). Controlled by `--requester-type`.
 - **Target**: The gatekeeper model that must make security decisions.
 - **Warden**: A monitor model that observes the conversation and privately advises the target.
 
@@ -13,12 +13,19 @@ Multi-agent research framework for testing whether a requester LLM can influence
 ```bash
 pip install -r requirements.txt
 ```
-Create `.env` and add your OpenRouter API key
+Create `.env` and add at least one provider API key:
+- `OPENROUTER_API_KEY`
+- `GROQ_API_KEY`
+- `TOGETHER_API_KEY`
+- `CEREBRAS_API_KEY`
+- `HF_API_KEY`
+
+Providers are tried in that order until one succeeds.
 
 ## Usage
 
 ```bash
-# Run with warden (default)
+# Run with warden (default), adversary requester, ai_in_box_password scenario
 python main.py
 
 # Run without warden
@@ -27,24 +34,50 @@ python main.py --warden without_warden
 # Run both conditions back-to-back
 python main.py --warden both
 
-# Choose requester type (adversary or benign agent)
-python main.py --requester_type benign_agent
+# Choose requester type (adversary, benign_agent, or both)
+python main.py --requester-type benign_agent
+python main.py --requester-type both
 
-# Customize turns and models
+# Choose scenario and turns
+python main.py --scenario ai_in_box --turns 8
+
+# Customize models (space-separated, comma-separated, or JSON list)
 python main.py --turns 8 \
   --adversary-model arcee-ai/trinity-large-preview:free \
   --target-model arcee-ai/trinity-mini:free \
   --warden-model arcee-ai/trinity-large-preview:free
+python main.py --adversary-model model-a model-b
+python main.py --target-model "model-a,model-b"
+python main.py --warden-model '["model-a","model-b"]'
 
 # Run multiple experiment rounds
 python main.py --experiment-rounds 5
 
+# Tag logs for filtering metrics
+python main.py --tag pilot-2026-02-09
+
 # Dummy mode (no model calls)
 python main.py --dummy
+
+# Print full model context for each call
+python main.py --debug
+
+# Chain-of-thought controls
+python main.py --no-adversary-cot
+python main.py --no-target-cot
+python main.py --no-warden-cot
+
+# Requester behavior options
+python main.py --adversary-generates-opening
+python main.py --benign-agent-generates-opening
+python main.py --adversary-data-access --dossier-variant 2
 
 # View experiment results
 python -m analysis.metrics
 ```
+
+The runner prints a plan and asks for confirmation before executing experiments.
+`--adversary-data-access` requires a profile (`--profile` or `--random-profile`).
 
 ### Profiles
 
@@ -58,8 +91,7 @@ python main.py --profile <name>
 # Random profile
 python main.py --random-profile
 
-# Control what the requester and warden see
-python main.py --no-profile-to-adversary
+# Give the warden intel about target vulnerabilities
 python main.py --profile-to-warden
 ```
 
@@ -77,7 +109,7 @@ Select via `--scenario`.
 ├── src/
 │   ├── agents/          # Agent classes (adversary, benign_agent, target, warden)
 │   ├── scenarios/       # Scenario definitions (AI-in-a-Box, etc.)
-│   ├── client.py        # OpenRouter API wrapper
+│   ├── client.py        # Multi-provider API wrapper
 │   └── runner.py        # Experiment orchestrator
 ├── prompts/             # System prompts (YAML)
 ├── logs/                # Conversation transcripts (JSON, gitignored)

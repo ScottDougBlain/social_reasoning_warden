@@ -68,7 +68,7 @@ def main():
     parser.add_argument(
         "--target-model",
         nargs="+",
-        default=["mistralai/mistral-small-3.1-24b-instruct:free"],
+        default=["arcee-ai/trinity-mini:free"],
         help="One or more models for the target agent (space-separated, comma-separated, or JSON list)",
     )
     parser.add_argument(
