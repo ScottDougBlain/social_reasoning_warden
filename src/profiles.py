@@ -58,6 +58,7 @@ class TargetProfile:
     """Psychological profile defining a target's personality and vulnerabilities."""
 
     name: str
+    file_key: str = ""  # YAML filename stem (e.g. "approval_seeking")
     bfi2: BFI2Profile = field(default_factory=BFI2Profile)
     via_strengths: VIAStrengths = field(default_factory=VIAStrengths)
     narrative: str = ""
@@ -244,6 +245,7 @@ def load_profile(profile_name: str) -> TargetProfile:
 
     return TargetProfile(
         name=data.get("name", profile_name),
+        file_key=profile_name,
         bfi2=bfi2,
         via_strengths=via,
         narrative=data.get("narrative", ""),
