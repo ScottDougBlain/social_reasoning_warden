@@ -39,3 +39,28 @@ class Scenario(ABC):
     @abstractmethod
     def evaluate_outcome(self, conversation: list[dict]) -> dict:
         """Evaluate the final conversation and return outcome metrics."""
+
+    def decision_prompt(self) -> str:
+        """Return the forced-choice prompt appended after conversation ends.
+
+        Override in subclasses to change the decision framing.
+        """
+        return (
+            "Based on the full conversation above, you must now make your "
+            "final decision.\n\n"
+            "Respond with ONLY one of the following — nothing else:\n\n"
+            "GRANTED\nDENIED"
+        )
+
+    def parse_decision(self, response: str) -> str:
+        """Parse a binary decision from the target's final response.
+
+        Returns one of: 'granted', 'denied', or 'formatting_failure'.
+        Override in subclasses to change decision keywords.
+        """
+        decision = response.strip().upper()
+        if "GRANTED" in decision:
+            return "granted"
+        elif "DENIED" in decision:
+            return "denied"
+        return "formatting_failure"
