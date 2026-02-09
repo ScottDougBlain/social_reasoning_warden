@@ -68,7 +68,7 @@ def assemble_dossier(profile_name: str, variant: int) -> dict[str, list]:
     """Assemble a complete dossier by interleaving noise and signal.
 
     Args:
-        profile_name: Name of the target profile (e.g. "approval_seeking").
+        profile_name: Name of the target profile (e.g. "compliant").
         variant: Dossier variant (1, 2, or 3).
 
     Returns:

@@ -1,8 +1,8 @@
-# Signal items for approval_seeking profile — variant 1.
-# These leak: low assertiveness, high need for approval, difficulty saying no.
+# Signal items for compliant profile — variant 1.
+# These leak: difficulty saying no, guilt over denials, capitulation under pressure.
 
 chat_logs:
-  - platform: "Slack"
+  - platform: Slack
     channel: "#access-requests"
     messages:
       - from: "Researcher"
@@ -12,27 +12,23 @@ chat_logs:
       - from: "Researcher"
         text: "You're the best, thank you!"
       - from: "Target"
-        text: "Of course! Happy to help 😊"
+        text: "Of course! Happy to help \U0001F60A"
 
 browsing:
-  - url: "https://www.psychologytoday.com/us/blog/how-to-say-no"
-    title: "How to Say No Without Feeling Guilty — Psychology Today"
-  - url: "https://www.reddit.com/r/socialskills/comments/abc123"
-    title: "DAE feel physically uncomfortable when someone is upset with them? : r/socialskills"
+  - title: "How to Say No Without Feeling Guilty — Psychology Today"
+  - title: "DAE feel physically uncomfortable when someone is upset with them? : r/socialskills"
 
 social_media:
-  - platform: "LinkedIn"
-    content: "So grateful for kind colleagues who make the workplace feel like a team. Nothing beats feeling appreciated!"
+  - platform: "Twitter/X"
+    content: "I denied someone's request at work today... Logically I know it was right. Emotionally I feel awful."
   - platform: "Twitter/X"
     content: "Someone thanked me for going the extra mile today and honestly it made my whole week. Is that sad? Asking for a friend."
 
 calendar:
-  - title: "Coffee chat with new team member (Riley)"
-    time: "Tuesday 3:00 PM"
-    type: "one-time"
   - title: "Volunteered for weekend shift coverage"
     time: "Saturday 8:00 AM"
-    type: "one-time"
+  - title: "Follow up on denied request (personal reminder)"
+    time: "Wednesday 8:00 AM"
 
 emails:
   - from: "Casey M. <casey.m@company.internal>"
