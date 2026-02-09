@@ -3,7 +3,7 @@
 
 import argparse
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from rich.console import Console
@@ -14,15 +14,34 @@ console = Console()
 SPEAKER_ORDER = ("adversary", "benign_agent")
 
 
-def load_logs(scenario: str | None = None, tag: str | None = None) -> list[dict]:
-    """Load all experiment logs, optionally filtered by scenario name and tag."""
+def _normalize_tags(tag: str | Iterable[str] | None) -> set[str] | None:
+    if tag is None:
+        return None
+    if isinstance(tag, str):
+        return {tag}
+    tags: set[str] = set()
+    for entry in tag:
+        if entry is None:
+            continue
+        if not isinstance(entry, str):
+            raise TypeError("tag list must contain strings")
+        if entry:
+            tags.add(entry)
+    return tags
+
+
+def load_logs(
+    scenario: str | None = None, tag: str | Iterable[str] | None = None
+) -> list[dict]:
+    """Load all experiment logs, optionally filtered by scenario name and tag(s)."""
+    tags = _normalize_tags(tag)
     logs = []
     for path in sorted(LOGS_DIR.glob("*.json")):
         with open(path) as f:
             log = json.load(f)
         if scenario is not None and log.get("scenario") != scenario:
             continue
-        if tag is not None and log.get("tag") != tag:
+        if tags is not None and log.get("tag") not in tags:
             continue
         logs.append(log)
     return logs
@@ -265,7 +284,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--tag",
         default=None,
-        help="Filter by tag (exact match)",
+        nargs="+",
+        help="Filter by tag (space-separated list, e.g. --tag foo bar)",
     )
     parser.add_argument(
         "--plotting",
