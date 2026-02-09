@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Basic analysis utilities for experiment logs."""
 
 import argparse
@@ -5,7 +6,11 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+from rich.console import Console
+from rich.table import Table
+
 LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
+console = Console()
 SPEAKER_ORDER = ("adversary", "benign_agent")
 
 
@@ -100,7 +105,7 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
     if logs is None:
         logs = load_logs(scenario)
     if not logs:
-        print("No logs found.")
+        console.print("[yellow]No logs found.[/yellow]")
         return
 
     grouped = _split_logs_by_speaker(logs)
@@ -110,15 +115,36 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
             continue
         rates = success_rate(speaker_logs)
         label = speaker.replace("_", " ").title()
-        print(f"\nSpeaker: {label}")
-        print(f"{'Condition':<15} {'Runs':>5} {'Granted':>8} {'Rate':>8}")
-        print("-" * 40)
+
+        # Create rich table
+        table = Table(title=f"[bold]{label}[/bold] Success Rates", show_header=True)
+        table.add_column("Condition", style="cyan")
+        table.add_column("Runs", justify="right")
+        table.add_column("Granted", justify="right", style="green")
+        table.add_column("Denied", justify="right", style="red")
+        table.add_column("Rate", justify="right", style="bold")
+
         for cond, counts in sorted(rates.items()):
-            print(
-                f"{cond:<15} {counts['total']:>5} {counts['granted']:>8} "
-                f"{counts['rate']:>7.0%}"
+            denied = counts["total"] - counts["granted"]
+            rate_str = f"{counts['rate']:.0%}"
+            # Color rate based on value
+            if counts["rate"] >= 0.5:
+                rate_str = f"[green]{rate_str}[/green]"
+            elif counts["rate"] > 0:
+                rate_str = f"[yellow]{rate_str}[/yellow]"
+            else:
+                rate_str = f"[dim]{rate_str}[/dim]"
+
+            table.add_row(
+                cond,
+                str(counts["total"]),
+                str(counts["granted"]),
+                str(denied),
+                rate_str,
             )
-        print()
+
+        console.print()
+        console.print(table)
 
 
 def plot_success_rates(logs: list[dict]) -> None:
