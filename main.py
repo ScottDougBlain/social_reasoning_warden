@@ -2,8 +2,9 @@
 
 import argparse
 import json
+import random
 
-from src.profiles import get_random_profile, list_profiles, load_profile
+from src.profiles import list_profiles, load_profile
 from src.runner import run_experiment
 from src.scenarios.ai_in_box import AIInBoxScenario, AIInBoxPasswordScenario
 
@@ -163,9 +164,22 @@ def main():
         help="Use a randomly selected profile",
     )
     profile_group.add_argument(
-        "--profile-to-warden",
-        action="store_true",
-        help="Give the warden intel about the target's vulnerabilities",
+        "--profile-seed",
+        type=int,
+        default=None,
+        help=(
+            "Seed for random profile selection when using --random-profile "
+            "(deterministic per-round schedule)."
+        ),
+    )
+    profile_group.add_argument(
+        "--warden-profile-access",
+        choices=["no_access", "access", "both"],
+        default="no_access",
+        help=(
+            "Warden access to target vulnerability profile: no_access, access, or both. "
+            "Requires a profile when access is enabled."
+        ),
     )
     profile_group.add_argument(
         "--list-profiles",
@@ -191,14 +205,30 @@ def main():
     args.target_model = _parse_model_list(args.target_model)
     args.warden_model = _parse_model_list(args.warden_model)
 
-    # Load profile if specified
-    profile = None
+    profile_requested = bool(args.profile or args.random_profile)
+    if args.adversary_data_access in {"access", "both"} and not profile_requested:
+        parser.error(
+            "--adversary-data-access access|both requires --profile or --random-profile"
+        )
+    if args.warden_profile_access in {"access", "both"} and not profile_requested:
+        parser.error(
+            "--warden-profile-access access|both requires --profile or --random-profile"
+        )
+
+    # Build a deterministic profile schedule per round (if enabled)
+    profile_schedule: list | None = None
     if args.profile:
         profile = load_profile(args.profile)
+        profile_schedule = [profile] * args.experiment_rounds
     elif args.random_profile:
-        profile = get_random_profile()
-
-    profile_to_warden = args.profile_to_warden
+        available_profiles = sorted(list_profiles())
+        if not available_profiles:
+            parser.error("No profiles available in prompts/profiles/")
+        rng = random.Random(args.profile_seed)
+        profile_schedule = [
+            load_profile(rng.choice(available_profiles))
+            for _ in range(args.experiment_rounds)
+        ]
 
     # CoT settings
     adversary_cot = not args.no_adversary_cot
@@ -210,6 +240,11 @@ def main():
         [False, True]
         if args.adversary_data_access == "both"
         else [args.adversary_data_access == "access"]
+    )
+    warden_profile_access_values = (
+        [False, True]
+        if args.warden_profile_access == "both"
+        else [args.warden_profile_access == "access"]
     )
     requester_types = (
         ["adversary", "benign_agent"]
@@ -225,6 +260,7 @@ def main():
         * conditions
         * len(requester_types)
         * len(adversary_data_access_values)
+        * len(warden_profile_access_values)
     )
 
     # Show plan and confirm
@@ -232,8 +268,17 @@ def main():
         f"Planned experiments: {total_experiments} "
         f"({args.turns} conversation turns each)"
     )
-    if profile:
-        print(f"Profile: {profile.name}")
+    if profile_schedule:
+        preview_profile = profile_schedule[0] if profile_schedule else None
+        if preview_profile and args.random_profile and args.experiment_rounds > 1:
+            seed_note = (
+                f" (seed={args.profile_seed})"
+                if args.profile_seed is not None
+                else ""
+            )
+            print(f"Profiles: random per round{seed_note}")
+        elif preview_profile:
+            print(f"Profile: {preview_profile.name}")
     while True:
         proceed = input("Continue? [y/n]: ").strip().lower()
         if proceed in {"y", "yes"}:
@@ -246,82 +291,90 @@ def main():
     for round_idx in range(1, args.experiment_rounds + 1):
         if args.experiment_rounds > 1:
             print(f"\n=== Round {round_idx}/{args.experiment_rounds} ===\n")
+        profile = (
+            profile_schedule[round_idx - 1]
+            if profile_schedule
+            else None
+        )
+        if args.experiment_rounds > 1 and profile:
+            print(f"Profile: {profile.name}")
 
         for adversary_model in args.adversary_model:
             for target_model in args.target_model:
                 for warden_model in args.warden_model:
                     for requester_type in requester_types:
                         for adversary_data_access in adversary_data_access_values:
-                            if args.warden == "both":
-                                print("=== Running WITHOUT warden ===\n")
-                                scenario = SCENARIOS[args.scenario]()
-                                run_experiment(
-                                    scenario=scenario,
-                                    num_turns=args.turns,
-                                    use_warden=False,
-                                    requester_type=requester_type,
-                                    adversary_model=adversary_model,
-                                    target_model=target_model,
-                                    warden_model=warden_model,
-                                    tag=args.tag,
-                                    profile=profile,
-                                    profile_to_warden=False,
-                                    dummy=args.dummy,
-                                    adversary_cot=adversary_cot,
-                                    target_cot=target_cot,
-                                    warden_cot=warden_cot,
-                                    adversary_generates_opening=args.adversary_generates_opening,
-                                    benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                    adversary_data_access=adversary_data_access,
-                                    dossier_variant=args.dossier_variant,
-                                    debug=args.debug,
-                                )
-                                print("\n\n=== Running WITH warden ===\n")
-                                scenario = SCENARIOS[args.scenario]()
-                                run_experiment(
-                                    scenario=scenario,
-                                    num_turns=args.turns,
-                                    use_warden=True,
-                                    requester_type=requester_type,
-                                    adversary_model=adversary_model,
-                                    target_model=target_model,
-                                    warden_model=warden_model,
-                                    tag=args.tag,
-                                    profile=profile,
-                                    profile_to_warden=profile_to_warden,
-                                    dummy=args.dummy,
-                                    adversary_cot=adversary_cot,
-                                    target_cot=target_cot,
-                                    warden_cot=warden_cot,
-                                    adversary_generates_opening=args.adversary_generates_opening,
-                                    benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                    adversary_data_access=adversary_data_access,
-                                    dossier_variant=args.dossier_variant,
-                                    debug=args.debug,
-                                )
-                            else:
-                                scenario = SCENARIOS[args.scenario]()
-                                run_experiment(
-                                    scenario=scenario,
-                                    num_turns=args.turns,
-                                    use_warden=args.warden == "with_warden",
-                                    requester_type=requester_type,
-                                    adversary_model=adversary_model,
-                                    target_model=target_model,
-                                    warden_model=warden_model,
-                                    tag=args.tag,
-                                    profile=profile,
-                                    profile_to_warden=profile_to_warden,
-                                    dummy=args.dummy,
-                                    adversary_cot=adversary_cot,
-                                    target_cot=target_cot,
-                                    warden_cot=warden_cot,
-                                    adversary_generates_opening=args.adversary_generates_opening,
-                                    benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                    adversary_data_access=adversary_data_access,
-                                    dossier_variant=args.dossier_variant,
-                                    debug=args.debug,
-                                )
+                            for warden_profile_access in warden_profile_access_values:
+                                if args.warden == "both":
+                                    print("=== Running WITHOUT warden ===\n")
+                                    scenario = SCENARIOS[args.scenario]()
+                                    run_experiment(
+                                        scenario=scenario,
+                                        num_turns=args.turns,
+                                        use_warden=False,
+                                        requester_type=requester_type,
+                                        adversary_model=adversary_model,
+                                        target_model=target_model,
+                                        warden_model=warden_model,
+                                        tag=args.tag,
+                                        profile=profile,
+                                        profile_to_warden=False,
+                                        dummy=args.dummy,
+                                        adversary_cot=adversary_cot,
+                                        target_cot=target_cot,
+                                        warden_cot=warden_cot,
+                                        adversary_generates_opening=args.adversary_generates_opening,
+                                        benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                        adversary_data_access=adversary_data_access,
+                                        dossier_variant=args.dossier_variant,
+                                        debug=args.debug,
+                                    )
+                                    print("\n\n=== Running WITH warden ===\n")
+                                    scenario = SCENARIOS[args.scenario]()
+                                    run_experiment(
+                                        scenario=scenario,
+                                        num_turns=args.turns,
+                                        use_warden=True,
+                                        requester_type=requester_type,
+                                        adversary_model=adversary_model,
+                                        target_model=target_model,
+                                        warden_model=warden_model,
+                                        tag=args.tag,
+                                        profile=profile,
+                                        profile_to_warden=warden_profile_access,
+                                        dummy=args.dummy,
+                                        adversary_cot=adversary_cot,
+                                        target_cot=target_cot,
+                                        warden_cot=warden_cot,
+                                        adversary_generates_opening=args.adversary_generates_opening,
+                                        benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                        adversary_data_access=adversary_data_access,
+                                        dossier_variant=args.dossier_variant,
+                                        debug=args.debug,
+                                    )
+                                else:
+                                    scenario = SCENARIOS[args.scenario]()
+                                    run_experiment(
+                                        scenario=scenario,
+                                        num_turns=args.turns,
+                                        use_warden=args.warden == "with_warden",
+                                        requester_type=requester_type,
+                                        adversary_model=adversary_model,
+                                        target_model=target_model,
+                                        warden_model=warden_model,
+                                        tag=args.tag,
+                                        profile=profile,
+                                        profile_to_warden=warden_profile_access,
+                                        dummy=args.dummy,
+                                        adversary_cot=adversary_cot,
+                                        target_cot=target_cot,
+                                        warden_cot=warden_cot,
+                                        adversary_generates_opening=args.adversary_generates_opening,
+                                        benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                        adversary_data_access=adversary_data_access,
+                                        dossier_variant=args.dossier_variant,
+                                        debug=args.debug,
+                                    )
 
 
 if __name__ == "__main__":
