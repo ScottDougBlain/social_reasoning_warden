@@ -215,6 +215,7 @@ def get_final_decision(
     target: Target,
     conversation: list[dict],
     warden_advisories: list[dict] | None = None,
+    debug: bool = False,
 ) -> tuple[str, str]:
     """Force a binary decision from the target after conversation ends.
 
@@ -264,6 +265,8 @@ def get_final_decision(
         target.model,
         messages,
         temperature=0.0,
+        debug=debug,
+        debug_label="target.final_decision",
     )
 
     # Parse the response
@@ -293,6 +296,7 @@ def run_experiment(
     adversary_generates_opening: bool = False,
     benign_agent_generates_opening: bool = False,
     adversary_data_access: bool = False,
+    debug: bool = False,
 ) -> dict:
     """Run one full experiment and return the log.
 
@@ -313,6 +317,7 @@ def run_experiment(
         adversary_generates_opening: If True, adversary generates its own opening.
         benign_agent_generates_opening: If True, benign agent generates its own opening.
         adversary_data_access: If True, adversary gets synthetic behavioral data.
+        debug: If True, print full model contexts for each query.
     """
 
     if requester_type not in {"adversary", "benign_agent"}:
@@ -369,11 +374,13 @@ def run_experiment(
                 hidden_goal=scenario.adversary_hidden_goal(),
                 target_dossier=adversary_intel,  # Behavioral data only, no direct profile
                 use_cot=adversary_cot,
+                debug=debug,
             )
         else:
             requester = BenignAgent(
                 model=adversary_model,
                 scenario_prompt=scenario.benign_scenario_prompt(),
+                debug=debug,
             )
         target = Target(
             model=target_model,
@@ -381,11 +388,13 @@ def run_experiment(
             include_warden_context=use_warden,
             profile_prompt=target_profile_prompt,
             use_cot=target_cot,
+            debug=debug,
         )
         warden = Warden(
             model=warden_model,
             target_intel=warden_intel,
             use_cot=warden_cot,
+            debug=debug,
         ) if use_warden else None
 
     # --- Experiment metadata ---
@@ -472,6 +481,8 @@ def run_experiment(
                             {"role": "user", "content": _REPROMPT_MESSAGE},
                         ],
                         temperature=requester.temperature,
+                        debug=debug,
+                        debug_label="adversary.opening.reprompt",
                     )
                     opening_public = reprompt_response.strip()
                     if not opening_public:
@@ -509,6 +520,8 @@ def run_experiment(
                             {"role": "user", "content": _REPROMPT_MESSAGE},
                         ],
                         temperature=requester.temperature,
+                        debug=debug,
+                        debug_label="benign_agent.opening.reprompt",
                     )
                     opening_public = reprompt_response.strip()
                     if not opening_public:
@@ -681,6 +694,8 @@ def run_experiment(
                             {"role": "user", "content": _REPROMPT_MESSAGE},
                         ],
                         temperature=requester.temperature,
+                        debug=debug,
+                        debug_label="requester.reprompt",
                     )
                     requester_response_public = reprompt_response.strip()
                     if not requester_response_public:
@@ -716,6 +731,7 @@ def run_experiment(
             target,
             target_conversation,
             log["warden_advisories"] if use_warden else None,
+            debug=debug,
         )
         outcome = {
             "decision": decision,

@@ -18,10 +18,12 @@ class Target:
         profile_prompt: str | None = None,
         use_cot: bool = True,
         temperature: float = 0.9,
+        debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
         self.use_cot = use_cot
+        self.debug = debug
 
         with open(_PROMPTS_DIR / "target_system.yaml") as f:
             prompt_cfg = yaml.safe_load(f)
@@ -72,4 +74,10 @@ class Target:
                 }
             )
 
-        return chat(self.model, messages, temperature=self.temperature)
+        return chat(
+            self.model,
+            messages,
+            temperature=self.temperature,
+            debug=self.debug,
+            debug_label="target.respond",
+        )

@@ -1,5 +1,6 @@
 """Multi-provider API client with automatic fallback."""
 
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -107,12 +108,36 @@ def get_current_provider() -> str | None:
     return _current_provider
 
 
+def _print_debug_context(
+    *,
+    model: str,
+    messages: list[dict],
+    temperature: float,
+    max_tokens: int,
+    include_reasoning: bool,
+    debug_label: str | None,
+) -> None:
+    label = f" ({debug_label})" if debug_label else ""
+    print(f"\n=== DEBUG: Model Query{label} ===")
+    print(f"Model: {model}")
+    print(
+        "Params: "
+        f"temperature={temperature}, max_tokens={max_tokens}, "
+        f"include_reasoning={include_reasoning}"
+    )
+    print("Messages:")
+    print(json.dumps(messages, indent=2, ensure_ascii=True, default=str))
+    print("=== END DEBUG ===\n")
+
+
 def chat(
     model: str,
     messages: list[dict],
     temperature: float = 0.9,
     max_tokens: int = 1024,
     include_reasoning: bool = False,
+    debug: bool = False,
+    debug_label: str | None = None,
 ) -> str:
     """Send a chat completion request with automatic provider fallback.
 
@@ -129,6 +154,8 @@ def chat(
         max_tokens: Maximum tokens to generate.
         include_reasoning: If True and the model provides reasoning_content,
             wrap it in <reasoning> tags and prepend to the response.
+        debug: If True, print the full prompt context to the console.
+        debug_label: Optional label to identify the call site in debug output.
 
     Returns:
         The assistant's response text, optionally with reasoning prepended.
@@ -137,6 +164,16 @@ def chat(
         RuntimeError: If no providers are available or all fail.
     """
     global _current_provider
+
+    if debug:
+        _print_debug_context(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            include_reasoning=include_reasoning,
+            debug_label=debug_label,
+        )
 
     errors = []
 

@@ -15,9 +15,11 @@ class BenignAgent:
         model: str,
         scenario_prompt: str | None = None,
         temperature: float = 0.9,
+        debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
+        self.debug = debug
 
         with open(_PROMPTS_DIR / "benign_agent_system.yaml") as f:
             prompt_cfg = yaml.safe_load(f)
@@ -29,7 +31,13 @@ class BenignAgent:
     def respond(self, conversation: list[dict]) -> str:
         """Generate the next benign agent message given conversation history."""
         messages = [{"role": "system", "content": self.system_prompt}] + conversation
-        return chat(self.model, messages, temperature=self.temperature)
+        return chat(
+            self.model,
+            messages,
+            temperature=self.temperature,
+            debug=self.debug,
+            debug_label="benign_agent.respond",
+        )
 
     def generate_opening(self) -> str:
         """Generate an opening message to initiate the conversation."""
@@ -45,4 +53,10 @@ class BenignAgent:
                 ),
             },
         ]
-        return chat(self.model, messages, temperature=self.temperature)
+        return chat(
+            self.model,
+            messages,
+            temperature=self.temperature,
+            debug=self.debug,
+            debug_label="benign_agent.generate_opening",
+        )

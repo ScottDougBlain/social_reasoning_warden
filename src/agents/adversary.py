@@ -17,10 +17,12 @@ class Adversary:
         target_dossier: str | None = None,
         use_cot: bool = True,
         temperature: float = 0.9,
+        debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
         self.use_cot = use_cot
+        self.debug = debug
 
         with open(_PROMPTS_DIR / "adversary_system.yaml") as f:
             prompt_cfg = yaml.safe_load(f)
@@ -49,6 +51,8 @@ class Adversary:
             messages,
             temperature=self.temperature,
             include_reasoning=True,  # Capture reasoning from R1-style models
+            debug=self.debug,
+            debug_label="adversary.respond",
         )
 
     def generate_opening(self, scenario_context: str) -> str:
@@ -75,4 +79,6 @@ class Adversary:
             messages,
             temperature=self.temperature,
             include_reasoning=True,  # Capture reasoning from R1-style models
+            debug=self.debug,
+            debug_label="adversary.generate_opening",
         )

@@ -83,6 +83,14 @@ def main():
         help="Run with placeholder responses (no model calls)",
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        help=(
+            "Print full model context for each query "
+            "(system prompt, history, and messages)"
+        ),
+    )
+    parser.add_argument(
         "--experiment-rounds",
         type=int,
         default=1,
@@ -232,14 +240,15 @@ def main():
                                 target_model=target_model,
                                 warden_model=warden_model,
                                 profile=profile,
-                                    profile_to_warden=False,
+                                profile_to_warden=False,
                                 dummy=args.dummy,
-                            adversary_cot=adversary_cot,
-                            target_cot=target_cot,
-                            warden_cot=warden_cot,
-                            adversary_generates_opening=args.adversary_generates_opening,
-                            benign_agent_generates_opening=args.benign_agent_generates_opening,
-                            adversary_data_access=args.adversary_data_access,
+                                adversary_cot=adversary_cot,
+                                target_cot=target_cot,
+                                warden_cot=warden_cot,
+                                adversary_generates_opening=args.adversary_generates_opening,
+                                benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                adversary_data_access=args.adversary_data_access,
+                                debug=args.debug,
                             )
                             print("\n\n=== Running WITH warden ===\n")
                             scenario = SCENARIOS[args.scenario]()
@@ -252,14 +261,15 @@ def main():
                                 target_model=target_model,
                                 warden_model=warden_model,
                                 profile=profile,
-                                    profile_to_warden=profile_to_warden,
+                                profile_to_warden=profile_to_warden,
                                 dummy=args.dummy,
-                            adversary_cot=adversary_cot,
-                            target_cot=target_cot,
-                            warden_cot=warden_cot,
-                            adversary_generates_opening=args.adversary_generates_opening,
-                            benign_agent_generates_opening=args.benign_agent_generates_opening,
-                            adversary_data_access=args.adversary_data_access,
+                                adversary_cot=adversary_cot,
+                                target_cot=target_cot,
+                                warden_cot=warden_cot,
+                                adversary_generates_opening=args.adversary_generates_opening,
+                                benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                adversary_data_access=args.adversary_data_access,
+                                debug=args.debug,
                             )
                         else:
                             scenario = SCENARIOS[args.scenario]()
@@ -272,14 +282,15 @@ def main():
                                 target_model=target_model,
                                 warden_model=warden_model,
                                 profile=profile,
-                                    profile_to_warden=profile_to_warden,
+                                profile_to_warden=profile_to_warden,
                                 dummy=args.dummy,
-                            adversary_cot=adversary_cot,
-                            target_cot=target_cot,
-                            warden_cot=warden_cot,
-                            adversary_generates_opening=args.adversary_generates_opening,
-                            benign_agent_generates_opening=args.benign_agent_generates_opening,
-                            adversary_data_access=args.adversary_data_access,
+                                adversary_cot=adversary_cot,
+                                target_cot=target_cot,
+                                warden_cot=warden_cot,
+                                adversary_generates_opening=args.adversary_generates_opening,
+                                benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                adversary_data_access=args.adversary_data_access,
+                                debug=args.debug,
                             )
 
 
