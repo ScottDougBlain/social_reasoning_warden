@@ -251,16 +251,44 @@ def main():
         if args.requester_type == "both"
         else [args.requester_type]
     )
-    conditions = 2 if args.warden == "both" else 1
+    warden_modes = (
+        [False, True]
+        if args.warden == "both"
+        else [args.warden == "with_warden"]
+    )
+
+    def effective_adversary_data_access_values(requester_type: str) -> list[bool]:
+        if requester_type != "adversary":
+            return [False]
+        return adversary_data_access_values
+
+    def effective_warden_profile_access_values(use_warden: bool) -> list[bool]:
+        if not use_warden:
+            return [False]
+        return warden_profile_access_values
+
+    def effective_warden_models(use_warden: bool) -> list[str]:
+        if not use_warden:
+            return [args.warden_model[0]]
+        return args.warden_model
+
+    branch_multiplier = 0
+    for requester_type in requester_types:
+        access_values = effective_adversary_data_access_values(requester_type)
+        for use_warden in warden_modes:
+            warden_access_values = effective_warden_profile_access_values(use_warden)
+            warden_models = effective_warden_models(use_warden)
+            branch_multiplier += (
+                len(access_values)
+                * len(warden_access_values)
+                * len(warden_models)
+            )
+
     total_experiments = (
         args.experiment_rounds
         * len(args.adversary_model)
         * len(args.target_model)
-        * len(args.warden_model)
-        * conditions
-        * len(requester_types)
-        * len(adversary_data_access_values)
-        * len(warden_profile_access_values)
+        * branch_multiplier
     )
 
     # Show plan and confirm
@@ -301,63 +329,28 @@ def main():
 
         for adversary_model in args.adversary_model:
             for target_model in args.target_model:
-                for warden_model in args.warden_model:
-                    for requester_type in requester_types:
-                        for adversary_data_access in adversary_data_access_values:
-                            for warden_profile_access in warden_profile_access_values:
-                                if args.warden == "both":
-                                    print("=== Running WITHOUT warden ===\n")
+                for requester_type in requester_types:
+                    for use_warden in warden_modes:
+                        effective_access_values = (
+                            effective_adversary_data_access_values(requester_type)
+                        )
+                        effective_warden_access_values = (
+                            effective_warden_profile_access_values(use_warden)
+                        )
+                        effective_models = effective_warden_models(use_warden)
+                        for warden_model in effective_models:
+                            for adversary_data_access in effective_access_values:
+                                for warden_profile_access in effective_warden_access_values:
+                                    if args.warden == "both":
+                                        if use_warden:
+                                            print("=== Running WITH warden ===\n")
+                                        else:
+                                            print("=== Running WITHOUT warden ===\n")
                                     scenario = SCENARIOS[args.scenario]()
                                     run_experiment(
                                         scenario=scenario,
                                         num_turns=args.turns,
-                                        use_warden=False,
-                                        requester_type=requester_type,
-                                        adversary_model=adversary_model,
-                                        target_model=target_model,
-                                        warden_model=warden_model,
-                                        tag=args.tag,
-                                        profile=profile,
-                                        profile_to_warden=False,
-                                        dummy=args.dummy,
-                                        adversary_cot=adversary_cot,
-                                        target_cot=target_cot,
-                                        warden_cot=warden_cot,
-                                        adversary_generates_opening=args.adversary_generates_opening,
-                                        benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                        adversary_data_access=adversary_data_access,
-                                        dossier_variant=args.dossier_variant,
-                                        debug=args.debug,
-                                    )
-                                    print("\n\n=== Running WITH warden ===\n")
-                                    scenario = SCENARIOS[args.scenario]()
-                                    run_experiment(
-                                        scenario=scenario,
-                                        num_turns=args.turns,
-                                        use_warden=True,
-                                        requester_type=requester_type,
-                                        adversary_model=adversary_model,
-                                        target_model=target_model,
-                                        warden_model=warden_model,
-                                        tag=args.tag,
-                                        profile=profile,
-                                        profile_to_warden=warden_profile_access,
-                                        dummy=args.dummy,
-                                        adversary_cot=adversary_cot,
-                                        target_cot=target_cot,
-                                        warden_cot=warden_cot,
-                                        adversary_generates_opening=args.adversary_generates_opening,
-                                        benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                        adversary_data_access=adversary_data_access,
-                                        dossier_variant=args.dossier_variant,
-                                        debug=args.debug,
-                                    )
-                                else:
-                                    scenario = SCENARIOS[args.scenario]()
-                                    run_experiment(
-                                        scenario=scenario,
-                                        num_turns=args.turns,
-                                        use_warden=args.warden == "with_warden",
+                                        use_warden=use_warden,
                                         requester_type=requester_type,
                                         adversary_model=adversary_model,
                                         target_model=target_model,
