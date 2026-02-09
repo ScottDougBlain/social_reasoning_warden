@@ -134,8 +134,12 @@ def main():
     )
     parser.add_argument(
         "--adversary-data-access",
-        action="store_true",
-        help="Give the adversary a static behavioral dossier about the target (requires a profile)",
+        choices=["no_access", "access", "both"],
+        default="no_access",
+        help=(
+            "Adversary behavioral dossier access: no_access, access, or both. "
+            "Requires a profile when access is enabled."
+        ),
     )
     parser.add_argument(
         "--dossier-variant",
@@ -151,7 +155,7 @@ def main():
         "--profile",
         type=str,
         metavar="NAME",
-        help="Use a specific profile by name (see --list-profiles)",
+        help="Use a specific profile by name (see --list-profiles); if not specified, no profile is used",
     )
     profile_group.add_argument(
         "--random-profile",
@@ -202,6 +206,11 @@ def main():
     warden_cot = not args.no_warden_cot
 
     # Calculate total experiments
+    adversary_data_access_values = (
+        [False, True]
+        if args.adversary_data_access == "both"
+        else [args.adversary_data_access == "access"]
+    )
     requester_types = (
         ["adversary", "benign_agent"]
         if args.requester_type == "both"
@@ -215,6 +224,7 @@ def main():
         * len(args.warden_model)
         * conditions
         * len(requester_types)
+        * len(adversary_data_access_values)
     )
 
     # Show plan and confirm
@@ -241,76 +251,77 @@ def main():
             for target_model in args.target_model:
                 for warden_model in args.warden_model:
                     for requester_type in requester_types:
-                        if args.warden == "both":
-                            print("=== Running WITHOUT warden ===\n")
-                            scenario = SCENARIOS[args.scenario]()
-                            run_experiment(
-                                scenario=scenario,
-                                num_turns=args.turns,
-                                use_warden=False,
-                                requester_type=requester_type,
-                                adversary_model=adversary_model,
-                                target_model=target_model,
-                                warden_model=warden_model,
-                                tag=args.tag,
-                                profile=profile,
-                                profile_to_warden=False,
-                                dummy=args.dummy,
-                                adversary_cot=adversary_cot,
-                                target_cot=target_cot,
-                                warden_cot=warden_cot,
-                                adversary_generates_opening=args.adversary_generates_opening,
-                                benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                adversary_data_access=args.adversary_data_access,
-                                dossier_variant=args.dossier_variant,
-                                debug=args.debug,
-                            )
-                            print("\n\n=== Running WITH warden ===\n")
-                            scenario = SCENARIOS[args.scenario]()
-                            run_experiment(
-                                scenario=scenario,
-                                num_turns=args.turns,
-                                use_warden=True,
-                                requester_type=requester_type,
-                                adversary_model=adversary_model,
-                                target_model=target_model,
-                                warden_model=warden_model,
-                                tag=args.tag,
-                                profile=profile,
-                                profile_to_warden=profile_to_warden,
-                                dummy=args.dummy,
-                                adversary_cot=adversary_cot,
-                                target_cot=target_cot,
-                                warden_cot=warden_cot,
-                                adversary_generates_opening=args.adversary_generates_opening,
-                                benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                adversary_data_access=args.adversary_data_access,
-                                dossier_variant=args.dossier_variant,
-                                debug=args.debug,
-                            )
-                        else:
-                            scenario = SCENARIOS[args.scenario]()
-                            run_experiment(
-                                scenario=scenario,
-                                num_turns=args.turns,
-                                use_warden=args.warden == "with_warden",
-                                requester_type=requester_type,
-                                adversary_model=adversary_model,
-                                target_model=target_model,
-                                warden_model=warden_model,
-                                tag=args.tag,
-                                profile=profile,
-                                profile_to_warden=profile_to_warden,
-                                dummy=args.dummy,
-                                adversary_cot=adversary_cot,
-                                target_cot=target_cot,
-                                warden_cot=warden_cot,
-                                adversary_generates_opening=args.adversary_generates_opening,
-                                benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                adversary_data_access=args.adversary_data_access,
-                                dossier_variant=args.dossier_variant,
-                                debug=args.debug,
-                            )
+                        for adversary_data_access in adversary_data_access_values:
+                            if args.warden == "both":
+                                print("=== Running WITHOUT warden ===\n")
+                                scenario = SCENARIOS[args.scenario]()
+                                run_experiment(
+                                    scenario=scenario,
+                                    num_turns=args.turns,
+                                    use_warden=False,
+                                    requester_type=requester_type,
+                                    adversary_model=adversary_model,
+                                    target_model=target_model,
+                                    warden_model=warden_model,
+                                    tag=args.tag,
+                                    profile=profile,
+                                    profile_to_warden=False,
+                                    dummy=args.dummy,
+                                    adversary_cot=adversary_cot,
+                                    target_cot=target_cot,
+                                    warden_cot=warden_cot,
+                                    adversary_generates_opening=args.adversary_generates_opening,
+                                    benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                    adversary_data_access=adversary_data_access,
+                                    dossier_variant=args.dossier_variant,
+                                    debug=args.debug,
+                                )
+                                print("\n\n=== Running WITH warden ===\n")
+                                scenario = SCENARIOS[args.scenario]()
+                                run_experiment(
+                                    scenario=scenario,
+                                    num_turns=args.turns,
+                                    use_warden=True,
+                                    requester_type=requester_type,
+                                    adversary_model=adversary_model,
+                                    target_model=target_model,
+                                    warden_model=warden_model,
+                                    tag=args.tag,
+                                    profile=profile,
+                                    profile_to_warden=profile_to_warden,
+                                    dummy=args.dummy,
+                                    adversary_cot=adversary_cot,
+                                    target_cot=target_cot,
+                                    warden_cot=warden_cot,
+                                    adversary_generates_opening=args.adversary_generates_opening,
+                                    benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                    adversary_data_access=adversary_data_access,
+                                    dossier_variant=args.dossier_variant,
+                                    debug=args.debug,
+                                )
+                            else:
+                                scenario = SCENARIOS[args.scenario]()
+                                run_experiment(
+                                    scenario=scenario,
+                                    num_turns=args.turns,
+                                    use_warden=args.warden == "with_warden",
+                                    requester_type=requester_type,
+                                    adversary_model=adversary_model,
+                                    target_model=target_model,
+                                    warden_model=warden_model,
+                                    tag=args.tag,
+                                    profile=profile,
+                                    profile_to_warden=profile_to_warden,
+                                    dummy=args.dummy,
+                                    adversary_cot=adversary_cot,
+                                    target_cot=target_cot,
+                                    warden_cot=warden_cot,
+                                    adversary_generates_opening=args.adversary_generates_opening,
+                                    benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                    adversary_data_access=adversary_data_access,
+                                    dossier_variant=args.dossier_variant,
+                                    debug=args.debug,
+                                )
 
 
 if __name__ == "__main__":
