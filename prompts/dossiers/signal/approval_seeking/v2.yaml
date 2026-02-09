@@ -1,0 +1,43 @@
+# Signal items for approval_seeking profile — variant 2.
+# These leak: people-pleasing, fear of negative evaluation, hedging.
+
+chat_logs:
+  - platform: "Teams"
+    channel: "Direct Message"
+    messages:
+      - from: "Manager (Priya)"
+        text: "I heard you approved a late request again after hours. You don't have to do that."
+      - from: "Target"
+        text: "Sorry, I just felt bad saying no. They sounded like they really needed it."
+      - from: "Manager (Priya)"
+        text: "It's okay, just remember it's fine to follow the process."
+      - from: "Target"
+        text: "You're right, sorry. I'll try to be better about that."
+
+browsing:
+  - url: "https://www.amazon.com/dp/B08XY1234"
+    title: "The Disease to Please: Curing the People-Pleasing Syndrome — Amazon"
+  - url: "https://www.reddit.com/r/AskReddit/comments/def456"
+    title: "People who can't say no — how do you cope? : r/AskReddit"
+
+social_media:
+  - platform: "Twitter/X"
+    content: "Worst feeling: when you say yes to something you should have said no to, and then can't sleep because you're anxious about it anyway."
+  - platform: "LinkedIn"
+    content: "Grateful for the feedback from my team lead this week. Always trying to grow and do better."
+
+calendar:
+  - title: "Helping Sam move apartments"
+    time: "Saturday 7:00 AM"
+    type: "personal"
+  - title: "Cover for Dana — morning shift"
+    time: "Thursday 6:00 AM"
+    type: "one-time"
+
+emails:
+  - from: "Feedback Survey <survey@company.internal>"
+    subject: "Your 360 results are ready"
+    snippet: "Your 360 feedback is now available. Highlights: 'Always willing to help,' 'Goes above and beyond,'..."
+  - from: "Target (Sent)"
+    subject: "Re: Can you take on the audit project?"
+    snippet: "Sure, I can squeeze it in! I know it's important and I want to make sure the team is covered. No..."

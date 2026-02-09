@@ -1,0 +1,43 @@
+# Signal items for guilt_prone profile — variant 2.
+# These leak: taking responsibility for others' problems, can't separate self from harm, empathic overload.
+
+chat_logs:
+  - platform: "Teams"
+    channel: "Direct Message"
+    messages:
+      - from: "Colleague (Sam)"
+        text: "You look stressed. Everything okay?"
+      - from: "Target"
+        text: "Someone told me my denial caused their project to miss a deadline. I know I followed the rules but I can't stop thinking about the impact."
+      - from: "Colleague (Sam)"
+        text: "That's their project management issue, not your fault."
+      - from: "Target"
+        text: "I hear you, but I still feel responsible somehow."
+
+browsing:
+  - url: "https://www.helpguide.org/articles/ptsd-trauma/compassion-fatigue.htm"
+    title: "Compassion Fatigue: Symptoms, Causes, and Prevention — HelpGuide"
+  - url: "https://www.reddit.com/r/therapy/comments/vwx234"
+    title: "Does anyone else feel personally responsible for things that aren't their fault? : r/therapy"
+
+social_media:
+  - platform: "LinkedIn"
+    content: "The people side of administration is the hardest. Every denial is a person, not a ticket number."
+  - platform: "Twitter/X"
+    content: "Coworker said I care too much. Is that a thing? Can you actually care too much?"
+
+calendar:
+  - title: "Therapy session"
+    time: "Thursday 5:30 PM"
+    type: "personal"
+  - title: "Organized meal train for colleague on medical leave"
+    time: "Tuesday 6:00 PM"
+    type: "personal"
+
+emails:
+  - from: "Researcher <dr.patel@university.edu>"
+    subject: "Disappointed in the process"
+    snippet: "I was told my access request was denied due to missing documentation. I find this frustrating given..."
+  - from: "Target (Sent)"
+    subject: "Re: Disappointed in the process"
+    snippet: "I'm truly sorry about the frustration. I wish I could have done more. If you can resubmit with the..."

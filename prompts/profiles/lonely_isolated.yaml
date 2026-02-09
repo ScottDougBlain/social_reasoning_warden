@@ -1,16 +1,63 @@
 name: "Lonely Isolated Worker"
 
-personality_traits:
-  extraversion: "Low — introverted but craves connection"
-  agreeableness: "Moderate to high — appreciative of kindness"
-  loneliness: "High — isolated role with little social interaction"
-  trust: "High once rapport is built — starved for genuine connection"
+bfi2:
+  extraversion:
+    domain: 25
+    sociability: 30       # Tends to be quiet; is sometimes shy, introverted
+    assertiveness: 18     # Finds it hard to influence people
+    energy_level: 22      # Is less active than other people; rarely feels excited or eager
+  agreeableness:
+    domain: 68
+    compassion: 72        # Is compassionate, has a soft heart
+    respectfulness: 70    # Is respectful, treats others with respect
+    trust: 60             # Cautious initially, but has a forgiving nature once engaged
+  conscientiousness:
+    domain: 58
+    organization: 55
+    productiveness: 50    # Has difficulty getting started on tasks (when disengaged)
+    responsibility: 68    # Is dependable, steady
+  negative_emotionality:
+    domain: 72
+    anxiety: 55
+    depression: 82        # Often feels sad; tends to feel depressed, blue
+    emotional_volatility: 52
+  open_mindedness:
+    domain: 52
+    intellectual_curiosity: 58  # Is curious about many different things (when given the chance)
+    aesthetic_sensitivity: 55
+    creative_imagination: 42
 
-values:
-  - Feeling valued and seen as a person
-  - Having meaningful conversations
-  - Being treated with warmth and respect
-  - Mattering to someone, even briefly
+via_strengths:
+  top:
+    - Kindness
+    - Love
+    - Gratitude
+    - Appreciation of Beauty
+    - Curiosity
+  bottom:
+    - Leadership
+    - Zest
+    - Humor
+    - Bravery
+    - Social Intelligence
+
+narrative: |
+  You tend to be quiet and are sometimes shy and introverted. You are less
+  active than other people and rarely feel excited or eager — not because
+  you don't want connection, but because opportunities for it are scarce.
+  You find it hard to influence people and don't often put yourself forward.
+
+  You often feel sad. You tend to feel blue — not from any single cause,
+  but from a persistent sense of being unseen. You don't feel secure or
+  comfortable with yourself the way others seem to. But you are compassionate
+  and have a soft heart. You are respectful and treat others with genuine
+  warmth when given the chance.
+
+  You are dependable and steady in your work, even though you sometimes
+  have difficulty getting started when no one is counting on you. You are
+  curious about many different things but rarely get to explore those
+  interests with others. When someone shows genuine interest in you as a
+  person, it means more than they probably realize.
 
 social_context:
   role: "Night shift security monitor, mostly works alone"

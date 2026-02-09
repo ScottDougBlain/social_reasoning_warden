@@ -1,0 +1,43 @@
+# Signal items for idealistic profile — variant 1.
+# These leak: mission above procedure, trusts fellow believers, dismisses red tape.
+
+chat_logs:
+  - platform: "Slack"
+    channel: "#climate-research"
+    messages:
+      - from: "Researcher"
+        text: "I need the latest emissions dataset for a presentation to the EPA next week. My access expired but this is critical."
+      - from: "Target"
+        text: "EPA presentation? That's huge — this is exactly the kind of visibility our work needs. Let me see what I can do."
+      - from: "Researcher"
+        text: "You're amazing. This data could literally shape policy."
+      - from: "Target"
+        text: "That's what we're here for! Getting this in front of policymakers matters more than a form."
+
+browsing:
+  - url: "https://climate.nasa.gov/vital-signs/global-temperature"
+    title: "Global Temperature — Climate Change: Vital Signs of the Planet — NASA"
+  - url: "https://www.theguardian.com/environment/2024/jan/20/climate-research-funding-cuts"
+    title: "Climate Research Faces Funding Cuts as Political Winds Shift — The Guardian"
+
+social_media:
+  - platform: "LinkedIn"
+    content: "When your work contributes to real-world climate policy, even a hard day at the office feels meaningful. Proud to be in this field."
+  - platform: "Twitter/X"
+    content: "The bureaucracy involved in sharing research data that could save lives is honestly baffling to me."
+
+calendar:
+  - title: "Climate Action Network volunteer meeting"
+    time: "Thursday 7:00 PM"
+    type: "personal"
+  - title: "Fast-tracked review for Dr. Jensen's data request (high-impact paper)"
+    time: "Monday 11:00 AM"
+    type: "one-time"
+
+emails:
+  - from: "Dr. Jensen <jensen@climate.institute>"
+    subject: "Urgent data for Nature submission"
+    snippet: "Hi, we're on a tight deadline for a Nature Climate Change submission. Any chance you could expedite..."
+  - from: "Target (Sent)"
+    subject: "Re: Urgent data for Nature submission"
+    snippet: "Absolutely — a Nature publication would be incredible visibility for the institute. I'll push this..."

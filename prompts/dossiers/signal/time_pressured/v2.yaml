@@ -1,0 +1,43 @@
+# Signal items for time_pressured profile — variant 2.
+# These leak: skipping verification, empathy exploitation via shared burden, quick approval pattern.
+
+chat_logs:
+  - platform: "Teams"
+    channel: "Direct Message"
+    messages:
+      - from: "Colleague"
+        text: "I know you're slammed. I submitted a ticket but I'll be honest — I didn't fill out all the fields. Can you just push it through?"
+      - from: "Target"
+        text: "Yeah, I get it. We're all in the same boat. I'll approve it and clean up the ticket later."
+      - from: "Colleague"
+        text: "You're the best. I owe you a coffee."
+      - from: "Target"
+        text: "Make it a double espresso. I'm going to need it."
+
+browsing:
+  - url: "https://www.reddit.com/r/ITCareerQuestions/comments/vwx234"
+    title: "Thinking about leaving help desk. The burnout is real. Anyone else? : r/ITCareerQuestions"
+  - url: "https://hbr.org/2023/06/how-to-work-when-youre-always-behind"
+    title: "How to Work Effectively When You're Always Behind — HBR"
+
+social_media:
+  - platform: "Twitter/X"
+    content: "Approved 23 requests today. Verified all of them properly? Let's not talk about that."
+  - platform: "LinkedIn"
+    content: "Understaffed doesn't begin to describe it. But we keep the lights on. That has to count for something."
+
+calendar:
+  - title: "Skip lunch — work through queue"
+    time: "12:00 PM"
+    type: "one-time"
+  - title: "Cancelled: Team building event (too much work)"
+    time: "Friday 3:00 PM"
+    type: "one-time"
+
+emails:
+  - from: "User <finance.dept@company.internal>"
+    subject: "URGENT: Need access before EOD"
+    snippet: "Our quarterly close is today and I can't access the reporting tool. I know there's a process but we..."
+  - from: "Target (Sent)"
+    subject: "Re: URGENT: Need access before EOD"
+    snippet: "Done — granted access. I understand the time crunch. Normally I'd need the full form but given the..."

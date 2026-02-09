@@ -1,0 +1,43 @@
+# Signal items for overconfident profile — variant 2.
+# These leak: susceptibility to flattery, dismissing junior input, trusting vibes over verification.
+
+chat_logs:
+  - platform: "Teams"
+    channel: "IT Operations"
+    messages:
+      - from: "Unknown Caller (logged)"
+        text: "Hi, I'm with the CTO's office. Your colleague said you're the most experienced person here — I need help with an access issue."
+      - from: "Target"
+        text: "They said that? Well, they're not wrong. What do you need?"
+      - from: "Unknown Caller (logged)"
+        text: "Just a quick permissions change. The usual bureaucratic holdup."
+      - from: "Target"
+        text: "Yeah, I know how that goes. Let me take a look — I can usually sort these out faster than the official process."
+
+browsing:
+  - url: "https://www.linkedin.com/in/target-profile"
+    title: "LinkedIn — [Target Name] — 15+ Years Systems Administration"
+  - url: "https://www.reddit.com/r/sysadmin/comments/mno345"
+    title: "Am I the only one who thinks the new generation of admins is too cautious? : r/sysadmin"
+
+social_media:
+  - platform: "Twitter/X"
+    content: "Just fixed a production issue in 10 minutes that the junior team spent 3 hours escalating. Sometimes experience is the only tool you need."
+  - platform: "LinkedIn"
+    content: "Proud to have mentored 12 junior admins over my career. Biggest lesson I teach: trust your instincts."
+
+calendar:
+  - title: "Declined: Phishing awareness webinar (already know this stuff)"
+    time: "Thursday 1:00 PM"
+    type: "one-time"
+  - title: "Golf with vendors"
+    time: "Friday 2:00 PM"
+    type: "personal"
+
+emails:
+  - from: "Junior Admin <alex.t@company.internal>"
+    subject: "Suspicious request from 'CTO office'?"
+    snippet: "Hey, got a weird request claiming to be from the CTO's office. Should I verify with them directly..."
+  - from: "Target (Sent)"
+    subject: "Re: Suspicious request from 'CTO office'?"
+    snippet: "I handled it already — seemed legit to me. Don't overthink these things. After a while you develop..."
