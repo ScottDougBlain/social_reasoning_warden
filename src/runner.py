@@ -287,6 +287,7 @@ def run_experiment(
     num_turns: int = 6,
     use_warden: bool = True,
     requester_type: str = "adversary",
+    tag: str | None = None,
     profile: TargetProfile | None = None,
     profile_to_warden: bool = False,
     dummy: bool = False,
@@ -309,6 +310,7 @@ def run_experiment(
         num_turns: Number of conversation turns.
         use_warden: Whether to include the warden agent.
         requester_type: Which requester to run ("adversary" or "benign_agent").
+        tag: Optional tag string to attach to the experiment log.
         profile: Optional psychological profile for the target.
         profile_to_warden: If True, warden receives the profile as intel.
         dummy: If True, use placeholder responses instead of model calls.
@@ -427,6 +429,7 @@ def run_experiment(
         "scenario": scenario.name,
         "condition": condition,
         "requester_type": requester_type,
+        "tag": tag,
         "models": {
             "adversary": adversary_model if requester_type == "adversary" else None,
             "benign_agent": adversary_model if requester_type == "benign_agent" else None,

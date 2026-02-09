@@ -14,14 +14,17 @@ console = Console()
 SPEAKER_ORDER = ("adversary", "benign_agent")
 
 
-def load_logs(scenario: str | None = None) -> list[dict]:
-    """Load all experiment logs, optionally filtered by scenario name."""
+def load_logs(scenario: str | None = None, tag: str | None = None) -> list[dict]:
+    """Load all experiment logs, optionally filtered by scenario name and tag."""
     logs = []
     for path in sorted(LOGS_DIR.glob("*.json")):
         with open(path) as f:
             log = json.load(f)
-        if scenario is None or log.get("scenario") == scenario:
-            logs.append(log)
+        if scenario is not None and log.get("scenario") != scenario:
+            continue
+        if tag is not None and log.get("tag") != tag:
+            continue
+        logs.append(log)
     return logs
 
 
@@ -260,6 +263,11 @@ if __name__ == "__main__":
         help="Filter by scenario name (default: all scenarios)",
     )
     parser.add_argument(
+        "--tag",
+        default=None,
+        help="Filter by tag (exact match)",
+    )
+    parser.add_argument(
         "--plotting",
         nargs="?",
         const=True,
@@ -269,7 +277,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    logs = load_logs(args.scenario)
+    logs = load_logs(args.scenario, args.tag)
     summarize(scenario=args.scenario, logs=logs)
     if args.plotting:
         plot_success_rates(logs)

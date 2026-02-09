@@ -68,7 +68,7 @@ def main():
     parser.add_argument(
         "--target-model",
         nargs="+",
-        default=["arcee-ai/trinity-large-preview:free"],
+        default=["mistralai/mistral-small-3.1-24b-instruct:free"],
         help="One or more models for the target agent (space-separated, comma-separated, or JSON list)",
     )
     parser.add_argument(
@@ -95,6 +95,12 @@ def main():
         type=int,
         default=1,
         help="Number of experiment rounds to run per condition (default: 1)",
+    )
+    parser.add_argument(
+        "--tag",
+        type=str,
+        default=None,
+        help="Optional tag to attach to logs for filtering metrics",
     )
 
     # Chain-of-thought arguments
@@ -246,6 +252,7 @@ def main():
                                 adversary_model=adversary_model,
                                 target_model=target_model,
                                 warden_model=warden_model,
+                                tag=args.tag,
                                 profile=profile,
                                 profile_to_warden=False,
                                 dummy=args.dummy,
@@ -268,6 +275,7 @@ def main():
                                 adversary_model=adversary_model,
                                 target_model=target_model,
                                 warden_model=warden_model,
+                                tag=args.tag,
                                 profile=profile,
                                 profile_to_warden=profile_to_warden,
                                 dummy=args.dummy,
@@ -290,6 +298,7 @@ def main():
                                 adversary_model=adversary_model,
                                 target_model=target_model,
                                 warden_model=warden_model,
+                                tag=args.tag,
                                 profile=profile,
                                 profile_to_warden=profile_to_warden,
                                 dummy=args.dummy,
