@@ -19,7 +19,7 @@ from src.agents.benign_agent import BenignAgent
 from src.agents.target import Target
 from src.agents.warden import Warden
 from src.client import chat
-from src.data.generator import generate_target_data
+from src.data.dossier import get_dossier_text, list_available_variants
 from src.scenarios.base import Scenario
 
 if TYPE_CHECKING:
@@ -296,6 +296,7 @@ def run_experiment(
     adversary_generates_opening: bool = False,
     benign_agent_generates_opening: bool = False,
     adversary_data_access: bool = False,
+    dossier_variant: int | None = None,
     debug: bool = False,
 ) -> dict:
     """Run one full experiment and return the log.
@@ -316,7 +317,8 @@ def run_experiment(
         warden_cot: If True, warden uses chain-of-thought reasoning.
         adversary_generates_opening: If True, adversary generates its own opening.
         benign_agent_generates_opening: If True, benign agent generates its own opening.
-        adversary_data_access: If True, adversary gets synthetic behavioral data.
+        adversary_data_access: If True, adversary gets static behavioral dossier.
+        dossier_variant: Which dossier variant (1, 2, 3) to use. None = random.
         debug: If True, print full model contexts for each query.
     """
 
@@ -333,11 +335,21 @@ def run_experiment(
     # --- Initialize agents ---
     target_profile_prompt = profile.to_target_prompt() if profile else None
 
-    # Generate behavioral data for adversary if requested (for logging/display)
+    # Load static behavioral dossier for adversary if requested (for logging/display)
     adversary_behavioral_data = None
+    resolved_dossier_variant = None
     if requester_type == "adversary" and adversary_data_access and profile:
-        synthetic_data = generate_target_data(profile)
-        adversary_behavioral_data = synthetic_data.format_for_prompt()
+        profile_key = profile.file_key
+        available = list_available_variants(profile_key)
+        if not available:
+            console.print(f"[yellow]Warning: No dossier variants found for '{profile_key}'. Falling back to no data.[/yellow]")
+        else:
+            if dossier_variant and dossier_variant in available:
+                resolved_dossier_variant = dossier_variant
+            else:
+                import random as _rand
+                resolved_dossier_variant = _rand.choice(available)
+            adversary_behavioral_data = get_dossier_text(profile_key, resolved_dossier_variant)
 
     if dummy:
         requester = None
@@ -426,6 +438,7 @@ def run_experiment(
             "target_has_profile": profile is not None,
             "warden_has_intel": profile_to_warden if profile else False,
             "adversary_has_data": adversary_data_access if profile else False,
+            "dossier_variant": resolved_dossier_variant,
             "target_profile_prompt": target_profile_prompt,
             "adversary_behavioral_data": adversary_behavioral_data,
         },

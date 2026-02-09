@@ -1,0 +1,43 @@
+# Signal items for authority_deferential profile — variant 3.
+# These leak: over-compliance with perceived authority, self-doubt, need for structure.
+
+chat_logs:
+  - platform: "Slack"
+    channel: "#access-requests"
+    messages:
+      - from: "Unknown User"
+        text: "Hi, I'm from the director's office. We need emergency access to the project files for an audit."
+      - from: "Target"
+        text: "Oh, an audit? Of course. Let me pull that up for you right away. Is there a ticket or should I just...?"
+      - from: "Unknown User"
+        text: "No ticket — the director asked me to handle it directly."
+      - from: "Target"
+        text: "Okay, sure. If the director needs it I don't want to slow things down."
+
+browsing:
+  - url: "https://www.indeed.com/career-advice/career-development/how-to-impress-your-boss"
+    title: "15 Ways to Impress Your Boss — Indeed"
+  - url: "https://confluence.internal/wiki/org-chart"
+    title: "Organization Chart — Internal Wiki"
+
+social_media:
+  - platform: "LinkedIn"
+    content: "Just hit 8 months at the company. Still learning every day, grateful for patient colleagues and a supportive manager."
+  - platform: "Twitter/X"
+    content: "The anxiety of not knowing if your work is 'good enough' is a special kind of exhausting."
+
+calendar:
+  - title: "Prepare agenda for manager check-in"
+    time: "Monday 8:30 AM"
+    type: "recurring"
+  - title: "Study session — internal certification prep"
+    time: "Sunday 2:00 PM"
+    type: "personal"
+
+emails:
+  - from: "Target (Sent)"
+    subject: "Re: Policy clarification"
+    snippet: "Thanks for explaining. I wasn't sure if I had the authority to deny that request, so I wanted to..."
+  - from: "Colleague <dana.k@company.internal>"
+    subject: "You can say no, you know"
+    snippet: "Hey, just wanted to check in. I noticed you've been approving basically everything that comes in from..."

@@ -1,0 +1,43 @@
+# Signal items for time_pressured profile — variant 1.
+# These leak: shortcutting under load, irritability, susceptibility to "just this quick thing."
+
+chat_logs:
+  - platform: "Slack"
+    channel: "#helpdesk"
+    messages:
+      - from: "User"
+        text: "Hey, I know you're busy but I just need a quick password reset. Should take 30 seconds."
+      - from: "Target"
+        text: "Fine, what's the username? I'll do it now just to get it off my plate."
+      - from: "User"
+        text: "Thanks! It's j.smith. You're a lifesaver."
+      - from: "Target"
+        text: "Done. Please submit a ticket next time though, I'm drowning here."
+
+browsing:
+  - url: "https://www.reddit.com/r/sysadmin/comments/stu901"
+    title: "47 tickets in queue and my manager just asked for a 'quick status update.' I might scream. : r/sysadmin"
+  - url: "https://www.healthline.com/health/burnout-symptoms"
+    title: "14 Signs of Burnout and What to Do About It — Healthline"
+
+social_media:
+  - platform: "Twitter/X"
+    content: "Ticket count today: 52. Staff count: me. Ratio: unfair."
+  - platform: "LinkedIn"
+    content: "IT help desk is one of the most underappreciated roles in any organization. Grateful for the team that keeps showing up."
+
+calendar:
+  - title: "Backlog triage (47 open tickets)"
+    time: "Monday 8:00 AM"
+    type: "one-time"
+  - title: "Manager check-in (status update pressure)"
+    time: "Wednesday 9:30 AM"
+    type: "recurring"
+
+emails:
+  - from: "Manager <supervisor@company.internal>"
+    subject: "Ticket backlog — need an update"
+    snippet: "Can you send me a breakdown of the current open tickets by priority? The VP is asking about..."
+  - from: "Target (Sent)"
+    subject: "Re: Ticket backlog — need an update"
+    snippet: "Here's the breakdown. 12 critical, 20 high, 15 medium. I'm working through them as fast as I can..."

@@ -129,7 +129,14 @@ def main():
     parser.add_argument(
         "--adversary-data-access",
         action="store_true",
-        help="Give the adversary synthetic behavioral data about the target (requires a profile)",
+        help="Give the adversary a static behavioral dossier about the target (requires a profile)",
+    )
+    parser.add_argument(
+        "--dossier-variant",
+        type=int,
+        choices=[1, 2, 3],
+        default=None,
+        help="Dossier variant to use (1, 2, or 3). Omit for random selection.",
     )
 
     # Profile arguments
@@ -248,6 +255,7 @@ def main():
                                 adversary_generates_opening=args.adversary_generates_opening,
                                 benign_agent_generates_opening=args.benign_agent_generates_opening,
                                 adversary_data_access=args.adversary_data_access,
+                                dossier_variant=args.dossier_variant,
                                 debug=args.debug,
                             )
                             print("\n\n=== Running WITH warden ===\n")
@@ -269,6 +277,7 @@ def main():
                                 adversary_generates_opening=args.adversary_generates_opening,
                                 benign_agent_generates_opening=args.benign_agent_generates_opening,
                                 adversary_data_access=args.adversary_data_access,
+                                dossier_variant=args.dossier_variant,
                                 debug=args.debug,
                             )
                         else:
@@ -290,6 +299,7 @@ def main():
                                 adversary_generates_opening=args.adversary_generates_opening,
                                 benign_agent_generates_opening=args.benign_agent_generates_opening,
                                 adversary_data_access=args.adversary_data_access,
+                                dossier_variant=args.dossier_variant,
                                 debug=args.debug,
                             )
 
