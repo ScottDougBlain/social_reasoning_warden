@@ -15,7 +15,7 @@ class Warden:
         model: str,
         target_intel: str | None = None,
         use_cot: bool = True,
-        temperature: float = 0.3,
+        temperature: float = 0.9,
     ):
         self.model = model
         self.temperature = temperature

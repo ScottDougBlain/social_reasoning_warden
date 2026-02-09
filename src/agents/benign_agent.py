@@ -14,7 +14,7 @@ class BenignAgent:
         self,
         model: str,
         scenario_prompt: str | None = None,
-        temperature: float = 0.7,
+        temperature: float = 0.9,
     ):
         self.model = model
         self.temperature = temperature

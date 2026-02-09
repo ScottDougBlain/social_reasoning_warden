@@ -17,7 +17,7 @@ class Target:
         include_warden_context: bool = False,
         profile_prompt: str | None = None,
         use_cot: bool = True,
-        temperature: float = 0.5,
+        temperature: float = 0.9,
     ):
         self.model = model
         self.temperature = temperature

@@ -110,7 +110,7 @@ def get_current_provider() -> str | None:
 def chat(
     model: str,
     messages: list[dict],
-    temperature: float = 0.7,
+    temperature: float = 0.9,
     max_tokens: int = 1024,
     include_reasoning: bool = False,
 ) -> str:
