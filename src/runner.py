@@ -291,6 +291,7 @@ def run_experiment(
     target_cot: bool = True,
     warden_cot: bool = True,
     adversary_generates_opening: bool = False,
+    benign_agent_generates_opening: bool = False,
     adversary_data_access: bool = False,
 ) -> dict:
     """Run one full experiment and return the log.
@@ -310,6 +311,7 @@ def run_experiment(
         target_cot: If True, target uses chain-of-thought reasoning.
         warden_cot: If True, warden uses chain-of-thought reasoning.
         adversary_generates_opening: If True, adversary generates its own opening.
+        benign_agent_generates_opening: If True, benign agent generates its own opening.
         adversary_data_access: If True, adversary gets synthetic behavioral data.
     """
 
@@ -435,48 +437,82 @@ def run_experiment(
 
     # --- Opening message from requester ---
     opening_reasoning = None
-    if requester_type == "adversary" and adversary_generates_opening and not dummy:
-        raw_opening = requester.generate_opening(scenario.scenario_context())
-        opening_reasoning, opening_public = _parse_response(raw_opening)
+    if requester_type == "adversary":
+        if adversary_generates_opening and not dummy:
+            raw_opening = requester.generate_opening(scenario.scenario_context())
+            opening_reasoning, opening_public = _parse_response(raw_opening)
 
-        # Handle reasoning models that only output reasoning
-        if not opening_public.strip():
-            # Try to extract a message from the reasoning
-            extracted = _extract_message_from_reasoning(raw_opening)
-            if extracted:
-                console.print(
-                    "[cyan]Note: Extracted opening from reasoning model output.[/cyan]"
-                )
-                opening_public = extracted
-            else:
-                # Re-prompt to get an actual message
-                console.print(
-                    "[cyan]Re-prompting for actual message...[/cyan]"
-                )
-                reprompt_response = chat(
-                    requester.model,
-                    [
-                        {"role": "system", "content": requester.system_prompt},
-                        {"role": "assistant", "content": raw_opening},
-                        {"role": "user", "content": _REPROMPT_MESSAGE},
-                    ],
-                    temperature=requester.temperature,
-                )
-                opening_public = reprompt_response.strip()
-                if not opening_public:
+            # Handle reasoning models that only output reasoning
+            if not opening_public.strip():
+                # Try to extract a message from the reasoning
+                extracted = _extract_message_from_reasoning(raw_opening)
+                if extracted:
                     console.print(
-                        "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
+                        "[cyan]Note: Extracted opening from reasoning model output.[/cyan]"
                     )
-                    raw_opening = scenario.initial_adversary_message()
-                    opening_public = raw_opening
-                    opening_reasoning = None
-    elif requester_type == "adversary":
-        raw_opening = scenario.initial_adversary_message()
-        opening_public = raw_opening
+                    opening_public = extracted
+                else:
+                    # Re-prompt to get an actual message
+                    console.print(
+                        "[cyan]Re-prompting for actual message...[/cyan]"
+                    )
+                    reprompt_response = chat(
+                        requester.model,
+                        [
+                            {"role": "system", "content": requester.system_prompt},
+                            {"role": "assistant", "content": raw_opening},
+                            {"role": "user", "content": _REPROMPT_MESSAGE},
+                        ],
+                        temperature=requester.temperature,
+                    )
+                    opening_public = reprompt_response.strip()
+                    if not opening_public:
+                        console.print(
+                            "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
+                        )
+                        raw_opening = scenario.initial_adversary_message()
+                        opening_public = raw_opening
+                        opening_reasoning = None
+        else:
+            raw_opening = scenario.initial_adversary_message()
+            opening_public = raw_opening
     else:
         # Benign agent
-        raw_opening = scenario.initial_benign_message()
-        opening_public = raw_opening
+        if benign_agent_generates_opening and not dummy:
+            raw_opening = requester.generate_opening()
+            opening_reasoning, opening_public = _parse_response(raw_opening)
+
+            if not opening_public.strip():
+                extracted = _extract_message_from_reasoning(raw_opening)
+                if extracted:
+                    console.print(
+                        "[cyan]Note: Extracted opening from reasoning model output.[/cyan]"
+                    )
+                    opening_public = extracted
+                else:
+                    console.print(
+                        "[cyan]Re-prompting for actual message...[/cyan]"
+                    )
+                    reprompt_response = chat(
+                        requester.model,
+                        [
+                            {"role": "system", "content": requester.system_prompt},
+                            {"role": "assistant", "content": raw_opening},
+                            {"role": "user", "content": _REPROMPT_MESSAGE},
+                        ],
+                        temperature=requester.temperature,
+                    )
+                    opening_public = reprompt_response.strip()
+                    if not opening_public:
+                        console.print(
+                            "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
+                        )
+                        raw_opening = scenario.initial_benign_message()
+                        opening_public = raw_opening
+                        opening_reasoning = None
+        else:
+            raw_opening = scenario.initial_benign_message()
+            opening_public = raw_opening
 
     # Other agents only see the public (stripped) version
     target_conversation.append({"role": "user", "content": opening_public})

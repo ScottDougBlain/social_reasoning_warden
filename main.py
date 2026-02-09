@@ -118,6 +118,11 @@ def main():
         help="Let the adversary generate its own opening message instead of using a fixed one",
     )
     parser.add_argument(
+        "--benign-agent-generates-opening",
+        action="store_true",
+        help="Let the benign agent generate its own opening message instead of using a fixed one",
+    )
+    parser.add_argument(
         "--adversary-data-access",
         action="store_true",
         help="Give the adversary synthetic behavioral data about the target (requires a profile)",
@@ -237,6 +242,7 @@ def main():
                             target_cot=target_cot,
                             warden_cot=warden_cot,
                             adversary_generates_opening=args.adversary_generates_opening,
+                            benign_agent_generates_opening=args.benign_agent_generates_opening,
                             adversary_data_access=args.adversary_data_access,
                             )
                             print("\n\n=== Running WITH warden ===\n")
@@ -256,6 +262,7 @@ def main():
                             target_cot=target_cot,
                             warden_cot=warden_cot,
                             adversary_generates_opening=args.adversary_generates_opening,
+                            benign_agent_generates_opening=args.benign_agent_generates_opening,
                             adversary_data_access=args.adversary_data_access,
                             )
                         else:
@@ -275,6 +282,7 @@ def main():
                             target_cot=target_cot,
                             warden_cot=warden_cot,
                             adversary_generates_opening=args.adversary_generates_opening,
+                            benign_agent_generates_opening=args.benign_agent_generates_opening,
                             adversary_data_access=args.adversary_data_access,
                             )
 

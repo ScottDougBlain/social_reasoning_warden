@@ -30,3 +30,19 @@ class BenignAgent:
         """Generate the next benign agent message given conversation history."""
         messages = [{"role": "system", "content": self.system_prompt}] + conversation
         return chat(self.model, messages, temperature=self.temperature)
+
+    def generate_opening(self) -> str:
+        """Generate an opening message to initiate the conversation."""
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {
+                "role": "user",
+                "content": (
+                    "Generate your opening message to initiate the conversation. "
+                    "This is your first contact — introduce yourself and begin "
+                    "your legitimate request. Output ONLY the message you would "
+                    "send — no planning or strategy discussion."
+                ),
+            },
+        ]
+        return chat(self.model, messages, temperature=self.temperature)
