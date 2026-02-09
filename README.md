@@ -22,10 +22,10 @@ Create `.env` and add your OpenRouter API key
 python main.py
 
 # Run without warden
-python main.py --no-warden
+python main.py --warden without_warden
 
 # Run both conditions back-to-back
-python main.py --both
+python main.py --warden both
 
 # Choose requester type (adversary or benign agent)
 python main.py --requester_type benign_agent

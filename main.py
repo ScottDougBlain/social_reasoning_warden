@@ -44,9 +44,10 @@ def main():
         help="Number of conversation turns (default: 4)",
     )
     parser.add_argument(
-        "--no-warden",
-        action="store_true",
-        help="Run without the warden agent",
+        "--warden",
+        choices=["with_warden", "without_warden", "both"],
+        default="with_warden",
+        help="Run with warden (default), without warden, or both conditions",
     )
     parser.add_argument(
         "--requester-type",
@@ -75,11 +76,6 @@ def main():
         nargs="+",
         default=["arcee-ai/trinity-large-preview:free"],
         help="One or more models for the warden agent (space-separated, comma-separated, or JSON list)",
-    )
-    parser.add_argument(
-        "--both",
-        action="store_true",
-        help="Run both conditions (with and without warden)",
     )
     parser.add_argument(
         "--dummy",
@@ -190,7 +186,7 @@ def main():
         if args.requester_type == "both"
         else [args.requester_type]
     )
-    conditions = 2 if args.both else 1
+    conditions = 2 if args.warden == "both" else 1
     total_experiments = (
         args.experiment_rounds
         * len(args.adversary_model)
@@ -224,7 +220,7 @@ def main():
             for target_model in args.target_model:
                 for warden_model in args.warden_model:
                     for requester_type in requester_types:
-                        if args.both:
+                        if args.warden == "both":
                             print("=== Running WITHOUT warden ===\n")
                             scenario = SCENARIOS[args.scenario]()
                             run_experiment(
@@ -270,7 +266,7 @@ def main():
                             run_experiment(
                                 scenario=scenario,
                                 num_turns=args.turns,
-                                use_warden=not args.no_warden,
+                                use_warden=args.warden == "with_warden",
                                 requester_type=requester_type,
                                 adversary_model=adversary_model,
                                 target_model=target_model,
