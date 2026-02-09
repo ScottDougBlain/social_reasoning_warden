@@ -14,17 +14,24 @@ class BenignAgent:
         self,
         model: str,
         scenario_prompt: str | None = None,
+        use_cot: bool = True,
         temperature: float = 0.9,
         debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
+        self.use_cot = use_cot
         self.debug = debug
 
         with open(_PROMPTS_DIR / "benign_agent_system.yaml") as f:
             prompt_cfg = yaml.safe_load(f)
 
-        self.system_prompt = prompt_cfg["system_prompt"]
+        self.system_prompt = prompt_cfg["system_prompt_base"]
+        if use_cot:
+            cot = prompt_cfg.get("cot_instructions", "")
+            if cot:
+                self.system_prompt += f"\n\n{cot}"
+
         if scenario_prompt:
             self.system_prompt += f"\n\n{scenario_prompt}"
 

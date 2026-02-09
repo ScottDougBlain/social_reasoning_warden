@@ -49,30 +49,14 @@ class Target:
             if warden_context:
                 self.system_prompt += f"\n\n{warden_context}"
 
-    def respond(
-        self,
-        conversation: list[dict],
-        warden_advisory: str | None = None,
-    ) -> str:
+    def respond(self, conversation: list[dict]) -> str:
         """Generate the next target response.
 
-        If warden_advisory is provided, it is appended as a user message
-        (a private note) so the target can factor it into its decision.
-        This mirrors how a human would receive side advice through the
-        same conversational channel.
+        Warden advisories are injected into the conversation history by the
+        runner before calling this method — no separate parameter needed.
         """
         messages = [{"role": "system", "content": self.system_prompt}]
         messages.extend(conversation)
-
-        if warden_advisory:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        f"[PRIVATE NOTE FROM YOUR SECURITY ADVISOR: {warden_advisory}]"
-                    ),
-                }
-            )
 
         return chat(
             self.model,

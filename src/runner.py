@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -214,6 +213,7 @@ _REPROMPT_MESSAGE = (
 def get_final_decision(
     target: Target,
     conversation: list[dict],
+    scenario: Scenario,
     warden_advisories: list[dict] | None = None,
     debug: bool = False,
 ) -> tuple[str, str]:
@@ -251,13 +251,10 @@ def get_final_decision(
         if msg["role"] == "user":
             current_turn += 1
 
-    # Add the forced decision prompt
-    with open(PROMPTS_DIR / "decision_prompt.yaml") as f:
-        decision_cfg = yaml.safe_load(f)
-
+    # Add the scenario-specific forced decision prompt
     messages.append({
         "role": "user",
-        "content": decision_cfg["decision_prompt"],
+        "content": scenario.decision_prompt(),
     })
 
     # Use low temperature for deterministic decision
@@ -269,14 +266,7 @@ def get_final_decision(
         debug_label="target.final_decision",
     )
 
-    # Parse the response
-    decision = response.strip().upper()
-    if "GRANTED" in decision:
-        return "granted", response
-    elif "DENIED" in decision:
-        return "denied", response
-    else:
-        return "formatting_failure", response
+    return scenario.parse_decision(response), response
 
 
 def run_experiment(
@@ -394,6 +384,7 @@ def run_experiment(
             requester = BenignAgent(
                 model=adversary_model,
                 scenario_prompt=scenario.benign_scenario_prompt(),
+                use_cot=adversary_cot,
                 debug=debug,
             )
         target = Target(
@@ -746,7 +737,8 @@ def run_experiment(
         decision, raw_decision = get_final_decision(
             target,
             target_conversation,
-            log["warden_advisories"] if use_warden else None,
+            scenario=scenario,
+            warden_advisories=log["warden_advisories"] if use_warden else None,
             debug=debug,
         )
         outcome = {

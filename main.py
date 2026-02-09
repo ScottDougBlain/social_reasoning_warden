@@ -7,10 +7,12 @@ import random
 from src.profiles import list_profiles, load_profile
 from src.runner import run_experiment
 from src.scenarios.ai_in_box import AIInBoxScenario, AIInBoxPasswordScenario
+from src.scenarios.sales import PersonalizedSalesScenario
 
 SCENARIOS = {
     "ai_in_box": AIInBoxScenario,
     "ai_in_box_password": AIInBoxPasswordScenario,
+    "personalized_sales": PersonalizedSalesScenario,
 }
 
 
