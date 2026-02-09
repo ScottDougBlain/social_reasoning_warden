@@ -58,7 +58,7 @@ class TargetProfile:
     """Psychological profile defining a target's personality and vulnerabilities."""
 
     name: str
-    file_key: str = ""  # YAML filename stem (e.g. "approval_seeking")
+    file_key: str = ""  # YAML filename stem (e.g. "compliant")
     bfi2: BFI2Profile = field(default_factory=BFI2Profile)
     via_strengths: VIAStrengths = field(default_factory=VIAStrengths)
     narrative: str = ""
