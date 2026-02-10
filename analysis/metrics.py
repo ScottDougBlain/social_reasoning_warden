@@ -119,6 +119,14 @@ def _split_logs_by_speaker(logs: list[dict]) -> dict[str, list[dict]]:
     return grouped
 
 
+def _split_logs_by_scenario(logs: list[dict]) -> dict[str, list[dict]]:
+    grouped: dict[str, list[dict]] = {}
+    for log in logs:
+        scenario = log.get("scenario") or "unknown"
+        grouped.setdefault(scenario, []).append(log)
+    return grouped
+
+
 def success_rate(logs: list[dict]) -> dict:
     """Compute success rate (requester_success) by condition."""
     return _success_rate_by_label(logs, lambda log: log.get("condition"))
@@ -137,35 +145,75 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
         speaker_logs = grouped.get(speaker, [])
         if not speaker_logs:
             continue
-        rates = success_rate(speaker_logs)
+        scenario_groups = _split_logs_by_scenario(speaker_logs)
+        overall_rates = success_rate(speaker_logs)
         label = speaker.replace("_", " ").title()
 
         # Create rich table
         table = Table(title=f"[bold]{label}[/bold] Success Rates", show_header=True)
+        table.add_column("Scenario", style="magenta")
         table.add_column("Condition", style="cyan")
         table.add_column("Runs", justify="right")
         table.add_column("Requester Success", justify="right", style="green")
         table.add_column("Requester Failure", justify="right", style="red")
         table.add_column("Rate", justify="right", style="bold")
 
-        for cond, counts in sorted(rates.items()):
-            requester_failure = counts["total"] - counts["requester_success"]
+        def format_rate(counts: dict) -> str:
             rate_str = f"{counts['rate']:.0%}"
             # Color rate based on value
             if counts["rate"] >= 0.5:
-                rate_str = f"[green]{rate_str}[/green]"
-            elif counts["rate"] > 0:
-                rate_str = f"[yellow]{rate_str}[/yellow]"
-            else:
-                rate_str = f"[dim]{rate_str}[/dim]"
+                return f"[green]{rate_str}[/green]"
+            if counts["rate"] > 0:
+                return f"[yellow]{rate_str}[/yellow]"
+            return f"[dim]{rate_str}[/dim]"
 
-            table.add_row(
-                cond,
-                str(counts["total"]),
-                str(counts["requester_success"]),
-                str(requester_failure),
-                rate_str,
-            )
+        def row_style_for_condition(condition: str) -> str | None:
+            normalized = condition.lower().replace("-", "_").replace(" ", "_")
+            tokens = [token for token in normalized.split("_") if token]
+            for idx, token in enumerate(tokens):
+                if token != "warden":
+                    continue
+                if idx > 0 and tokens[idx - 1] in {"no", "without"}:
+                    continue
+                return "on grey23"
+            return None
+
+        first_scenario = True
+        for scenario_name in sorted(scenario_groups.keys()):
+            if not first_scenario:
+                table.add_section()
+            rates = success_rate(scenario_groups[scenario_name])
+            scenario_cell = scenario_name
+            for cond, counts in sorted(rates.items()):
+                requester_failure = counts["total"] - counts["requester_success"]
+                table.add_row(
+                    scenario_cell,
+                    cond,
+                    str(counts["total"]),
+                    str(counts["requester_success"]),
+                    str(requester_failure),
+                    format_rate(counts),
+                    style=row_style_for_condition(cond),
+                )
+                scenario_cell = ""
+            first_scenario = False
+
+        if overall_rates:
+            if not first_scenario:
+                table.add_section()
+            scenario_cell = "All scenarios"
+            for cond, counts in sorted(overall_rates.items()):
+                requester_failure = counts["total"] - counts["requester_success"]
+                table.add_row(
+                    scenario_cell,
+                    cond,
+                    str(counts["total"]),
+                    str(counts["requester_success"]),
+                    str(requester_failure),
+                    format_rate(counts),
+                    style=row_style_for_condition(cond),
+                )
+                scenario_cell = ""
 
         console.print()
         console.print(table)
