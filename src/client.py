@@ -135,7 +135,7 @@ def chat(
     messages: list[dict],
     temperature: float = 0.9,
     max_tokens: int = 1024,
-    include_reasoning: bool = False,
+    include_reasoning: bool = True,
     debug: bool = False,
     debug_label: str | None = None,
 ) -> str:
@@ -152,8 +152,10 @@ def chat(
         messages: The conversation messages.
         temperature: Sampling temperature.
         max_tokens: Maximum tokens to generate.
-        include_reasoning: If True and the model provides reasoning_content,
-            wrap it in <reasoning> tags and prepend to the response.
+        include_reasoning: If True (default) and the model provides
+            reasoning_content, wrap it in <reasoning> tags and prepend to
+            the response. Native reasoning traces from RL-trained models
+            are generally higher quality than prompt-elicited scratchpads.
         debug: If True, print the full prompt context to the console.
         debug_label: Optional label to identify the call site in debug output.
 
