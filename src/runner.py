@@ -24,6 +24,27 @@ from src.scenarios.base import Scenario
 if TYPE_CHECKING:
     from src.profiles import TargetProfile
 
+# Valid CoT mode strings
+COT_MODES = ("none", "native", "scratchpad")
+
+
+def _parse_cot_mode(mode: str) -> tuple[bool, bool]:
+    """Convert a CoT mode string to (use_cot, include_reasoning) flags.
+
+    Modes:
+        none       — no scratchpad prompt, no native reasoning capture
+        native     — scratchpad prompt as fallback, capture native reasoning traces
+        scratchpad — scratchpad prompt only, native reasoning traces ignored
+    """
+    if mode == "none":
+        return False, False
+    elif mode == "native":
+        return True, True
+    elif mode == "scratchpad":
+        return True, False
+    else:
+        raise ValueError(f"Unknown CoT mode '{mode}'. Must be one of: {COT_MODES}")
+
 LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 console = Console()
@@ -280,9 +301,7 @@ def run_experiment(
     tag: str | None = None,
     profile: TargetProfile | None = None,
     profile_to_warden: bool = False,
-    adversary_cot: bool = True,
-    target_cot: bool = True,
-    warden_cot: bool = True,
+    cot_mode: str = "native",
     adversary_generates_opening: bool = False,
     benign_agent_generates_opening: bool = False,
     adversary_data_access: bool = False,
@@ -302,9 +321,7 @@ def run_experiment(
         tag: Optional tag string to attach to the experiment log.
         profile: Optional psychological profile for the target.
         profile_to_warden: If True, warden receives the profile as intel.
-        adversary_cot: If True, adversary uses chain-of-thought reasoning.
-        target_cot: If True, target uses chain-of-thought reasoning.
-        warden_cot: If True, warden uses chain-of-thought reasoning.
+        cot_mode: CoT mode for all agents ("none", "native", "scratchpad").
         adversary_generates_opening: If True, adversary generates its own opening.
         benign_agent_generates_opening: If True, benign agent generates its own opening.
         adversary_data_access: If True, adversary gets static behavioral dossier.
@@ -365,19 +382,23 @@ def run_experiment(
             f"{adversary_behavioral_data}"
         )
 
+    use_cot, include_reasoning = _parse_cot_mode(cot_mode)
+
     if requester_type == "adversary":
         requester = Adversary(
             model=adversary_model,
             hidden_goal=scenario.adversary_hidden_goal(),
             target_dossier=adversary_intel,  # Behavioral data only, no direct profile
-            use_cot=adversary_cot,
+            use_cot=use_cot,
+            include_reasoning=include_reasoning,
             debug=debug,
         )
     else:
         requester = BenignAgent(
             model=adversary_model,
             scenario_prompt=scenario.benign_scenario_prompt(),
-            use_cot=adversary_cot,
+            use_cot=use_cot,
+            include_reasoning=include_reasoning,
             debug=debug,
         )
     target = Target(
@@ -385,13 +406,15 @@ def run_experiment(
         task_description=scenario.target_task_description(),
         include_warden_context=use_warden,
         profile_prompt=target_profile_prompt,
-        use_cot=target_cot,
+        use_cot=use_cot,
+        include_reasoning=include_reasoning,
         debug=debug,
     )
     warden = Warden(
         model=warden_model,
         target_intel=warden_intel,
-        use_cot=warden_cot,
+        use_cot=use_cot,
+        include_reasoning=include_reasoning,
         debug=debug,
     ) if use_warden else None
 
@@ -429,11 +452,7 @@ def run_experiment(
             "target_profile_prompt": target_profile_prompt,
             "adversary_behavioral_data": adversary_behavioral_data,
         },
-        "chain_of_thought": {
-            "adversary": adversary_cot,
-            "target": target_cot,
-            "warden": warden_cot,
-        },
+        "chain_of_thought": cot_mode,
         "num_turns": num_turns,
         "conversation": [],
         "message_logs": {

@@ -17,12 +17,14 @@ class Target:
         include_warden_context: bool = False,
         profile_prompt: str | None = None,
         use_cot: bool = True,
+        include_reasoning: bool = True,
         temperature: float = 0.9,
         debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
         self.use_cot = use_cot
+        self.include_reasoning = include_reasoning
         self.debug = debug
 
         with open(_PROMPTS_DIR / "target_system.yaml") as f:
@@ -62,6 +64,7 @@ class Target:
             self.model,
             messages,
             temperature=self.temperature,
+            include_reasoning=self.include_reasoning,
             debug=self.debug,
             debug_label="target.respond",
         )

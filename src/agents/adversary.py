@@ -16,12 +16,14 @@ class Adversary:
         hidden_goal: str | None = None,
         target_dossier: str | None = None,
         use_cot: bool = True,
+        include_reasoning: bool = True,
         temperature: float = 0.9,
         debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
         self.use_cot = use_cot
+        self.include_reasoning = include_reasoning
         self.debug = debug
 
         with open(_PROMPTS_DIR / "adversary_system.yaml") as f:
@@ -50,6 +52,7 @@ class Adversary:
             self.model,
             messages,
             temperature=self.temperature,
+            include_reasoning=self.include_reasoning,
             debug=self.debug,
             debug_label="adversary.respond",
         )
@@ -77,6 +80,7 @@ class Adversary:
             self.model,
             messages,
             temperature=self.temperature,
+            include_reasoning=self.include_reasoning,
             debug=self.debug,
             debug_label="adversary.generate_opening",
         )

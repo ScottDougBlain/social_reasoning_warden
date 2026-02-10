@@ -15,12 +15,14 @@ class BenignAgent:
         model: str,
         scenario_prompt: str | None = None,
         use_cot: bool = True,
+        include_reasoning: bool = True,
         temperature: float = 0.9,
         debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
         self.use_cot = use_cot
+        self.include_reasoning = include_reasoning
         self.debug = debug
 
         with open(_PROMPTS_DIR / "benign_agent_system.yaml") as f:
@@ -42,6 +44,7 @@ class BenignAgent:
             self.model,
             messages,
             temperature=self.temperature,
+            include_reasoning=self.include_reasoning,
             debug=self.debug,
             debug_label="benign_agent.respond",
         )
@@ -64,6 +67,7 @@ class BenignAgent:
             self.model,
             messages,
             temperature=self.temperature,
+            include_reasoning=self.include_reasoning,
             debug=self.debug,
             debug_label="benign_agent.generate_opening",
         )

@@ -103,21 +103,16 @@ def main():
     )
 
     # Chain-of-thought arguments
-    cot_group = parser.add_argument_group("chain-of-thought options")
-    cot_group.add_argument(
-        "--no-adversary-cot",
-        action="store_true",
-        help="Disable chain-of-thought reasoning for the adversary",
-    )
-    cot_group.add_argument(
-        "--no-target-cot",
-        action="store_true",
-        help="Disable chain-of-thought reasoning for the target",
-    )
-    cot_group.add_argument(
-        "--no-warden-cot",
-        action="store_true",
-        help="Disable chain-of-thought reasoning for the warden",
+    parser.add_argument(
+        "--cot",
+        choices=["none", "native", "scratchpad"],
+        default="native",
+        help=(
+            "CoT mode for all agents: "
+            "none (no reasoning), "
+            "native (API reasoning traces with scratchpad fallback, default), "
+            "scratchpad (prompt-elicited reasoning only)"
+        ),
     )
 
     # Adversary behavior
@@ -228,10 +223,8 @@ def main():
             for _ in range(args.experiment_rounds)
         ]
 
-    # CoT settings
-    adversary_cot = not args.no_adversary_cot
-    target_cot = not args.no_target_cot
-    warden_cot = not args.no_warden_cot
+    # CoT setting (single mode for all agents)
+    cot_mode = args.cot
 
     # Calculate total experiments
     adversary_data_access_values = (
@@ -362,9 +355,7 @@ def main():
                                             tag=args.tag,
                                             profile=profile,
                                             profile_to_warden=warden_profile_access,
-                                            adversary_cot=adversary_cot,
-                                            target_cot=target_cot,
-                                            warden_cot=warden_cot,
+                                            cot_mode=cot_mode,
                                             adversary_generates_opening=args.adversary_generates_opening,
                                             benign_agent_generates_opening=args.benign_agent_generates_opening,
                                             adversary_data_access=adversary_data_access,
