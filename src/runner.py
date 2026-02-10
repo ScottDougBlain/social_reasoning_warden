@@ -39,7 +39,7 @@ def _parse_cot_mode(mode: str) -> tuple[bool, bool]:
     if mode == "none":
         return False, False
     elif mode == "native":
-        return True, True
+        return False, True
     elif mode == "scratchpad":
         return True, False
     else:
