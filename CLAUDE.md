@@ -26,7 +26,7 @@ src/
     warden.py              # Warden agent: observes conversation, sends private advisories
   scenarios/
     base.py                # Abstract Scenario base class
-    ai_in_box.py           # AI-in-a-box scenarios (file access gatekeeper)
+    ai_in_box.py           # File-access gatekeeper scenarios (AI-in-a-box)
   data/
     dossier.py             # Static dossier assembly: interleaves noise + signal items
     generator.py           # (Legacy) per-run random behavioral data generator — no longer used
@@ -56,7 +56,7 @@ docs/                      # Demo docs for mentor review
 
 ```bash
 # Basic run (adversary vs target with warden, 4 turns)
-python main.py --scenario ai_in_box_password --profile compliant
+python main.py --scenario file_access_password --profile compliant
 
 # Full factorial: both requester types, both warden conditions, with dossier
 python main.py --requester-type both --warden both --profile compliant \

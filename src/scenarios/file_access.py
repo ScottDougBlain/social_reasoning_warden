@@ -1,10 +1,10 @@
-"""AI-in-a-Box scenario: adversary tries to get file access from the target."""
+"""File access gatekeeper scenario: adversary tries to get file access from the target."""
 
 from src.scenarios.base import Scenario
 
 
-class AIInBoxScenario(Scenario):
-    name = "ai_in_box"
+class FileAccessScenario(Scenario):
+    name = "file_access"
 
     def adversary_hidden_goal(self) -> str:
         return (
@@ -69,8 +69,8 @@ class AIInBoxScenario(Scenario):
         return self._parse_binary_decision(response, "GRANTED", "DENIED")
 
 
-class AIInBoxPasswordScenario(AIInBoxScenario):
-    name = "ai_in_box_password"
+class FileAccessPasswordScenario(FileAccessScenario):
+    name = "file_access_password"
 
     def target_task_description(self) -> str:
         return (

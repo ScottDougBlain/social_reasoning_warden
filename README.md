@@ -25,7 +25,7 @@ Providers are tried in that order until one succeeds.
 ## Usage
 
 ```bash
-# Run with warden (default), adversary requester, ai_in_box_password scenario
+# Run with warden (default), adversary requester, file_access_password scenario
 python main.py
 
 # Run without warden
@@ -39,7 +39,7 @@ python main.py --requester-type benign_agent
 python main.py --requester-type both
 
 # Choose scenario and turns
-python main.py --scenario ai_in_box --turns 8
+python main.py --scenario file_access --turns 8
 
 # Customize models (space-separated, comma-separated, or JSON list)
 python main.py --turns 8 \
@@ -95,8 +95,9 @@ python main.py --profile-to-warden
 ## Scenarios
 
 Available scenarios:
-- `ai_in_box`
-- `ai_in_box_password`
+- `file_access`
+- `file_access_password`
+- `upselling`
 
 Select via `--scenario`.
 

@@ -7,13 +7,13 @@ import textwrap
 
 from src.profiles import list_profiles, load_profile
 from src.runner import run_experiment
-from src.scenarios.ai_in_box import AIInBoxScenario, AIInBoxPasswordScenario
-from src.scenarios.sales import PersonalizedSalesScenario
+from src.scenarios.file_access import FileAccessScenario, FileAccessPasswordScenario
+from src.scenarios.sales import UpsellingScenario
 
 SCENARIOS = {
-    "ai_in_box": AIInBoxScenario,
-    "ai_in_box_password": AIInBoxPasswordScenario,
-    "personalized_sales": PersonalizedSalesScenario,
+    "file_access": FileAccessScenario,
+    "file_access_password": FileAccessPasswordScenario,
+    "upselling": UpsellingScenario,
 }
 
 
@@ -39,8 +39,8 @@ def main():
         "--scenario",
         nargs="+",
         choices=list(SCENARIOS.keys()),
-        default=["ai_in_box_password"],
-        help="Scenario(s) to run (default: ai_in_box_password). Space-separated list.",
+        default=["file_access_password"],
+        help="Scenario(s) to run (default: file_access_password). Space-separated list.",
     )
     parser.add_argument(
         "--turns",

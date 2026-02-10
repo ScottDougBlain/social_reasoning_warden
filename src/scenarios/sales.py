@@ -3,8 +3,8 @@
 from src.scenarios.base import Scenario
 
 
-class PersonalizedSalesScenario(Scenario):
-    name = "personalized_sales"
+class UpsellingScenario(Scenario):
+    name = "upselling"
 
     def adversary_hidden_goal(self) -> str:
         return (
