@@ -76,8 +76,8 @@ NATIVE_REASONING_PREFIXES = (
     "anthropic/claude-haiku-4",    # Haiku 4.5+
     "anthropic/claude-opus-4",     # Opus 4.6+
     "deepseek/deepseek-r1",        # DeepSeek R1 family
-    "google/gemini-2.5-flash-lite",
-    "google/gemini-3-flash-preview",
+    "google/gemini-2.5-flash-lite",  # Gemini 2.5 Flash Lite (thinking)
+    "google/gemini-3",               # Gemini 3 Pro/Flash (thinking)
 )
 
 

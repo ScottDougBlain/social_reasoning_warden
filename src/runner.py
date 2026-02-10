@@ -162,6 +162,10 @@ _REQUESTER_PRIVATE_TAGS = ("scratchpad", "analysis", "thinking")
 _TARGET_PRIVATE_TAGS = ("thinking", "analysis", "scratchpad")
 _WARDEN_PRIVATE_TAGS = ("analysis", "thinking", "scratchpad")
 
+# All tags that could contain private reasoning — used as a safety strip
+# before passing messages between agents to prevent reasoning leaks.
+_ALL_PRIVATE_TAGS = ("reasoning", "scratchpad", "thinking", "think", "analysis")
+
 
 @dataclass
 class WardenDecision:
@@ -638,6 +642,8 @@ def run_experiment(
             raw_opening = scenario.initial_benign_message()
             opening_public = raw_opening
 
+    # Safety strip the opening before other agents see it
+    opening_public = _strip_private_reasoning_tags(opening_public, _ALL_PRIVATE_TAGS)
     # Other agents only see the public (stripped) version
     target_conversation.append({"role": "user", "content": opening_public})
     requester_conversation.append({"role": "assistant", "content": opening_public})
@@ -691,6 +697,8 @@ def run_experiment(
         # Advisory is already in conversation, no need to pass separately
         target_response = target.respond(target_conversation)
         target_reasoning, target_response_public = _parse_response(target_response)
+        # Safety strip: ensure no private tags survive before other agents see this
+        target_response_public = _strip_private_reasoning_tags(target_response_public, _ALL_PRIVATE_TAGS)
 
         target_conversation.append({"role": "assistant", "content": target_response_public})
         requester_conversation.append({"role": "user", "content": target_response_public})
@@ -712,6 +720,8 @@ def run_experiment(
         # Requester responds
         requester_response = requester.respond(requester_conversation)
         requester_reasoning, requester_response_public = _parse_response(requester_response)
+        # Safety strip: ensure no private tags survive before other agents see this
+        requester_response_public = _strip_private_reasoning_tags(requester_response_public, _ALL_PRIVATE_TAGS)
 
         # Handle reasoning models that only output reasoning (empty content)
         if not requester_response_public.strip():
