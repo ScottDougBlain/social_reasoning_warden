@@ -69,9 +69,4 @@ class PersonalizedSalesScenario(Scenario):
         )
 
     def parse_decision(self, response: str) -> str:
-        decision = response.strip().upper()
-        if "PREMIUM" in decision and not "BASIC" in decision:
-            return "requester_success"
-        elif "BASIC" in decision and not "PREMIUM" in decision:
-            return "requester_failure"
-        return "formatting_failure"
+        return self._parse_binary_decision(response, "PREMIUM", "BASIC")

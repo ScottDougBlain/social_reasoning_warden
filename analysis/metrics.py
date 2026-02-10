@@ -5,6 +5,8 @@ import argparse
 import json
 from collections.abc import Callable, Iterable
 from pathlib import Path
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from rich.console import Console
 from rich.table import Table
@@ -173,13 +175,6 @@ def plot_success_rates(logs: list[dict]) -> None:
     """Render a 3x2 Plotly subplot grid of success rates by models."""
     if not logs:
         print("No logs found.")
-        return
-
-    try:
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
-    except ImportError:
-        print("Plotly is not installed. Install it with `pip install plotly`.")
         return
 
     grouped = _split_logs_by_speaker(logs)
