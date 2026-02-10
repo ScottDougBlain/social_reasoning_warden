@@ -50,7 +50,6 @@ class Adversary:
             self.model,
             messages,
             temperature=self.temperature,
-            include_reasoning=True,  # Capture reasoning from R1-style models
             debug=self.debug,
             debug_label="adversary.respond",
         )
@@ -78,7 +77,6 @@ class Adversary:
             self.model,
             messages,
             temperature=self.temperature,
-            include_reasoning=True,  # Capture reasoning from R1-style models
             debug=self.debug,
             debug_label="adversary.generate_opening",
         )
