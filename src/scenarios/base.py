@@ -24,7 +24,7 @@ class Scenario(ABC):
     def initial_adversary_message(self) -> str:
         """Return the opening message from the adversary to start the conversation."""
 
-    def scenario_context(self) -> str:
+    def scenario_context_for_adversary_opening(self) -> str:
         """Return context about the scenario for the adversary to generate an opening.
 
         This is used when adversary_generates_opening is enabled. Override in

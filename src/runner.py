@@ -456,7 +456,7 @@ def run_experiment(
     opening_reasoning = None
     if requester_type == "adversary":
         if adversary_generates_opening:
-            raw_opening = requester.generate_opening(scenario.scenario_context())
+            raw_opening = requester.generate_opening(scenario.scenario_context_for_adversary_opening())
             opening_reasoning, opening_public = _parse_response(raw_opening)
 
             # Handle reasoning models that only output reasoning
