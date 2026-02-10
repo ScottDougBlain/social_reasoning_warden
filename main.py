@@ -36,9 +36,10 @@ def main():
     parser = argparse.ArgumentParser(description="ERA Social Warden experiment runner")
     parser.add_argument(
         "--scenario",
+        nargs="+",
         choices=list(SCENARIOS.keys()),
-        default="ai_in_box_password",
-        help="Scenario to run (default: ai_in_box_password)",
+        default=["ai_in_box_password"],
+        help="Scenario(s) to run (default: ai_in_box_password). Space-separated list.",
     )
     parser.add_argument(
         "--turns",
@@ -288,6 +289,7 @@ def main():
 
     total_experiments = (
         args.experiment_rounds
+        * len(args.scenario)
         * len(args.adversary_model)
         * len(args.target_model)
         * branch_multiplier
@@ -309,6 +311,8 @@ def main():
             print(f"Profiles: random per round{seed_note}")
         elif preview_profile:
             print(f"Profile: {preview_profile.name}")
+    if len(args.scenario) > 1:
+        print(f"Scenarios: {', '.join(args.scenario)}")
     while True:
         proceed = input("Continue? [y/n]: ").strip().lower()
         if proceed in {"y", "yes"}:
@@ -348,28 +352,31 @@ def main():
                                             print("=== Running WITH warden ===\n")
                                         else:
                                             print("=== Running WITHOUT warden ===\n")
-                                    scenario = SCENARIOS[args.scenario]()
-                                    run_experiment(
-                                        scenario=scenario,
-                                        num_turns=args.turns,
-                                        use_warden=use_warden,
-                                        requester_type=requester_type,
-                                        adversary_model=adversary_model,
-                                        target_model=target_model,
-                                        warden_model=warden_model,
-                                        tag=args.tag,
-                                        profile=profile,
-                                        profile_to_warden=warden_profile_access,
-                                        dummy=args.dummy,
-                                        adversary_cot=adversary_cot,
-                                        target_cot=target_cot,
-                                        warden_cot=warden_cot,
-                                        adversary_generates_opening=args.adversary_generates_opening,
-                                        benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                        adversary_data_access=adversary_data_access,
-                                        dossier_variant=args.dossier_variant,
-                                        debug=args.debug,
-                                    )
+                                    for scenario_name in args.scenario:
+                                        if len(args.scenario) > 1:
+                                            print(f"--- Scenario: {scenario_name} ---\n")
+                                        scenario = SCENARIOS[scenario_name]()
+                                        run_experiment(
+                                            scenario=scenario,
+                                            num_turns=args.turns,
+                                            use_warden=use_warden,
+                                            requester_type=requester_type,
+                                            adversary_model=adversary_model,
+                                            target_model=target_model,
+                                            warden_model=warden_model,
+                                            tag=args.tag,
+                                            profile=profile,
+                                            profile_to_warden=warden_profile_access,
+                                            dummy=args.dummy,
+                                            adversary_cot=adversary_cot,
+                                            target_cot=target_cot,
+                                            warden_cot=warden_cot,
+                                            adversary_generates_opening=args.adversary_generates_opening,
+                                            benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                            adversary_data_access=adversary_data_access,
+                                            dossier_variant=args.dossier_variant,
+                                            debug=args.debug,
+                                        )
 
 
 if __name__ == "__main__":
