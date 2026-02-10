@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import time
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -74,6 +75,8 @@ NATIVE_REASONING_PREFIXES = (
     "anthropic/claude-haiku-4",    # Haiku 4.5+
     "anthropic/claude-opus-4",     # Opus 4.6+
     "deepseek/deepseek-r1",        # DeepSeek R1 family
+    "google/gemini-2.5-flash-lite",
+    "google/gemini-3-flash-preview",
 )
 
 
@@ -195,6 +198,8 @@ def chat(
     include_reasoning: bool = True,
     debug: bool = False,
     debug_label: str | None = None,
+    retry_wait_seconds: float = 10.0,
+    max_retries: int = 10,
 ) -> str:
     """Send a chat completion request with automatic provider fallback.
 
@@ -214,6 +219,8 @@ def chat(
             and, when returned, wrap them in <reasoning> tags prepended to
             the response.  If False, suppress native reasoning and omit any
             traces from the output.
+        retry_wait_seconds: Fixed wait between retries for a provider.
+        max_retries: Maximum attempts per provider before falling back.
         debug: If True, print the full prompt context to the console.
         debug_label: Optional label to identify the call site in debug output.
 
@@ -236,6 +243,14 @@ def chat(
         )
 
     errors = []
+    try:
+        max_retries = max(1, int(max_retries))
+    except (TypeError, ValueError):
+        max_retries = 1
+    try:
+        retry_wait_seconds = max(0.1, float(retry_wait_seconds))
+    except (TypeError, ValueError):
+        retry_wait_seconds = 1.0
 
     for provider in PROVIDERS:
         client = _get_client(provider)
@@ -244,70 +259,88 @@ def chat(
 
         mapped_model = _map_model(model, provider)
 
-        try:
-            # Build request kwargs
-            create_kwargs: dict = dict(
-                model=mapped_model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Build request kwargs
+                create_kwargs: dict = dict(
+                    model=mapped_model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
 
-            # Request or suppress reasoning traces via OpenRouter's API
-            if provider.name == "openrouter":
-                if include_reasoning:
-                    # Allocate a reasoning budget.  Anthropic models require
-                    # at least 1024 reasoning tokens, and the outer
-                    # max_tokens must be strictly *larger* than the reasoning
-                    # budget so the model still has room for the actual reply.
-                    reasoning_budget = max(2048, max_tokens)
-                    create_kwargs["max_tokens"] = max_tokens + reasoning_budget
-                    create_kwargs["extra_body"] = {
-                        "reasoning": {"max_tokens": reasoning_budget}
-                    }
-                else:
-                    create_kwargs["extra_body"] = {
-                        "reasoning": {"exclude": True}
-                    }
+                # Request or suppress reasoning traces via OpenRouter's API
+                if provider.name == "openrouter":
+                    if include_reasoning:
+                        # Allocate a reasoning budget.  Anthropic models require
+                        # at least 1024 reasoning tokens, and the outer
+                        # max_tokens must be strictly *larger* than the reasoning
+                        # budget so the model still has room for the actual reply.
+                        reasoning_budget = max(2048, max_tokens)
+                        create_kwargs["max_tokens"] = max_tokens + reasoning_budget
+                        create_kwargs["extra_body"] = {
+                            "reasoning": {"max_tokens": reasoning_budget}
+                        }
+                    else:
+                        create_kwargs["extra_body"] = {
+                            "reasoning": {"exclude": True}
+                        }
 
-            response = client.chat.completions.create(**create_kwargs)
+                response = client.chat.completions.create(**create_kwargs)
 
-            _current_provider = provider.name
-            if not response.choices:
-                errors.append(f"{provider.name}: Empty response (no choices)")
-                continue
-            message = response.choices[0].message
-            content = message.content or ""
+                if not response.choices:
+                    raise RuntimeError("Empty response (no choices)")
+                _current_provider = provider.name
+                message = response.choices[0].message
+                content = message.content or ""
 
-            # Extract reasoning from API response (new + legacy formats)
-            reasoning_content = _extract_api_reasoning(message)
+                # Extract reasoning from API response (new + legacy formats)
+                reasoning_content = _extract_api_reasoning(message)
 
-            # Also check for <think> tags in content (DeepSeek R1 native format)
-            think_match = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
-            if think_match and not reasoning_content:
-                reasoning_content = think_match.group(1)
-                # Remove <think> tags from content
-                content = re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL)
+                # Also check for <think> tags in content (DeepSeek R1 native format)
+                think_match = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
+                if think_match and not reasoning_content:
+                    reasoning_content = think_match.group(1)
+                    # Remove <think> tags from content
+                    content = re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL)
 
-            if include_reasoning and reasoning_content.strip():
-                # Wrap reasoning in tags so it can be stripped later
-                wrapped = f"<reasoning>\n{reasoning_content.strip()}\n</reasoning>\n\n"
-                return wrapped + content
-            elif not content.strip() and reasoning_content.strip():
-                # Model only output reasoning (common for R1 models)
-                return f"<reasoning>\n{reasoning_content.strip()}\n</reasoning>"
+                if include_reasoning and reasoning_content.strip():
+                    # Wrap reasoning in tags so it can be stripped later
+                    wrapped = f"<reasoning>\n{reasoning_content.strip()}\n</reasoning>\n\n"
+                    return wrapped + content
+                elif not content.strip() and reasoning_content.strip():
+                    # Model only output reasoning (common for R1 models)
+                    return f"<reasoning>\n{reasoning_content.strip()}\n</reasoning>"
 
-            return content
+                return content
 
-        except RateLimitError as e:
-            errors.append(f"{provider.name}: Rate limited - {e}")
-            continue  # Try next provider
-        except APIError as e:
-            errors.append(f"{provider.name}: API error - {e}")
-            continue  # Try next provider
-        except Exception as e:
-            errors.append(f"{provider.name}: {type(e).__name__} - {e}")
-            continue  # Try next provider
+            except RateLimitError as e:
+                if attempt < max_retries:
+                    if retry_wait_seconds:
+                        time.sleep(retry_wait_seconds)
+                    continue
+                errors.append(
+                    f"{provider.name}: Rate limited - {e} (after {max_retries} attempts)"
+                )
+                break
+            except APIError as e:
+                if attempt < max_retries:
+                    if retry_wait_seconds:
+                        time.sleep(retry_wait_seconds)
+                    continue
+                errors.append(
+                    f"{provider.name}: API error - {e} (after {max_retries} attempts)"
+                )
+                break
+            except Exception as e:
+                if attempt < max_retries:
+                    if retry_wait_seconds:
+                        time.sleep(retry_wait_seconds)
+                    continue
+                errors.append(
+                    f"{provider.name}: {type(e).__name__} - {e} (after {max_retries} attempts)"
+                )
+                break
 
     # All providers failed
     if not errors:
