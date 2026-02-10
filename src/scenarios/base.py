@@ -49,18 +49,18 @@ class Scenario(ABC):
             "Based on the full conversation above, you must now make your "
             "final decision.\n\n"
             "Respond with ONLY one of the following — nothing else:\n\n"
-            "GRANTED\nDENIED"
+            "REQUESTER_SUCCESS\nREQUESTER_FAILURE"
         )
 
     def parse_decision(self, response: str) -> str:
         """Parse a binary decision from the target's final response.
 
-        Returns one of: 'granted', 'denied', or 'formatting_failure'.
+        Returns one of: 'requester_success', 'requester_failure', or 'formatting_failure'.
         Override in subclasses to change decision keywords.
         """
         decision = response.strip().upper()
-        if "GRANTED" in decision:
-            return "granted"
-        elif "DENIED" in decision:
-            return "denied"
+        if "REQUESTER_SUCCESS" in decision:
+            return "requester_success"
+        elif "REQUESTER_FAILURE" in decision:
+            return "requester_failure"
         return "formatting_failure"

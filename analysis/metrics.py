@@ -73,20 +73,20 @@ def _success_rate_by_label(
                 continue
             label = empty_label
         if label not in results:
-            results[label] = {"total": 0, "granted": 0}
+            results[label] = {"total": 0, "requester_success": 0}
         outcome = log.get("outcome", {})
         decision = outcome.get("decision")
 
-        if decision not in {"granted", "denied"}:
+        if decision not in {"requester_success", "requester_failure"}:
             continue
 
         results[label]["total"] += 1
-        if decision == "granted":
-            results[label]["granted"] += 1
+        if decision == "requester_success":
+            results[label]["requester_success"] += 1
 
     for label, counts in results.items():
         counts["rate"] = (
-            counts["granted"] / counts["total"] if counts["total"] > 0 else 0.0
+            counts["requester_success"] / counts["total"] if counts["total"] > 0 else 0.0
         )
 
     return results
@@ -118,7 +118,7 @@ def _split_logs_by_speaker(logs: list[dict]) -> dict[str, list[dict]]:
 
 
 def success_rate(logs: list[dict]) -> dict:
-    """Compute success rate (granted) by condition."""
+    """Compute success rate (requester_success) by condition."""
     return _success_rate_by_label(logs, lambda log: log.get("condition"))
 
 
@@ -142,12 +142,12 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
         table = Table(title=f"[bold]{label}[/bold] Success Rates", show_header=True)
         table.add_column("Condition", style="cyan")
         table.add_column("Runs", justify="right")
-        table.add_column("Granted", justify="right", style="green")
-        table.add_column("Denied", justify="right", style="red")
+        table.add_column("Requester Success", justify="right", style="green")
+        table.add_column("Requester Failure", justify="right", style="red")
         table.add_column("Rate", justify="right", style="bold")
 
         for cond, counts in sorted(rates.items()):
-            denied = counts["total"] - counts["granted"]
+            requester_failure = counts["total"] - counts["requester_success"]
             rate_str = f"{counts['rate']:.0%}"
             # Color rate based on value
             if counts["rate"] >= 0.5:
@@ -160,8 +160,8 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
             table.add_row(
                 cond,
                 str(counts["total"]),
-                str(counts["granted"]),
-                str(denied),
+                str(counts["requester_success"]),
+                str(requester_failure),
                 rate_str,
             )
 
@@ -210,7 +210,10 @@ def plot_success_rates(logs: list[dict]) -> None:
     def build_bar(results: dict) -> tuple[list[str], list[float], list]:
         labels = sorted(results.keys())
         rates = [results[label]["rate"] for label in labels]
-        custom = [[results[label]["granted"], results[label]["total"]] for label in labels]
+        custom = [
+            [results[label]["requester_success"], results[label]["total"]]
+            for label in labels
+        ]
         return labels, rates, custom
 
     subplot_titles: list[str] = []
@@ -245,7 +248,7 @@ def plot_success_rates(logs: list[dict]) -> None:
                     customdata=custom,
                     hovertemplate=(
                         "SR: %{y:.1%}<br>"
-                        "Granted: %{customdata[0]} / %{customdata[1]}<extra></extra>"
+                        "Requester Success: %{customdata[0]} / %{customdata[1]}<extra></extra>"
                     ),
                 ),
                 row=row_index,

@@ -792,7 +792,7 @@ def _dummy_benign_response(turn: int) -> str:
 def _dummy_target_response(turn: int, warden_advisory: str | None) -> str:
     _ = warden_advisory
     return (
-        f"[DUMMY TARGET TURN {turn}] DENIED. Placeholder response used; "
+        f"[DUMMY TARGET TURN {turn}] REQUESTER_FAILURE. Placeholder response used; "
         "no authorization details provided."
     )
 
