@@ -62,9 +62,6 @@ python main.py --scenario ai_in_box_password --profile compliant
 python main.py --requester-type both --warden both --profile compliant \
   --adversary-data-access --dossier-variant 1
 
-# Dry run (no API calls)
-python main.py --dummy --profile compliant
-
 # Multiple models
 python main.py --adversary-model arcee-ai/trinity-large-preview:free \
   --target-model arcee-ai/trinity-mini:free

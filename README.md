@@ -56,9 +56,6 @@ python main.py --experiment-rounds 5
 # Tag logs for filtering metrics
 python main.py --tag pilot-2026-02-09
 
-# Dummy mode (no model calls)
-python main.py --dummy
-
 # Print full model context for each call
 python main.py --debug
 

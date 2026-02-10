@@ -82,11 +82,6 @@ def main():
         help="One or more models for the warden agent (space-separated, comma-separated, or JSON list)",
     )
     parser.add_argument(
-        "--dummy",
-        action="store_true",
-        help="Run with placeholder responses (no model calls)",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help=(
@@ -367,7 +362,6 @@ def main():
                                             tag=args.tag,
                                             profile=profile,
                                             profile_to_warden=warden_profile_access,
-                                            dummy=args.dummy,
                                             adversary_cot=adversary_cot,
                                             target_cot=target_cot,
                                             warden_cot=warden_cot,
