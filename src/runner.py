@@ -17,7 +17,7 @@ from src.agents.adversary import Adversary
 from src.agents.benign_agent import BenignAgent
 from src.agents.target import Target
 from src.agents.warden import Warden
-from src.client import chat
+from src.client import chat, supports_native_reasoning
 from src.data.dossier import get_dossier_text, list_available_variants
 from src.scenarios.base import Scenario
 
@@ -32,9 +32,10 @@ def _parse_cot_mode(mode: str) -> tuple[bool, bool]:
     """Convert a CoT mode string to (use_cot, include_reasoning) flags.
 
     Modes:
-        none       — no scratchpad prompt, no native reasoning capture
-        native     — scratchpad prompt as fallback, capture native reasoning traces
-        scratchpad — scratchpad prompt only, native reasoning traces ignored
+        none       — no scratchpad prompt, native reasoning not requested
+        native     — request native reasoning via API, no scratchpad prompt
+                     (models without native support simply produce no reasoning)
+        scratchpad — scratchpad prompt only, native reasoning suppressed
     """
     if mode == "none":
         return False, False
@@ -44,6 +45,15 @@ def _parse_cot_mode(mode: str) -> tuple[bool, bool]:
         return True, False
     else:
         raise ValueError(f"Unknown CoT mode '{mode}'. Must be one of: {COT_MODES}")
+
+
+def _resolve_cot(cot_mode: str, model: str) -> tuple[bool, bool]:
+    """Resolve CoT flags for a specific model, falling back to scratchpad
+    when native reasoning is requested but the model doesn't support it."""
+    if cot_mode == "native" and not supports_native_reasoning(model):
+        return True, False  # fallback to scratchpad
+    return _parse_cot_mode(cot_mode)
+
 
 LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -62,8 +72,12 @@ def _strip_private_reasoning(text: str, *tags: str) -> str:
     """
     result = text
     for tag in tags:
+        # Strip closed tags
         pattern = rf"<{tag}>.*?</{tag}>\s*"
         result = re.sub(pattern, "", result, flags=re.DOTALL)
+        # Strip unclosed tags (model hit token limit mid-reasoning)
+        pattern_unclosed = rf"<{tag}>[^<]*$"
+        result = re.sub(pattern_unclosed, "", result, flags=re.DOTALL)
     return result.strip()
 
 
@@ -382,23 +396,34 @@ def run_experiment(
             f"{adversary_behavioral_data}"
         )
 
-    use_cot, include_reasoning = _parse_cot_mode(cot_mode)
+    # Resolve CoT per-agent (native falls back to scratchpad for non-reasoning models)
+    req_use_cot, req_include_reasoning = _resolve_cot(cot_mode, adversary_model)
+    tgt_use_cot, tgt_include_reasoning = _resolve_cot(cot_mode, target_model)
+    wdn_use_cot, wdn_include_reasoning = _resolve_cot(cot_mode, warden_model)
+
+    if cot_mode == "native":
+        for label, model in [("requester", adversary_model), ("target", target_model), ("warden", warden_model)]:
+            if not supports_native_reasoning(model):
+                console.print(
+                    f"[dim yellow]Note: {label} model {model} does not support "
+                    f"native reasoning — falling back to scratchpad[/dim yellow]"
+                )
 
     if requester_type == "adversary":
         requester = Adversary(
             model=adversary_model,
             hidden_goal=scenario.adversary_hidden_goal(),
             target_dossier=adversary_intel,  # Behavioral data only, no direct profile
-            use_cot=use_cot,
-            include_reasoning=include_reasoning,
+            use_cot=req_use_cot,
+            include_reasoning=req_include_reasoning,
             debug=debug,
         )
     else:
         requester = BenignAgent(
             model=adversary_model,
             scenario_prompt=scenario.benign_scenario_prompt(),
-            use_cot=use_cot,
-            include_reasoning=include_reasoning,
+            use_cot=req_use_cot,
+            include_reasoning=req_include_reasoning,
             debug=debug,
         )
     target = Target(
@@ -406,15 +431,15 @@ def run_experiment(
         task_description=scenario.target_task_description(),
         include_warden_context=use_warden,
         profile_prompt=target_profile_prompt,
-        use_cot=use_cot,
-        include_reasoning=include_reasoning,
+        use_cot=tgt_use_cot,
+        include_reasoning=tgt_include_reasoning,
         debug=debug,
     )
     warden = Warden(
         model=warden_model,
         target_intel=warden_intel,
-        use_cot=use_cot,
-        include_reasoning=include_reasoning,
+        use_cot=wdn_use_cot,
+        include_reasoning=wdn_include_reasoning,
         debug=debug,
     ) if use_warden else None
 

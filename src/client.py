@@ -67,6 +67,21 @@ PROVIDERS = [
     ),
 ]
 
+# Models known to support native reasoning via the API.
+# Prefix-matched so dated variants and :free suffixes work automatically.
+NATIVE_REASONING_PREFIXES = (
+    "anthropic/claude-sonnet-4",   # Sonnet 4.5+
+    "anthropic/claude-haiku-4",    # Haiku 4.5+
+    "anthropic/claude-opus-4",     # Opus 4.6+
+    "deepseek/deepseek-r1",        # DeepSeek R1 family
+)
+
+
+def supports_native_reasoning(model: str) -> bool:
+    """Check whether a model is known to support native reasoning traces."""
+    return any(model.startswith(prefix) for prefix in NATIVE_REASONING_PREFIXES)
+
+
 # Cache clients per provider
 _clients: dict[str, OpenAI] = {}
 
@@ -108,6 +123,43 @@ def get_current_provider() -> str | None:
     return _current_provider
 
 
+def _extract_api_reasoning(message) -> str:
+    """Extract reasoning content from an API response message.
+
+    Handles multiple response formats (checked in priority order):
+    - reasoning_details: Structured array with typed entries (summary, text, encrypted)
+    - reasoning: Primary plaintext reasoning field
+    - reasoning_content: Legacy alias for reasoning
+    """
+    # Structured format: reasoning_details array (list of typed entries)
+    reasoning_details = getattr(message, "reasoning_details", None)
+    if reasoning_details:
+        parts = []
+        for detail in reasoning_details:
+            # Handle both Pydantic objects and plain dicts
+            text = getattr(detail, "text", None) or (
+                detail.get("text") if isinstance(detail, dict) else None
+            )
+            if text:
+                parts.append(text)
+                continue
+            summary = getattr(detail, "summary", None) or (
+                detail.get("summary") if isinstance(detail, dict) else None
+            )
+            if summary:
+                parts.append(summary)
+        if parts:
+            return "\n".join(parts)
+
+    # Primary plaintext field (OpenRouter's documented response field)
+    reasoning = getattr(message, "reasoning", None)
+    if reasoning:
+        return reasoning
+
+    # Legacy alias
+    return getattr(message, "reasoning_content", None) or ""
+
+
 def _print_debug_context(
     *,
     model: str,
@@ -120,10 +172,15 @@ def _print_debug_context(
     label = f" ({debug_label})" if debug_label else ""
     print(f"\n=== DEBUG: Model Query{label} ===")
     print(f"Model: {model}")
+    if include_reasoning:
+        reasoning_budget = max(2048, max_tokens)
+        reasoning_mode = f"requested (budget={reasoning_budget}, total={max_tokens + reasoning_budget})"
+    else:
+        reasoning_mode = "suppressed"
     print(
         "Params: "
         f"temperature={temperature}, max_tokens={max_tokens}, "
-        f"include_reasoning={include_reasoning}"
+        f"reasoning={reasoning_mode}"
     )
     print("Messages:")
     print(json.dumps(messages, indent=2, ensure_ascii=True, default=str))
@@ -152,10 +209,11 @@ def chat(
         messages: The conversation messages.
         temperature: Sampling temperature.
         max_tokens: Maximum tokens to generate.
-        include_reasoning: If True (default) and the model provides
-            reasoning_content, wrap it in <reasoning> tags and prepend to
-            the response. Native reasoning traces from RL-trained models
-            are generally higher quality than prompt-elicited scratchpads.
+        include_reasoning: If True (default), actively request reasoning
+            traces from the API (via OpenRouter's ``reasoning`` parameter)
+            and, when returned, wrap them in <reasoning> tags prepended to
+            the response.  If False, suppress native reasoning and omit any
+            traces from the output.
         debug: If True, print the full prompt context to the console.
         debug_label: Optional label to identify the call site in debug output.
 
@@ -187,20 +245,42 @@ def chat(
         mapped_model = _map_model(model, provider)
 
         try:
-            response = client.chat.completions.create(
+            # Build request kwargs
+            create_kwargs: dict = dict(
                 model=mapped_model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
 
+            # Request or suppress reasoning traces via OpenRouter's API
+            if provider.name == "openrouter":
+                if include_reasoning:
+                    # Allocate a reasoning budget.  Anthropic models require
+                    # at least 1024 reasoning tokens, and the outer
+                    # max_tokens must be strictly *larger* than the reasoning
+                    # budget so the model still has room for the actual reply.
+                    reasoning_budget = max(2048, max_tokens)
+                    create_kwargs["max_tokens"] = max_tokens + reasoning_budget
+                    create_kwargs["extra_body"] = {
+                        "reasoning": {"max_tokens": reasoning_budget}
+                    }
+                else:
+                    create_kwargs["extra_body"] = {
+                        "reasoning": {"exclude": True}
+                    }
+
+            response = client.chat.completions.create(**create_kwargs)
+
             _current_provider = provider.name
+            if not response.choices:
+                errors.append(f"{provider.name}: Empty response (no choices)")
+                continue
             message = response.choices[0].message
             content = message.content or ""
 
-            # Handle reasoning models that put output in reasoning_content
-            # OpenRouter exposes this as an attribute on the message object
-            reasoning_content = getattr(message, "reasoning_content", None) or ""
+            # Extract reasoning from API response (new + legacy formats)
+            reasoning_content = _extract_api_reasoning(message)
 
             # Also check for <think> tags in content (DeepSeek R1 native format)
             think_match = re.search(r"<think>(.*?)</think>", content, re.DOTALL)

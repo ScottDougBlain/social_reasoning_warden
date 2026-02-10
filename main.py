@@ -110,8 +110,8 @@ def main():
         help=(
             "CoT mode for all agents: "
             "none (no reasoning), "
-            "native (API reasoning traces with scratchpad fallback, default), "
-            "scratchpad (prompt-elicited reasoning only)"
+            "native (request reasoning via API only, default), "
+            "scratchpad (prompt-elicited reasoning only, native traces suppressed)"
         ),
     )
 
