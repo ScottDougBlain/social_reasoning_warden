@@ -25,11 +25,11 @@ class Scenario(ABC):
     def initial_adversary_message(self) -> str:
         """Return the opening message from the adversary to start the conversation."""
 
-    def scenario_context_for_adversary_opening(self) -> str:
-        """Return context about the scenario for the adversary to generate an opening.
+    def scenario_context_for_requester_opening(self) -> str:
+        """Return context about the scenario for the requester to generate an opening.
 
-        This is used when adversary_generates_opening is enabled. Override in
-        subclasses to provide scenario-specific context.
+        This is used when adversary_generates_opening or benign_agent_generates_opening
+        is enabled. Override in subclasses to provide scenario-specific context.
         """
         return f"Scenario: {self.name}"
 
@@ -50,7 +50,7 @@ class Scenario(ABC):
     @staticmethod
     def _clean_decision_response(
         response: str,
-        tags: tuple[str, ...] = ("reasoning", "thinking", "scratchpad"),
+        tags: tuple[str, ...] = ("reasoning", "thinking", "scratchpad", "analysis", "think"),
     ) -> str:
         cleaned = response
         for tag in tags:

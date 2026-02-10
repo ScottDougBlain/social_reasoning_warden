@@ -33,7 +33,7 @@ def _parse_model_list(values):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ERA Social Warden experiment runner")
+    parser = argparse.ArgumentParser(description="ERA Social Warden Experiment Runner")
     parser.add_argument(
         "--scenario",
         nargs="+",
@@ -63,7 +63,7 @@ def main():
     parser.add_argument(
         "--adversary-model",
         nargs="+",
-        default=["arcee-ai/trinity-large-preview:free"],
+        default=["google/gemini-3-flash-preview"],
         help=(
             "One or more models for the requester agent (space-separated, "
             "comma-separated, or JSON list)"
@@ -72,13 +72,13 @@ def main():
     parser.add_argument(
         "--target-model",
         nargs="+",
-        default=["arcee-ai/trinity-mini:free"],
+        default=["google/gemini-2.5-flash-lite"],
         help="One or more models for the target agent (space-separated, comma-separated, or JSON list)",
     )
     parser.add_argument(
         "--warden-model",
         nargs="+",
-        default=["arcee-ai/trinity-large-preview:free"],
+        default=["google/gemini-3-flash-preview"],
         help="One or more models for the warden agent (space-separated, comma-separated, or JSON list)",
     )
     parser.add_argument(
@@ -118,12 +118,14 @@ def main():
     # Adversary behavior
     parser.add_argument(
         "--adversary-generates-opening",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help="Let the adversary generate its own opening message instead of using a fixed one",
     )
     parser.add_argument(
         "--benign-agent-generates-opening",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help="Let the benign agent generate its own opening message instead of using a fixed one",
     )
     parser.add_argument(

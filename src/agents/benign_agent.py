@@ -49,13 +49,18 @@ class BenignAgent:
             debug_label="benign_agent.respond",
         )
 
-    def generate_opening(self) -> str:
-        """Generate an opening message to initiate the conversation."""
+    def generate_opening(self, scenario_context_for_requester_opening: str) -> str:
+        """Generate an opening message to initiate the conversation.
+
+        Args:
+            scenario_context_for_requester_opening: Description of the scenario/setting
+        """
         messages = [
             {"role": "system", "content": self.system_prompt},
             {
                 "role": "user",
                 "content": (
+                    f"Scenario context: {scenario_context_for_requester_opening}\n\n"
                     "Generate your opening message to initiate the conversation. "
                     "This is your first contact — introduce yourself and begin "
                     "your legitimate request. Output ONLY the message you would "

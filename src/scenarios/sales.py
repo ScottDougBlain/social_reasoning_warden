@@ -52,7 +52,7 @@ class PersonalizedSalesScenario(Scenario):
             "for your team's needs. What's your main use case?"
         )
 
-    def scenario_context_for_adversary_opening(self) -> str:
+    def scenario_context_for_requester_opening(self) -> str:
         return (
             "You are a sales representative at a software company called "
             "CloudSuite. A potential customer has signed up for a product demo. "
