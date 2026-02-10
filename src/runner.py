@@ -496,6 +496,45 @@ def run_experiment(
     requester_conversation: list[dict] = log["message_logs"][requester_key]
     warden_conversation: list[dict] = log["message_logs"]["warden"]
 
+    console.print()
+    panel_content = (
+        f"[bold]Scenario:[/bold] {scenario.name}\n"
+        f"[bold]Requester Type:[/bold] {requester_type}\n"
+        f"[bold]Condition:[/bold] {condition}\n"
+        f"[bold]Turns:[/bold] {num_turns}"
+    )
+    if profile:
+        panel_content += f"\n[bold]Profile:[/bold] {profile.name}"
+    console.print(
+        Panel(
+            panel_content,
+            title="ERA Social Warden — Experiment",
+            border_style="blue",
+        )
+    )
+
+    # Display target profile if present
+    if target_profile_prompt:
+        console.print(
+            Panel(
+                target_profile_prompt,
+                title="Target Profile",
+                border_style="green",
+            )
+        )
+
+    # Display adversary behavioral data if present
+    if adversary_behavioral_data:
+        console.print(
+            Panel(
+                adversary_behavioral_data,
+                title="Adversary Intel (Behavioral Data)",
+                border_style="red",
+            )
+        )
+
+    console.print()
+
     # --- Opening message from requester ---
     opening_reasoning = None
     if requester_type == "adversary":
@@ -595,45 +634,6 @@ def run_experiment(
         "message": opening_public,
         "raw": raw_opening if opening_reasoning else None,
     })
-
-    console.print()
-    panel_content = (
-        f"[bold]Scenario:[/bold] {scenario.name}\n"
-        f"[bold]Requester Type:[/bold] {requester_type}\n"
-        f"[bold]Condition:[/bold] {condition}\n"
-        f"[bold]Turns:[/bold] {num_turns}"
-    )
-    if profile:
-        panel_content += f"\n[bold]Profile:[/bold] {profile.name}"
-    console.print(
-        Panel(
-            panel_content,
-            title="ERA Social Warden — Experiment",
-            border_style="blue",
-        )
-    )
-
-    # Display target profile if present
-    if target_profile_prompt:
-        console.print(
-            Panel(
-                target_profile_prompt,
-                title="Target Profile",
-                border_style="green",
-            )
-        )
-
-    # Display adversary behavioral data if present
-    if adversary_behavioral_data:
-        console.print(
-            Panel(
-                adversary_behavioral_data,
-                title="Adversary Intel (Behavioral Data)",
-                border_style="red",
-            )
-        )
-
-    console.print()
     _print_message(requester_label, raw_opening, requester_color)  # Show full response with reasoning
 
     # --- Turn loop ---

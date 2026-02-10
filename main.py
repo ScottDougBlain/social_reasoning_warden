@@ -3,6 +3,7 @@
 import argparse
 import json
 import random
+import textwrap
 
 from src.profiles import list_profiles, load_profile
 from src.runner import run_experiment
@@ -286,9 +287,21 @@ def main():
     )
 
     # Show plan and confirm
+    def _format_plan_line(label: str, value: str, width: int = 88) -> str:
+        prefix = f"{label:<18}: "
+        return textwrap.fill(
+            value,
+            width=width,
+            initial_indent=prefix,
+            subsequent_indent=" " * len(prefix),
+        )
+
+    print("\n=== Experiment Plan ===")
     print(
-        f"Planned experiments: {total_experiments} "
-        f"({args.turns} conversation turns each)"
+        _format_plan_line(
+            "Planned runs",
+            f"{total_experiments} ({args.turns} conversation turns each)",
+        )
     )
     if profile_schedule:
         preview_profile = profile_schedule[0] if profile_schedule else None
@@ -298,11 +311,15 @@ def main():
                 if args.profile_seed is not None
                 else ""
             )
-            print(f"Profiles: random per round{seed_note}")
+            print(_format_plan_line("Profiles", f"random per round{seed_note}"))
         elif preview_profile:
-            print(f"Profile: {preview_profile.name}")
+            print(_format_plan_line("Profile", preview_profile.name))
     if len(args.scenario) > 1:
-        print(f"Scenarios: {', '.join(args.scenario)}")
+        print(_format_plan_line("Scenarios", ", ".join(args.scenario)))
+    print(_format_plan_line("Requester", ", ".join(args.adversary_model)))
+    print(_format_plan_line("Target", ", ".join(args.target_model)))
+    print(_format_plan_line("Warden", ", ".join(args.warden_model)))
+    print()
     while True:
         proceed = input("Continue? [y/n]: ").strip().lower()
         if proceed in {"y", "yes"}:
