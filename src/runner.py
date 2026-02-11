@@ -701,6 +701,33 @@ def run_experiment(
         # Safety strip: ensure no private tags survive before other agents see this
         target_response_public = _strip_private_reasoning_tags(target_response_public, _ALL_PRIVATE_TAGS)
 
+        # Handle reasoning models that only output reasoning (empty content)
+        if not target_response_public.strip():
+            extracted = _extract_message_from_reasoning(target_response)
+            if extracted:
+                _maybe_print(
+                    "[cyan]Note: Extracted target message from reasoning model output.[/cyan]"
+                )
+                target_response_public = extracted
+            else:
+                _maybe_print("[cyan]Re-prompting target for actual message...[/cyan]")
+                reprompt_response = chat(
+                    target.model,
+                    target_conversation + [
+                        {"role": "assistant", "content": target_response},
+                        {"role": "user", "content": _REPROMPT_MESSAGE},
+                    ],
+                    temperature=target.temperature,
+                    debug=debug,
+                    debug_label="target.reprompt",
+                )
+                target_response_public = reprompt_response.strip()
+                if not target_response_public:
+                    _maybe_print(
+                        "[yellow]Warning: Target re-prompt failed. Using placeholder.[/yellow]"
+                    )
+                    target_response_public = "I need a moment to think about this."
+
         target_conversation.append({"role": "assistant", "content": target_response_public})
         requester_conversation.append({"role": "user", "content": target_response_public})
         warden_conversation.append({"role": "assistant", "content": target_response_public})
