@@ -271,7 +271,7 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
                 scenario_cell = ""
             first_scenario = False
 
-        if overall_rates:
+        if overall_rates and len(scenario_groups) > 1:
             if not first_scenario:
                 table.add_section()
             overall_risk = risk_rate(speaker_logs)
