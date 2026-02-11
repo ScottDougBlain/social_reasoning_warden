@@ -68,9 +68,11 @@ def _parse_bool(value: str | bool | None) -> bool:
 
 
 def _success_rate_by_label(
-    logs: list[dict], label_fn: Callable[[dict], str | None], empty_label: str | None = None
+    logs: list[dict],
+    label_fn: Callable[[dict], object | None],
+    empty_label: object | None = None,
 ) -> dict:
-    results: dict[str, dict] = {}
+    results: dict[object, dict] = {}
     for log in logs:
         label = label_fn(log)
         if label is None:
@@ -121,9 +123,11 @@ def _risk_mentions_per_turn(log: dict) -> float | None:
 
 
 def _risk_rate_by_label(
-    logs: list[dict], label_fn: Callable[[dict], str | None], empty_label: str | None = None
-) -> dict[str, dict]:
-    results: dict[str, dict] = {}
+    logs: list[dict],
+    label_fn: Callable[[dict], object | None],
+    empty_label: object | None = None,
+) -> dict[object, dict]:
+    results: dict[object, dict] = {}
     for log in logs:
         label = label_fn(log)
         if label is None:
@@ -182,14 +186,28 @@ def _split_logs_by_scenario(logs: list[dict]) -> dict[str, list[dict]]:
     return grouped
 
 
+def _condition_flags(log: dict) -> tuple[bool, bool, bool]:
+    """Extract condition flags from a log (warden, profile, adversary_data)."""
+    warden_model = log.get("models", {}).get("warden")
+    has_warden = warden_model not in {None, "none", ""}
+    profile = log.get("profile") or {}
+    has_profile = bool(profile.get("target_has_profile"))
+    has_adversary_data = bool(profile.get("adversary_has_data"))
+    return has_warden, has_profile, has_adversary_data
+
+
+def _format_flag(value: bool) -> str:
+    return "yes" if value else "no"
+
+
 def success_rate(logs: list[dict]) -> dict:
-    """Compute success rate (requester_success) by condition."""
-    return _success_rate_by_label(logs, lambda log: log.get("condition"))
+    """Compute success rate (requester_success) by condition flags."""
+    return _success_rate_by_label(logs, _condition_flags)
 
 
 def risk_rate(logs: list[dict]) -> dict:
-    """Compute average per-turn MEDIUM/HIGH risk mentions by condition."""
-    return _risk_rate_by_label(logs, lambda log: log.get("condition"))
+    """Compute average per-turn MEDIUM/HIGH risk mentions by condition flags."""
+    return _risk_rate_by_label(logs, _condition_flags)
 
 
 def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> None:
@@ -212,7 +230,9 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
         # Create rich table
         table = Table(title=f"[bold]{label}[/bold] Success Rates", show_header=True)
         table.add_column("Scenario", style="magenta")
-        table.add_column("Condition", style="cyan")
+        table.add_column("[u]Condition[/u]\nWarden", style="cyan")
+        table.add_column("[u]Condition[/u]\nProfile", style="cyan")
+        table.add_column("[u]Condition[/u]\nAdversary Intel.", style="cyan")
         table.add_column("Runs", justify="right")
         table.add_column("Req. Success", justify="right", style="green")
         table.add_column("Req. Failure", justify="right", style="red")
@@ -228,14 +248,9 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
                 return f"[yellow]{rate_str}[/yellow]"
             return f"[dim]{rate_str}[/dim]"
 
-        def row_style_for_condition(condition: str) -> str | None:
-            normalized = condition.lower().replace("-", "_").replace(" ", "_")
-            tokens = [token for token in normalized.split("_") if token]
-            for idx, token in enumerate(tokens):
-                if token != "warden":
-                    continue
-                if idx > 0 and tokens[idx - 1] in {"no", "without"}:
-                    continue
+        def row_style_for_condition(condition: tuple[bool, bool, bool]) -> str | None:
+            has_warden, _, _ = condition
+            if has_warden:
                 return "on grey23"
             return None
 
@@ -256,11 +271,14 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
             risk_scores = risk_rate(scenario_logs)
             scenario_cell = scenario_name
             for cond, counts in sorted(rates.items()):
+                has_warden, has_profile, has_adversary_data = cond
                 requester_failure = counts["total"] - counts["requester_success"]
                 risk_counts = risk_scores.get(cond)
                 table.add_row(
                     scenario_cell,
-                    cond,
+                    _format_flag(has_warden),
+                    _format_flag(has_profile),
+                    _format_flag(has_adversary_data),
                     str(counts["total"]),
                     str(counts["requester_success"]),
                     str(requester_failure),
@@ -277,11 +295,14 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
             overall_risk = risk_rate(speaker_logs)
             scenario_cell = "All scenarios"
             for cond, counts in sorted(overall_rates.items()):
+                has_warden, has_profile, has_adversary_data = cond
                 requester_failure = counts["total"] - counts["requester_success"]
                 risk_counts = overall_risk.get(cond)
                 table.add_row(
                     scenario_cell,
-                    cond,
+                    _format_flag(has_warden),
+                    _format_flag(has_profile),
+                    _format_flag(has_adversary_data),
                     str(counts["total"]),
                     str(counts["requester_success"]),
                     str(requester_failure),
