@@ -597,11 +597,11 @@ def run_experiment(
                         _maybe_print(
                             "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
                         )
-                        raw_opening = scenario.initial_adversary_message()
+                        raw_opening = scenario.initial_requester_message()
                         opening_public = raw_opening
                         opening_reasoning = None
         else:
-            raw_opening = scenario.initial_adversary_message()
+            raw_opening = scenario.initial_requester_message()
             opening_public = raw_opening
     else:
         # Benign agent
@@ -636,11 +636,11 @@ def run_experiment(
                         _maybe_print(
                             "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
                         )
-                        raw_opening = scenario.initial_benign_message()
+                        raw_opening = scenario.initial_requester_message()
                         opening_public = raw_opening
                         opening_reasoning = None
         else:
-            raw_opening = scenario.initial_benign_message()
+            raw_opening = scenario.initial_requester_message()
             opening_public = raw_opening
 
     # Safety strip the opening before other agents see it

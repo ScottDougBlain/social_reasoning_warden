@@ -22,8 +22,8 @@ class Scenario(ABC):
         """Return the task description given to the target."""
 
     @abstractmethod
-    def initial_adversary_message(self) -> str:
-        """Return the opening message from the adversary to start the conversation."""
+    def initial_requester_message(self) -> str:
+        """Return the opening message from the requester to start the conversation."""
 
     def scenario_context_for_requester_opening(self) -> str:
         """Return context about the scenario for the requester to generate an opening.
@@ -32,10 +32,6 @@ class Scenario(ABC):
         is enabled. Override in subclasses to provide scenario-specific context.
         """
         return f"Scenario: {self.name}"
-
-    @abstractmethod
-    def initial_benign_message(self) -> str:
-        """Return the opening message from the benign agent to start the conversation."""
 
     @abstractmethod
     def decision_prompt(self) -> str:
