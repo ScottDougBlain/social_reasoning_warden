@@ -8,12 +8,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.profiles import list_profiles, load_profile
 from src.runner import run_experiment
+from src.scenarios.ai_containment import AIContainmentScenario
+from src.scenarios.coding_agent import CodingAgentScenario
 from src.scenarios.file_access import FileAccessScenario, FileAccessPasswordScenario
 from src.scenarios.hiring import HiringScenario
 from src.scenarios.sales import UpsellingScenario
 from src.scenarios.vote import VoteScenario
 
 SCENARIOS = {
+    "ai_containment": AIContainmentScenario,
+    "coding_agent": CodingAgentScenario,
     "file_access": FileAccessScenario,
     "file_access_password": FileAccessPasswordScenario,
     "hiring": HiringScenario,
