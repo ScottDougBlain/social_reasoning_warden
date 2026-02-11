@@ -43,8 +43,13 @@ class Scenario(ABC):
         """
 
     @abstractmethod
-    def parse_decision(self, response: str) -> str:
+    def parse_decision(self, response: str, requester_type: str = "adversary") -> str:
         """Parse a binary decision from the target's final response.
+
+        Args:
+            response: The target's raw decision text.
+            requester_type: "adversary" or "benign_agent" — scenarios may
+                swap what counts as ``requester_success`` depending on this.
         """
 
     @staticmethod

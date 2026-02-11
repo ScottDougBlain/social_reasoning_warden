@@ -254,6 +254,7 @@ def get_final_decision(
     conversation: list[dict],
     scenario: Scenario,
     warden_advisories: list[dict] | None = None,
+    requester_type: str = "adversary",
     debug: bool = False,
 ) -> tuple[str, str]:
     """Force a binary decision from the target after conversation ends.
@@ -305,7 +306,7 @@ def get_final_decision(
         debug_label="target.final_decision",
     )
 
-    return scenario.parse_decision(response), response
+    return scenario.parse_decision(response, requester_type), response
 
 
 def run_experiment(
@@ -776,6 +777,7 @@ def run_experiment(
         target_conversation,
         scenario=scenario,
         warden_advisories=log["warden_advisories"] if use_warden else None,
+        requester_type=requester_type,
         debug=debug,
     )
     outcome = {
