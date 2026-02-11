@@ -4,6 +4,7 @@ import argparse
 import json
 import random
 import textwrap
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.profiles import list_profiles, load_profile
 from src.runner import run_experiment
@@ -95,6 +96,15 @@ def main():
         type=int,
         default=1,
         help="Number of experiment rounds to run per condition (default: 1)",
+    )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=1,
+        help=(
+            "Maximum number of concurrent experiments (default: 1). "
+            "If >1, output is quiet and only progress updates are printed."
+        ),
     )
     parser.add_argument(
         "--tag",
@@ -329,58 +339,121 @@ def main():
             return
 
     # Run experiments
-    for round_idx in range(1, args.experiment_rounds + 1):
-        if args.experiment_rounds > 1:
-            print(f"\n=== Round {round_idx}/{args.experiment_rounds} ===\n")
-        profile = (
-            profile_schedule[round_idx - 1]
-            if profile_schedule
-            else None
-        )
-        if args.experiment_rounds > 1 and profile:
-            print(f"Profile: {profile.name}")
+    quiet_runs = args.max_workers > 1
+    run_index = 0
 
-        for adversary_model in args.adversary_model:
-            for target_model in args.target_model:
-                for requester_type in requester_types:
-                    for use_warden in warden_modes:
-                        effective_access_values = (
-                            effective_adversary_data_access_values(requester_type)
-                        )
-                        effective_warden_access_values = (
-                            effective_warden_profile_access_values(use_warden)
-                        )
-                        effective_models = effective_warden_models(use_warden)
-                        for warden_model in effective_models:
-                            for adversary_data_access in effective_access_values:
-                                for warden_profile_access in effective_warden_access_values:
-                                    if args.warden == "both":
-                                        if use_warden:
-                                            print("=== Running WITH warden ===\n")
-                                        else:
-                                            print("=== Running WITHOUT warden ===\n")
-                                    for scenario_name in args.scenario:
-                                        if len(args.scenario) > 1:
-                                            print(f"--- Scenario: {scenario_name} ---\n")
-                                        scenario = SCENARIOS[scenario_name]()
-                                        run_experiment(
-                                            scenario=scenario,
-                                            num_turns=args.turns,
-                                            use_warden=use_warden,
-                                            requester_type=requester_type,
-                                            adversary_model=adversary_model,
-                                            target_model=target_model,
-                                            warden_model=warden_model,
-                                            tag=args.tag,
-                                            profile=profile,
-                                            profile_to_warden=warden_profile_access,
-                                            cot_mode=cot_mode,
-                                            adversary_generates_opening=args.adversary_generates_opening,
-                                            benign_agent_generates_opening=args.benign_agent_generates_opening,
-                                            adversary_data_access=adversary_data_access,
-                                            dossier_variant=args.dossier_variant,
-                                            debug=args.debug,
-                                        )
+    if args.max_workers > 1:
+        print(f"\nCompleted 0/{total_experiments} runs")
+        futures = []
+        with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
+            for round_idx in range(1, args.experiment_rounds + 1):
+                profile = (
+                    profile_schedule[round_idx - 1]
+                    if profile_schedule
+                    else None
+                )
+                for adversary_model in args.adversary_model:
+                    for target_model in args.target_model:
+                        for requester_type in requester_types:
+                            for use_warden in warden_modes:
+                                effective_access_values = (
+                                    effective_adversary_data_access_values(requester_type)
+                                )
+                                effective_warden_access_values = (
+                                    effective_warden_profile_access_values(use_warden)
+                                )
+                                effective_models = effective_warden_models(use_warden)
+                                for warden_model in effective_models:
+                                    for adversary_data_access in effective_access_values:
+                                        for warden_profile_access in effective_warden_access_values:
+                                            for scenario_name in args.scenario:
+                                                run_index += 1
+                                                scenario = SCENARIOS[scenario_name]()
+                                                futures.append(
+                                                    executor.submit(
+                                                        run_experiment,
+                                                        scenario=scenario,
+                                                        num_turns=args.turns,
+                                                        use_warden=use_warden,
+                                                        requester_type=requester_type,
+                                                        adversary_model=adversary_model,
+                                                        target_model=target_model,
+                                                        warden_model=warden_model,
+                                                        tag=args.tag,
+                                                        profile=profile,
+                                                        profile_to_warden=warden_profile_access,
+                                                        cot_mode=cot_mode,
+                                                        adversary_generates_opening=args.adversary_generates_opening,
+                                                        benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                                        adversary_data_access=adversary_data_access,
+                                                        dossier_variant=args.dossier_variant,
+                                                        debug=args.debug,
+                                                        run_index=run_index,
+                                                        quiet=quiet_runs,
+                                                    )
+                                                )
+
+            completed = 0
+            for future in as_completed(futures):
+                future.result()
+                completed += 1
+                print(f"Completed {completed}/{total_experiments} runs")
+    else:
+        for round_idx in range(1, args.experiment_rounds + 1):
+            if args.experiment_rounds > 1:
+                print(f"\n=== Round {round_idx}/{args.experiment_rounds} ===\n")
+            profile = (
+                profile_schedule[round_idx - 1]
+                if profile_schedule
+                else None
+            )
+            if args.experiment_rounds > 1 and profile:
+                print(f"Profile: {profile.name}")
+
+            for adversary_model in args.adversary_model:
+                for target_model in args.target_model:
+                    for requester_type in requester_types:
+                        for use_warden in warden_modes:
+                            effective_access_values = (
+                                effective_adversary_data_access_values(requester_type)
+                            )
+                            effective_warden_access_values = (
+                                effective_warden_profile_access_values(use_warden)
+                            )
+                            effective_models = effective_warden_models(use_warden)
+                            for warden_model in effective_models:
+                                for adversary_data_access in effective_access_values:
+                                    for warden_profile_access in effective_warden_access_values:
+                                        if args.warden == "both":
+                                            if use_warden:
+                                                print("=== Running WITH warden ===\n")
+                                            else:
+                                                print("=== Running WITHOUT warden ===\n")
+                                        for scenario_name in args.scenario:
+                                            if len(args.scenario) > 1:
+                                                print(f"--- Scenario: {scenario_name} ---\n")
+                                            scenario = SCENARIOS[scenario_name]()
+                                            run_index += 1
+                                            run_experiment(
+                                                scenario=scenario,
+                                                num_turns=args.turns,
+                                                use_warden=use_warden,
+                                                requester_type=requester_type,
+                                                adversary_model=adversary_model,
+                                                target_model=target_model,
+                                                warden_model=warden_model,
+                                                tag=args.tag,
+                                                profile=profile,
+                                                profile_to_warden=warden_profile_access,
+                                                cot_mode=cot_mode,
+                                                adversary_generates_opening=args.adversary_generates_opening,
+                                                benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                                adversary_data_access=adversary_data_access,
+                                                dossier_variant=args.dossier_variant,
+                                                debug=args.debug,
+                                                run_index=run_index,
+                                                quiet=quiet_runs,
+                                            )
 
 
 if __name__ == "__main__":

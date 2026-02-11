@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 
@@ -85,17 +86,23 @@ def supports_native_reasoning(model: str) -> bool:
     return any(model.startswith(prefix) for prefix in NATIVE_REASONING_PREFIXES)
 
 
-# Cache clients per provider
-_clients: dict[str, OpenAI] = {}
+_thread_state = threading.local()
 
-# Track current provider for logging
-_current_provider: str | None = None
+
+def _get_thread_clients() -> dict[str, OpenAI]:
+    clients = getattr(_thread_state, "clients", None)
+    if clients is None:
+        clients = {}
+        _thread_state.clients = clients
+    return clients
+
 
 
 def _get_client(provider: Provider) -> OpenAI | None:
     """Get or create a client for the given provider."""
-    if provider.name in _clients:
-        return _clients[provider.name]
+    clients = _get_thread_clients()
+    if provider.name in clients:
+        return clients[provider.name]
 
     api_key = os.getenv(provider.api_key_env)
     if not api_key:
@@ -105,7 +112,7 @@ def _get_client(provider: Provider) -> OpenAI | None:
         base_url=provider.base_url,
         api_key=api_key,
     )
-    _clients[provider.name] = client
+    clients[provider.name] = client
     return client
 
 
@@ -121,9 +128,6 @@ def _map_model(model: str, provider: Provider) -> str:
     return model
 
 
-def get_current_provider() -> str | None:
-    """Return the name of the provider used for the last successful call."""
-    return _current_provider
 
 
 def _extract_api_reasoning(message) -> str:
@@ -230,8 +234,6 @@ def chat(
     Raises:
         RuntimeError: If no providers are available or all fail.
     """
-    global _current_provider
-
     if debug:
         _print_debug_context(
             model=model,
@@ -290,7 +292,6 @@ def chat(
 
                 if not response.choices:
                     raise RuntimeError("Empty response (no choices)")
-                _current_provider = provider.name
                 message = response.choices[0].message
                 content = message.content or ""
 

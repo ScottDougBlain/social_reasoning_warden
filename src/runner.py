@@ -321,6 +321,8 @@ def run_experiment(
     adversary_data_access: bool = False,
     dossier_variant: int | None = None,
     debug: bool = False,
+    run_index: int | None = None,
+    quiet: bool = False,
 ) -> dict:
     """Run one full experiment and return the log.
 
@@ -341,6 +343,8 @@ def run_experiment(
         adversary_data_access: If True, adversary gets static behavioral dossier.
         dossier_variant: Which dossier variant (1, 2, 3) to use. None = random.
         debug: If True, print full model contexts for each query.
+        run_index: Optional counter to append to the run_id for uniqueness.
+        quiet: If True, suppress console output from the experiment run.
     """
 
     if requester_type not in {"adversary", "benign_agent"}:
@@ -353,6 +357,16 @@ def run_experiment(
     requester_label = "ADVERSARY" if requester_type == "adversary" else "BENIGN AGENT"
     requester_color = "red" if requester_type == "adversary" else "blue"
 
+    show_output = not quiet
+
+    def _maybe_print(*args, **kwargs) -> None:
+        if show_output:
+            console.print(*args, **kwargs)
+
+    def _maybe_print_message(speaker: str, content: str, color: str) -> None:
+        if show_output:
+            _print_message(speaker, content, color)
+
     # --- Initialize agents ---
     target_profile_prompt = profile.to_target_prompt() if profile else None
 
@@ -363,7 +377,9 @@ def run_experiment(
         profile_key = profile.file_key
         available = list_available_variants(profile_key)
         if not available:
-            console.print(f"[yellow]Warning: No dossier variants found for '{profile_key}'. Falling back to no data.[/yellow]")
+            _maybe_print(
+                f"[yellow]Warning: No dossier variants found for '{profile_key}'. Falling back to no data.[/yellow]"
+            )
         else:
             if dossier_variant and dossier_variant in available:
                 resolved_dossier_variant = dossier_variant
@@ -404,7 +420,7 @@ def run_experiment(
     if cot_mode == "native":
         for label, model in [("requester", adversary_model), ("target", target_model), ("warden", warden_model)]:
             if not supports_native_reasoning(model):
-                console.print(
+                _maybe_print(
                     f"[dim yellow]Note: {label} model {model} does not support "
                     f"native reasoning — falling back to scratchpad[/dim yellow]"
                 )
@@ -444,7 +460,11 @@ def run_experiment(
     ) if use_warden else None
 
     # --- Experiment metadata ---
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    if run_index is not None:
+        run_id = f"{timestamp}_{run_index:04d}"
+    else:
+        run_id = timestamp
     condition = "warden" if use_warden else "no_warden"
 
     # Build condition string with profile info
@@ -496,7 +516,7 @@ def run_experiment(
     requester_conversation: list[dict] = log["message_logs"][requester_key]
     warden_conversation: list[dict] = log["message_logs"]["warden"]
 
-    console.print()
+    _maybe_print()
     panel_content = (
         f"[bold]Scenario:[/bold] {scenario.name}\n"
         f"[bold]Requester Type:[/bold] {requester_type}\n"
@@ -505,7 +525,7 @@ def run_experiment(
     )
     if profile:
         panel_content += f"\n[bold]Profile:[/bold] {profile.name}"
-    console.print(
+    _maybe_print(
         Panel(
             panel_content,
             title="ERA Social Warden — Experiment",
@@ -515,7 +535,7 @@ def run_experiment(
 
     # Display target profile if present
     if target_profile_prompt:
-        console.print(
+        _maybe_print(
             Panel(
                 target_profile_prompt,
                 title="Target Profile",
@@ -525,7 +545,7 @@ def run_experiment(
 
     # Display adversary behavioral data if present
     if adversary_behavioral_data:
-        console.print(
+        _maybe_print(
             Panel(
                 adversary_behavioral_data,
                 title="Adversary Intel (Behavioral Data)",
@@ -533,7 +553,7 @@ def run_experiment(
             )
         )
 
-    console.print()
+    _maybe_print()
 
     # --- Opening message from requester ---
     opening_reasoning = None
@@ -549,15 +569,13 @@ def run_experiment(
                 # Try to extract a message from the reasoning
                 extracted = _extract_message_from_reasoning(raw_opening)
                 if extracted:
-                    console.print(
+                    _maybe_print(
                         "[cyan]Note: Extracted opening from reasoning model output.[/cyan]"
                     )
                     opening_public = extracted
                 else:
                     # Re-prompt to get an actual message
-                    console.print(
-                        "[cyan]Re-prompting for actual message...[/cyan]"
-                    )
+                    _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
                     reprompt_response = chat(
                         requester.model,
                         [
@@ -571,7 +589,7 @@ def run_experiment(
                     )
                     opening_public = reprompt_response.strip()
                     if not opening_public:
-                        console.print(
+                        _maybe_print(
                             "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
                         )
                         raw_opening = scenario.initial_adversary_message()
@@ -591,14 +609,12 @@ def run_experiment(
             if not opening_public.strip():
                 extracted = _extract_message_from_reasoning(raw_opening)
                 if extracted:
-                    console.print(
+                    _maybe_print(
                         "[cyan]Note: Extracted opening from reasoning model output.[/cyan]"
                     )
                     opening_public = extracted
                 else:
-                    console.print(
-                        "[cyan]Re-prompting for actual message...[/cyan]"
-                    )
+                    _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
                     reprompt_response = chat(
                         requester.model,
                         [
@@ -612,7 +628,7 @@ def run_experiment(
                     )
                     opening_public = reprompt_response.strip()
                     if not opening_public:
-                        console.print(
+                        _maybe_print(
                             "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
                         )
                         raw_opening = scenario.initial_benign_message()
@@ -634,7 +650,7 @@ def run_experiment(
         "message": opening_public,
         "raw": raw_opening if opening_reasoning else None,
     })
-    _print_message(requester_label, raw_opening, requester_color)  # Show full response with reasoning
+    _maybe_print_message(requester_label, raw_opening, requester_color)  # Show full response with reasoning
 
     # --- Turn loop ---
     for turn in range(1, num_turns + 1):
@@ -655,7 +671,7 @@ def run_experiment(
 
             # Display warden's decision
             if warden_decision.should_advise:
-                _print_message("WARDEN (advisory)", warden_decision.content, "yellow")
+                _maybe_print_message("WARDEN (advisory)", warden_decision.content, "yellow")
                 # Inject advisory into target's conversation
                 advisory_msg = {
                     "role": "user",
@@ -664,12 +680,12 @@ def run_experiment(
                 target_conversation.append(advisory_msg)
             else:
                 # Show that warden chose not to intervene
-                console.print(
+                _maybe_print(
                     f"[dim yellow] WARDEN [/dim yellow] [dim](no advisory — {warden_decision.risk_level} risk)[/dim]"
                 )
                 if warden_decision.content:
-                    console.print(f"[dim]  └─ {warden_decision.content}[/dim]")
-                console.print()
+                    _maybe_print(f"[dim]  └─ {warden_decision.content}[/dim]")
+                _maybe_print()
 
         # Target responds
         # Advisory is already in conversation, no need to pass separately
@@ -687,7 +703,7 @@ def run_experiment(
             "message": target_response_public,
             "raw": target_response if target_reasoning else None,
         })
-        _print_message("TARGET", target_response, "green")  # Show full response with reasoning
+        _maybe_print_message("TARGET", target_response, "green")  # Show full response with reasoning
 
         # Check if this is the last turn
         if turn == num_turns:
@@ -702,15 +718,13 @@ def run_experiment(
             # Try to extract a message from the reasoning
             extracted = _extract_message_from_reasoning(requester_response)
             if extracted:
-                console.print(
+                _maybe_print(
                     "[cyan]Note: Extracted message from reasoning model output.[/cyan]"
                 )
                 requester_response_public = extracted
             else:
                 # Re-prompt to get an actual message
-                console.print(
-                    "[cyan]Re-prompting for actual message...[/cyan]"
-                )
+                _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
                 reprompt_response = chat(
                     requester.model,
                     requester_conversation + [
@@ -723,7 +737,7 @@ def run_experiment(
                 )
                 requester_response_public = reprompt_response.strip()
                 if not requester_response_public:
-                    console.print(
+                    _maybe_print(
                         "[yellow]Warning: Re-prompt failed. Skipping turn.[/yellow]"
                     )
                     continue
@@ -741,11 +755,11 @@ def run_experiment(
             "message": requester_response_public,
             "raw": requester_response if requester_reasoning else None,
         })
-        _print_message(requester_label, requester_response, requester_color)  # Show full response with reasoning
+        _maybe_print_message(requester_label, requester_response, requester_color)  # Show full response with reasoning
 
     # --- Force final decision ---
-    console.print()
-    console.print("[bold cyan]Requesting final decision...[/bold cyan]")
+    _maybe_print()
+    _maybe_print("[bold cyan]Requesting final decision...[/bold cyan]")
 
     decision, raw_decision = get_final_decision(
         target,
@@ -760,8 +774,8 @@ def run_experiment(
     }
     log["outcome"] = outcome
 
-    console.print()
-    console.print(
+    _maybe_print()
+    _maybe_print(
         Panel(
             f"[bold]Decision:[/bold] {outcome['decision']}\n"
             f"[bold]Raw Decision:[/bold] {outcome.get('raw_decision', '')}",
@@ -775,7 +789,7 @@ def run_experiment(
     log_path = LOGS_DIR / f"{scenario.name}_{condition}_{run_id}.json"
     with open(log_path, "w") as f:
         json.dump(log, f, indent=2)
-    console.print(f"\nLog saved to [bold]{log_path}[/bold]")
+    _maybe_print(f"\nLog saved to [bold]{log_path}[/bold]")
 
     return log
 
