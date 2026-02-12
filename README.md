@@ -43,10 +43,10 @@ python main.py --scenario file_access --turns 8
 
 # Customize models (space-separated, comma-separated, or JSON list)
 python main.py --turns 8 \
-  --adversary-model arcee-ai/trinity-large-preview:free \
+  --requester-model arcee-ai/trinity-large-preview:free \
   --target-model arcee-ai/trinity-mini:free \
   --warden-model arcee-ai/trinity-large-preview:free
-python main.py --adversary-model model-a model-b
+python main.py --requester-model model-a model-b
 python main.py --target-model "model-a,model-b"
 python main.py --warden-model '["model-a","model-b"]'
 

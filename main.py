@@ -84,7 +84,7 @@ def main():
         help="Requester type to run (default: adversary). Use 'both' to run both types.",
     )
     parser.add_argument(
-        "--adversary-model",
+        "--requester-model",
         nargs="+",
         default=["google/gemini-3-flash-preview"],
         help=(
@@ -228,7 +228,7 @@ def main():
         return
 
     # Parse model lists
-    args.adversary_model = _parse_model_list(args.adversary_model)
+    args.requester_model = _parse_model_list(args.requester_model)
     args.target_model = _parse_model_list(args.target_model)
     args.warden_model = _parse_model_list(args.warden_model)
 
@@ -312,7 +312,7 @@ def main():
     total_experiments = (
         args.experiment_rounds
         * len(args.scenario)
-        * len(args.adversary_model)
+        * len(args.requester_model)
         * len(args.target_model)
         * branch_multiplier
     )
@@ -347,7 +347,7 @@ def main():
             print(_format_plan_line("Profile", preview_profile.name))
     if len(args.scenario) > 1:
         print(_format_plan_line("Scenarios", ", ".join(args.scenario)))
-    print(_format_plan_line("Requester", ", ".join(args.adversary_model)))
+    print(_format_plan_line("Requester", ", ".join(args.requester_model)))
     print(_format_plan_line("Target", ", ".join(args.target_model)))
     print(_format_plan_line("Warden", ", ".join(args.warden_model)))
     print()
@@ -373,7 +373,7 @@ def main():
                     if profile_schedule
                     else None
                 )
-                for adversary_model in args.adversary_model:
+                for requester_model in args.requester_model:
                     for target_model in args.target_model:
                         for requester_type in requester_types:
                             for use_warden in warden_modes:
@@ -397,7 +397,7 @@ def main():
                                                         args=args,
                                                         use_warden=use_warden,
                                                         requester_type=requester_type,
-                                                        adversary_model=adversary_model,
+                                                        requester_model=requester_model,
                                                         target_model=target_model,
                                                         warden_model=warden_model,
                                                         profile=profile,
@@ -426,7 +426,7 @@ def main():
             if args.experiment_rounds > 1 and profile:
                 print(f"Profile: {profile.name}")
 
-            for adversary_model in args.adversary_model:
+            for requester_model in args.requester_model:
                 for target_model in args.target_model:
                     for requester_type in requester_types:
                         for use_warden in warden_modes:
@@ -455,7 +455,7 @@ def main():
                                                 args=args,
                                                 use_warden=use_warden,
                                                 requester_type=requester_type,
-                                                adversary_model=adversary_model,
+                                                requester_model=requester_model,
                                                 target_model=target_model,
                                                 warden_model=warden_model,
                                                 profile=profile,
@@ -472,7 +472,7 @@ def _run_scenario(
     args,
     use_warden,
     requester_type,
-    adversary_model,
+    requester_model,
     target_model,
     warden_model,
     profile,
@@ -511,7 +511,7 @@ def _run_scenario(
             num_turns=args.turns,
             use_warden=use_warden,
             requester_type=requester_type,
-            adversary_model=adversary_model,
+            adversary_model=requester_model,
             target_model=target_model,
             warden_model=warden_model,
             tag=args.tag,
@@ -531,7 +531,7 @@ def _run_scenario(
             num_turns=args.turns,
             use_warden=use_warden,
             requester_type=requester_type,
-            adversary_model=adversary_model,
+            adversary_model=requester_model,
             target_model=target_model,
             warden_model=warden_model,
             tag=args.tag,

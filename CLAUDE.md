@@ -63,7 +63,7 @@ python main.py --requester-type both --warden both --profile compliant \
   --adversary-data-access --dossier-variant 1
 
 # Multiple models
-python main.py --adversary-model arcee-ai/trinity-large-preview:free \
+python main.py --requester-model arcee-ai/trinity-large-preview:free \
   --target-model arcee-ai/trinity-mini:free
 
 # List profiles
