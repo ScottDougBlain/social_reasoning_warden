@@ -7,6 +7,7 @@ __pycache__/
 
 # Logs
 logs/*
+analysis/transcript_output/*
 
 # Notebooks
 notebooks/.ipynb_checkpoints/
