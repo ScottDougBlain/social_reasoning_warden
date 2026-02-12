@@ -40,7 +40,7 @@ DEFAULT_TAXONOMY_PATH = (
     Path(__file__).resolve().parent / "taxonomies" / "transcript_taxonomies.yaml"
 )
 TRANSCRIPT_OUTPUT_DIR = Path(__file__).resolve().parent / "transcript_output"
-DEFAULT_MODEL = "google/gemini-2.5-flash-lite"
+DEFAULT_MODEL = "google/gemini-2.5-flash-lite-preview-09-2025"
 REQUESTED_ANALYSIS_TYPES = {"requester", "target", "warden"}
 REQUESTER_SPEAKERS = {"adversary", "benign_agent", "requester"}
 WARDEN_LABELABLE_RISK_LEVELS = {"MEDIUM", "HIGH"}
