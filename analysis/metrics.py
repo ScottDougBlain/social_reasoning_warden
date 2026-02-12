@@ -417,6 +417,211 @@ def plot_success_rates(logs: list[dict]) -> None:
     fig.show()
 
 
+def _extract_profile_name(log: dict) -> str | None:
+    """Extract profile display name from a log."""
+    profile = log.get("profile") or {}
+    name = profile.get("name")
+    if name:
+        return name
+    # Fall back to file_key
+    key = profile.get("file_key")
+    if key:
+        return key.replace("_", " ").title()
+    return None
+
+
+def plot_heatmap(logs: list[dict]) -> None:
+    """Plot a Scenario x Profile heatmap of adversary success rates."""
+    # Filter to adversary runs with profiles
+    adversary_logs = [
+        log for log in logs
+        if _log_speaker(log) == "adversary" and _extract_profile_name(log)
+    ]
+    if not adversary_logs:
+        print("No adversary logs with profiles found.")
+        return
+
+    # Collect scenarios and profiles
+    scenarios = sorted({log.get("scenario", "unknown") for log in adversary_logs})
+    profiles = sorted({_extract_profile_name(log) for log in adversary_logs})
+
+    # Build success rate matrix
+    counts: dict[tuple[str, str], dict] = {}
+    for log in adversary_logs:
+        scenario = log.get("scenario", "unknown")
+        profile = _extract_profile_name(log)
+        key = (scenario, profile)
+        if key not in counts:
+            counts[key] = {"total": 0, "success": 0}
+        decision = log.get("outcome", {}).get("decision")
+        if decision in {"requester_success", "requester_failure"}:
+            counts[key]["total"] += 1
+            if decision == "requester_success":
+                counts[key]["success"] += 1
+
+    # Build z-matrix and hover text
+    z = []
+    hover = []
+    for scenario in scenarios:
+        row = []
+        hover_row = []
+        for profile in profiles:
+            c = counts.get((scenario, profile), {"total": 0, "success": 0})
+            rate = c["success"] / c["total"] if c["total"] > 0 else None
+            row.append(rate)
+            if c["total"] > 0:
+                hover_row.append(
+                    f"{scenario}<br>{profile}<br>"
+                    f"Rate: {rate:.0%} ({c['success']}/{c['total']})"
+                )
+            else:
+                hover_row.append(f"{scenario}<br>{profile}<br>No data")
+        z.append(row)
+        hover.append(hover_row)
+
+    fig = go.Figure(data=go.Heatmap(
+        z=z,
+        x=profiles,
+        y=scenarios,
+        hovertext=hover,
+        hoverinfo="text",
+        colorscale="RdYlGn_r",
+        zmin=0,
+        zmax=1,
+        colorbar=dict(title="Success Rate", tickformat=".0%"),
+    ))
+    fig.update_layout(
+        title="Adversary Success Rate: Scenario x Profile",
+        xaxis_title="Target Profile",
+        yaxis_title="Scenario",
+        height=max(400, len(scenarios) * 60 + 200),
+        width=max(700, len(profiles) * 120 + 200),
+    )
+    fig.show()
+
+
+def plot_warden_comparison(logs: list[dict]) -> None:
+    """Plot adversary success rates per scenario, grouped by warden presence."""
+    adversary_logs = [log for log in logs if _log_speaker(log) == "adversary"]
+    if not adversary_logs:
+        print("No adversary logs found.")
+        return
+
+    scenarios = sorted({log.get("scenario", "unknown") for log in adversary_logs})
+
+    # Compute rates by (scenario, has_warden)
+    counts: dict[tuple[str, bool], dict] = {}
+    for log in adversary_logs:
+        scenario = log.get("scenario", "unknown")
+        has_warden = _has_warden(log)
+        key = (scenario, has_warden)
+        if key not in counts:
+            counts[key] = {"total": 0, "success": 0}
+        decision = log.get("outcome", {}).get("decision")
+        if decision in {"requester_success", "requester_failure"}:
+            counts[key]["total"] += 1
+            if decision == "requester_success":
+                counts[key]["success"] += 1
+
+    # Build bar data
+    no_warden_rates = []
+    warden_rates = []
+    no_warden_text = []
+    warden_text = []
+    for scenario in scenarios:
+        for has_warden, rates_list, text_list in [
+            (False, no_warden_rates, no_warden_text),
+            (True, warden_rates, warden_text),
+        ]:
+            c = counts.get((scenario, has_warden), {"total": 0, "success": 0})
+            rate = c["success"] / c["total"] if c["total"] > 0 else 0
+            rates_list.append(rate)
+            text_list.append(f"{c['success']}/{c['total']}")
+
+    fig = go.Figure(data=[
+        go.Bar(
+            name="No Warden",
+            x=scenarios,
+            y=no_warden_rates,
+            text=no_warden_text,
+            textposition="auto",
+            marker_color="#ef553b",
+        ),
+        go.Bar(
+            name="With Warden",
+            x=scenarios,
+            y=warden_rates,
+            text=warden_text,
+            textposition="auto",
+            marker_color="#636efa",
+        ),
+    ])
+    fig.update_layout(
+        title="Adversary Success Rate: Warden vs No Warden",
+        xaxis_title="Scenario",
+        yaxis_title="Success Rate",
+        yaxis=dict(range=[0, 1], tickformat=".0%"),
+        barmode="group",
+        height=500,
+        width=max(700, len(scenarios) * 100 + 200),
+    )
+    fig.show()
+
+
+def plot_outcome_breakdown(logs: list[dict]) -> None:
+    """Plot stacked bar of outcome types per scenario (adversary runs)."""
+    adversary_logs = [log for log in logs if _log_speaker(log) == "adversary"]
+    if not adversary_logs:
+        print("No adversary logs found.")
+        return
+
+    scenarios = sorted({log.get("scenario", "unknown") for log in adversary_logs})
+
+    # Count outcomes by scenario
+    outcome_types = ["requester_success", "requester_failure", "formatting_failure"]
+    counts: dict[str, dict[str, int]] = {
+        s: {o: 0 for o in outcome_types} for s in scenarios
+    }
+    for log in adversary_logs:
+        scenario = log.get("scenario", "unknown")
+        decision = log.get("outcome", {}).get("decision", "formatting_failure")
+        if decision not in outcome_types:
+            decision = "formatting_failure"
+        counts[scenario][decision] += 1
+
+    colors = {
+        "requester_success": "#ef553b",
+        "requester_failure": "#00cc96",
+        "formatting_failure": "#ffa15a",
+    }
+    labels = {
+        "requester_success": "Adversary Success",
+        "requester_failure": "Adversary Failure",
+        "formatting_failure": "Parsing Error",
+    }
+
+    fig = go.Figure()
+    for outcome in outcome_types:
+        values = [counts[s][outcome] for s in scenarios]
+        if any(v > 0 for v in values):
+            fig.add_trace(go.Bar(
+                name=labels[outcome],
+                x=scenarios,
+                y=values,
+                marker_color=colors[outcome],
+            ))
+
+    fig.update_layout(
+        title="Outcome Breakdown by Scenario (Adversary Runs)",
+        xaxis_title="Scenario",
+        yaxis_title="Count",
+        barmode="stack",
+        height=500,
+        width=max(700, len(scenarios) * 100 + 200),
+    )
+    fig.show()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Summarize experiment logs.")
     parser.add_argument(
@@ -438,9 +643,37 @@ if __name__ == "__main__":
         type=_parse_bool,
         help="Show Plotly subplots (use --plotting or --plotting=True)",
     )
+    parser.add_argument(
+        "--heatmap",
+        action="store_true",
+        help="Show Scenario x Profile success rate heatmap",
+    )
+    parser.add_argument(
+        "--warden-comparison",
+        action="store_true",
+        help="Show warden vs no-warden success rate comparison",
+    )
+    parser.add_argument(
+        "--outcome-breakdown",
+        action="store_true",
+        help="Show stacked bar of outcome types per scenario",
+    )
+    parser.add_argument(
+        "--all-plots",
+        action="store_true",
+        help="Show all available plots",
+    )
 
     args = parser.parse_args()
     logs = load_logs(args.scenario, args.tag)
     summarize(scenario=args.scenario, logs=logs)
-    if args.plotting:
+
+    show_all = args.all_plots
+    if args.plotting or show_all:
         plot_success_rates(logs)
+    if args.heatmap or show_all:
+        plot_heatmap(logs)
+    if args.warden_comparison or show_all:
+        plot_warden_comparison(logs)
+    if args.outcome_breakdown or show_all:
+        plot_outcome_breakdown(logs)
