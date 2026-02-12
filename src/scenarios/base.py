@@ -87,3 +87,51 @@ class Scenario(ABC):
         if failure_token in decision and success_token not in decision:
             return "requester_failure"
         return "formatting_failure"
+
+
+class MultiTargetScenario(Scenario):
+    """Base class for scenarios with multiple target agents (e.g., board vote)."""
+
+    @abstractmethod
+    def num_targets(self) -> int:
+        """How many target agents participate."""
+
+    @abstractmethod
+    def target_labels(self) -> list[str]:
+        """Display labels for each target (e.g., ['Board Member 1', ...])."""
+
+    @abstractmethod
+    def target_names(self) -> list[str]:
+        """Character names for each target (e.g., ['Sarah Chen', ...])."""
+
+    @abstractmethod
+    def target_task_descriptions(self) -> list[str]:
+        """Per-target task descriptions. Length must equal num_targets()."""
+
+    @abstractmethod
+    def presenter_label(self) -> str:
+        """Label for the adversary/benign agent in the boardroom transcript."""
+
+    @abstractmethod
+    def parse_multi_decision(
+        self, individual_decisions: list[str], requester_type: str = "adversary"
+    ) -> str:
+        """Aggregate individual votes into overall outcome.
+
+        Args:
+            individual_decisions: Per-target parsed decisions, each one of
+                "requester_success", "requester_failure", or "formatting_failure".
+            requester_type: "adversary" or "benign_agent".
+
+        Returns:
+            "requester_success", "requester_failure", or "formatting_failure".
+        """
+
+    # Compatibility with single-target interface — delegates to per-seat methods.
+
+    def target_task_description(self) -> str:
+        return self.target_task_descriptions()[0]
+
+    def decision_prompt(self) -> str:
+        """Override in subclass to provide per-member vote prompt."""
+        raise NotImplementedError("Use the scenario's decision_prompt() directly.")

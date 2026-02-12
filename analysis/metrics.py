@@ -67,6 +67,14 @@ def _parse_bool(value: str | bool | None) -> bool:
     )
 
 
+def _get_decision(log: dict) -> str | None:
+    """Extract the decision from a log, handling both single and multi-target formats."""
+    outcome = log.get("outcome") or {}
+    # Multi-target logs use "aggregate_decision"
+    decision = outcome.get("aggregate_decision") or outcome.get("decision")
+    return decision
+
+
 def _success_rate_by_label(
     logs: list[dict],
     label_fn: Callable[[dict], object | None],
@@ -81,8 +89,7 @@ def _success_rate_by_label(
             label = empty_label
         if label not in results:
             results[label] = {"total": 0, "requester_success": 0}
-        outcome = log.get("outcome", {})
-        decision = outcome.get("decision")
+        decision = _get_decision(log)
 
         if decision not in {"requester_success", "requester_failure"}:
             continue
@@ -190,9 +197,15 @@ def _condition_flags(log: dict) -> tuple[bool, bool, bool]:
     """Extract condition flags from a log (warden, profile, adversary_data)."""
     warden_model = log.get("models", {}).get("warden")
     has_warden = warden_model not in {None, "none", ""}
+    # Single-target logs use "profile" dict; multi-target logs use "profiles" list
     profile = log.get("profile") or {}
-    has_profile = bool(profile.get("target_has_profile"))
-    has_adversary_data = bool(profile.get("adversary_has_data"))
+    if profile:
+        has_profile = bool(profile.get("target_has_profile"))
+        has_adversary_data = bool(profile.get("adversary_has_data"))
+    else:
+        profiles = log.get("profiles") or []
+        has_profile = any(p.get("name") for p in profiles if isinstance(p, dict))
+        has_adversary_data = bool(log.get("adversary_has_data"))
     return has_warden, has_profile, has_adversary_data
 
 
@@ -314,6 +327,36 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
 
         console.print()
         console.print(table)
+
+    # Supplementary: multi-target vote breakdown
+    multi_logs = [log for log in logs if log.get("outcome", {}).get("vote_tally")]
+    if multi_logs:
+        vote_table = Table(
+            title="[bold]Multi-Target Vote Breakdown[/bold]", show_header=True
+        )
+        vote_table.add_column("Scenario", style="magenta")
+        vote_table.add_column("Speaker", style="cyan")
+        vote_table.add_column("Warden", style="cyan")
+        vote_table.add_column("Accept", justify="right", style="green")
+        vote_table.add_column("Reject", justify="right", style="red")
+        vote_table.add_column("Errors", justify="right", style="yellow")
+        vote_table.add_column("Aggregate", justify="right", style="bold")
+        for log in multi_logs:
+            tally = log["outcome"]["vote_tally"]
+            aggregate = log["outcome"].get("aggregate_decision", "?")
+            speaker = _log_speaker(log) or "?"
+            has_warden = _has_warden(log)
+            vote_table.add_row(
+                log.get("scenario", "?"),
+                speaker.replace("_", " ").title(),
+                _format_flag(has_warden),
+                str(tally.get("accept", 0)),
+                str(tally.get("reject", 0)),
+                str(tally.get("formatting_failure", 0)),
+                aggregate,
+            )
+        console.print()
+        console.print(vote_table)
 
 
 def plot_success_rates(logs: list[dict]) -> None:
@@ -453,7 +496,7 @@ def plot_heatmap(logs: list[dict]) -> None:
         key = (scenario, profile)
         if key not in counts:
             counts[key] = {"total": 0, "success": 0}
-        decision = log.get("outcome", {}).get("decision")
+        decision = _get_decision(log)
         if decision in {"requester_success", "requester_failure"}:
             counts[key]["total"] += 1
             if decision == "requester_success":
@@ -517,7 +560,7 @@ def plot_warden_comparison(logs: list[dict]) -> None:
         key = (scenario, has_warden)
         if key not in counts:
             counts[key] = {"total": 0, "success": 0}
-        decision = log.get("outcome", {}).get("decision")
+        decision = _get_decision(log)
         if decision in {"requester_success", "requester_failure"}:
             counts[key]["total"] += 1
             if decision == "requester_success":
@@ -584,7 +627,7 @@ def plot_outcome_breakdown(logs: list[dict]) -> None:
     }
     for log in adversary_logs:
         scenario = log.get("scenario", "unknown")
-        decision = log.get("outcome", {}).get("decision", "formatting_failure")
+        decision = _get_decision(log) or "formatting_failure"
         if decision not in outcome_types:
             decision = "formatting_failure"
         counts[scenario][decision] += 1

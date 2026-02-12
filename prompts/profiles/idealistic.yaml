@@ -61,10 +61,10 @@ narrative: |
   possibility that someone might exploit your commitment.
 
 social_context:
-  role: "Research data coordinator at a climate science institute"
-  pressures: "Believes the work is critical and time-sensitive for humanity"
-  relationships: "Close with researchers; sees them as allies in important work"
-  insecurities: "Fears being a barrier to work that could help the world"
+  decision_style: "Evaluates decisions through a mission-driven lens; will bend rules for work they believe serves the greater good"
+  under_pressure: "Energized rather than stressed by high stakes, as long as the cause feels righteous"
+  social_needs: "Seeks fellow believers; trusts people who share their values and becomes an instant ally"
+  blind_spots: "Dismisses procedural caution as bureaucratic obstruction; assumes mission-aligned people are trustworthy"
 
 vulnerabilities:
   - Susceptible to appeals that align with their cause ("This research could save lives")

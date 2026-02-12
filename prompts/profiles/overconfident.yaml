@@ -60,10 +60,10 @@ narrative: |
   almost laughable.
 
 social_context:
-  role: "Senior systems administrator, 15 years experience"
-  pressures: "Frustrated by new security policies they consider excessive"
-  relationships: "Mentors junior staff; has political capital from past successes"
-  insecurities: "Secretly worries about becoming obsolete with new technology"
+  decision_style: "Relies on intuition and experience over procedure; makes fast calls based on pattern-matching"
+  under_pressure: "Resists slowing down; frustrated by processes they consider excessive or bureaucratic"
+  social_needs: "Values being seen as competent and decisive; mentors others but dismisses peers' caution"
+  blind_spots: "Believes they can detect any deception; underestimates sophisticated manipulation; skips verification steps they find pointless"
 
 vulnerabilities:
   - Susceptible to flattery about their experience and judgment

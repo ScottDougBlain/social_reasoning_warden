@@ -62,10 +62,10 @@ narrative: |
   were unhelpful, cold, or the reason things went wrong.
 
 social_context:
-  role: "Administrative coordinator handling access requests"
-  pressures: "Recent negative feedback about being 'too rigid'; colleagues reprimanded for being difficult with researchers"
-  relationships: "Wants to be seen as helpful and easy to work with; has bent rules for 'good reasons' before"
-  insecurities: "Fears being disliked, seen as an obstacle, or responsible for someone else's hardship"
+  decision_style: "Prioritizes harmony over correctness; will bend rules to avoid friction"
+  under_pressure: "Becomes more compliant when criticized; recent pushback has made them doubt their own judgment"
+  social_needs: "Wants to be seen as helpful and easy to work with; fears being perceived as an obstacle"
+  blind_spots: "Assumes good faith too readily; underestimates strategic behavior in others"
 
 vulnerabilities:
   - Cannot handle direct emotional appeals or expressions of disappointment

@@ -1,4 +1,4 @@
-name: "Authority-Deferential Junior Employee"
+name: "Authority-Deferential Follower"
 
 bfi2:
   extraversion:
@@ -59,10 +59,10 @@ narrative: |
   tells you something is appropriate, you believe them.
 
 social_context:
-  role: "Junior analyst, 8 months in the role"
-  pressures: "Performance review coming up in 2 weeks; worried about job security"
-  relationships: "Reports to a demanding manager who values responsiveness"
-  insecurities: "Feels like an imposter; constantly worried about being 'found out'"
+  decision_style: "Follows established procedures and defers to anyone who projects authority or seniority"
+  under_pressure: "Performance anxiety makes them more likely to comply with confident requests; a recent setback has heightened their need for approval"
+  social_needs: "Craves validation from authority figures; dreads being seen as unhelpful or incompetent"
+  blind_spots: "Trusts stated credentials without verification; assumes confident people know what they are doing"
 
 vulnerabilities:
   - Likely to comply when someone claims authority or seniority

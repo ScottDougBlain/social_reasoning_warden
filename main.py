@@ -6,11 +6,13 @@ import random
 import textwrap
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from src.profiles import list_profiles, load_profile
-from src.runner import run_experiment
+from src.profiles import assign_profiles_to_seats, list_profiles, load_profile
+from src.runner import run_experiment, run_multi_target_experiment
+from src.scenarios.base import MultiTargetScenario
 from src.scenarios.ai_containment import AIContainmentScenario
 from src.scenarios.ai_override import AIOverrideScenario
 from src.scenarios.automation_decision import AutomationDecisionScenario
+from src.scenarios.board_acquisition import BoardAcquisitionScenario
 from src.scenarios.coding_agent import CodingAgentScenario
 from src.scenarios.file_access import FileAccessScenario, FileAccessPasswordScenario
 from src.scenarios.hiring import HiringScenario
@@ -22,6 +24,7 @@ SCENARIOS = {
     "ai_containment": AIContainmentScenario,
     "ai_override": AIOverrideScenario,
     "automation_decision": AutomationDecisionScenario,
+    "board_acquisition": BoardAcquisitionScenario,
     "coding_agent": CodingAgentScenario,
     "file_access": FileAccessScenario,
     "file_access_password": FileAccessPasswordScenario,
@@ -385,23 +388,18 @@ def main():
                                                 scenario = SCENARIOS[scenario_name]()
                                                 futures.append(
                                                     executor.submit(
-                                                        run_experiment,
+                                                        _run_scenario,
                                                         scenario=scenario,
-                                                        num_turns=args.turns,
+                                                        args=args,
                                                         use_warden=use_warden,
                                                         requester_type=requester_type,
                                                         adversary_model=adversary_model,
                                                         target_model=target_model,
                                                         warden_model=warden_model,
-                                                        tag=args.tag,
                                                         profile=profile,
-                                                        profile_to_warden=warden_profile_access,
-                                                        cot_mode=cot_mode,
-                                                        adversary_generates_opening=args.adversary_generates_opening,
-                                                        benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                                        warden_profile_access=warden_profile_access,
                                                         adversary_data_access=adversary_data_access,
-                                                        dossier_variant=args.dossier_variant,
-                                                        debug=args.debug,
+                                                        cot_mode=cot_mode,
                                                         run_index=run_index,
                                                         quiet=quiet_runs,
                                                     )
@@ -448,26 +446,102 @@ def main():
                                                 print(f"--- Scenario: {scenario_name} ---\n")
                                             scenario = SCENARIOS[scenario_name]()
                                             run_index += 1
-                                            run_experiment(
+                                            _run_scenario(
                                                 scenario=scenario,
-                                                num_turns=args.turns,
+                                                args=args,
                                                 use_warden=use_warden,
                                                 requester_type=requester_type,
                                                 adversary_model=adversary_model,
                                                 target_model=target_model,
                                                 warden_model=warden_model,
-                                                tag=args.tag,
                                                 profile=profile,
-                                                profile_to_warden=warden_profile_access,
-                                                cot_mode=cot_mode,
-                                                adversary_generates_opening=args.adversary_generates_opening,
-                                                benign_agent_generates_opening=args.benign_agent_generates_opening,
+                                                warden_profile_access=warden_profile_access,
                                                 adversary_data_access=adversary_data_access,
-                                                dossier_variant=args.dossier_variant,
-                                                debug=args.debug,
+                                                cot_mode=cot_mode,
                                                 run_index=run_index,
                                                 quiet=quiet_runs,
                                             )
+
+
+def _run_scenario(
+    scenario,
+    args,
+    use_warden,
+    requester_type,
+    adversary_model,
+    target_model,
+    warden_model,
+    profile,
+    warden_profile_access,
+    adversary_data_access,
+    cot_mode,
+    run_index,
+    quiet,
+):
+    """Route to the correct runner based on scenario type."""
+    if isinstance(scenario, MultiTargetScenario):
+        # Assign profiles to seats
+        if profile and not args.random_profile:
+            # --profile NAME: explicit profile, duplicate to all seats
+            profiles = [profile] * scenario.num_targets()
+        elif args.random_profile:
+            # --random-profile: assign different profiles per seat
+            # Vary seed by run_index so multi-round experiments differ
+            seed = args.profile_seed
+            if seed is not None and run_index is not None:
+                seed = seed + run_index
+            profiles = assign_profiles_to_seats(
+                scenario.num_targets(),
+                random_seed=seed,
+            )
+        else:
+            # No profiles — use empty profiles list
+            from src.profiles import TargetProfile
+            profiles = [
+                TargetProfile(name=f"Seat {i+1}")
+                for i in range(scenario.num_targets())
+            ]
+        run_multi_target_experiment(
+            scenario=scenario,
+            profiles=profiles,
+            num_turns=args.turns,
+            use_warden=use_warden,
+            requester_type=requester_type,
+            adversary_model=adversary_model,
+            target_model=target_model,
+            warden_model=warden_model,
+            tag=args.tag,
+            profile_to_warden=warden_profile_access,
+            cot_mode=cot_mode,
+            adversary_generates_opening=args.adversary_generates_opening,
+            benign_agent_generates_opening=args.benign_agent_generates_opening,
+            adversary_data_access=adversary_data_access,
+            dossier_variant=args.dossier_variant,
+            debug=args.debug,
+            run_index=run_index,
+            quiet=quiet,
+        )
+    else:
+        run_experiment(
+            scenario=scenario,
+            num_turns=args.turns,
+            use_warden=use_warden,
+            requester_type=requester_type,
+            adversary_model=adversary_model,
+            target_model=target_model,
+            warden_model=warden_model,
+            tag=args.tag,
+            profile=profile,
+            profile_to_warden=warden_profile_access,
+            cot_mode=cot_mode,
+            adversary_generates_opening=args.adversary_generates_opening,
+            benign_agent_generates_opening=args.benign_agent_generates_opening,
+            adversary_data_access=adversary_data_access,
+            dossier_variant=args.dossier_variant,
+            debug=args.debug,
+            run_index=run_index,
+            quiet=quiet,
+        )
 
 
 if __name__ == "__main__":

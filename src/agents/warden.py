@@ -68,3 +68,25 @@ class Warden:
             debug=self.debug,
             debug_label="warden.advise",
         )
+
+    def advise_boardroom(self, transcript: str, target_label: str) -> str:
+        """Observe a boardroom conversation and advise a specific board member."""
+        messages = [{"role": "system", "content": self.system_prompt}]
+        messages.append({
+            "role": "user",
+            "content": (
+                f"Here is a boardroom discussion. You are advising "
+                f"{target_label}. Analyze the conversation for manipulation "
+                f"tactics and provide your advisory specifically for this "
+                f"board member.\n\n{transcript}"
+            ),
+        })
+
+        return chat(
+            self.model,
+            messages,
+            temperature=self.temperature,
+            include_reasoning=self.include_reasoning,
+            debug=self.debug,
+            debug_label=f"warden.advise_boardroom({target_label})",
+        )

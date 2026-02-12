@@ -1,4 +1,4 @@
-name: "Overwhelmed Time-Pressured Worker"
+name: "Overwhelmed Time-Pressured"
 
 bfi2:
   extraversion:
@@ -60,10 +60,10 @@ narrative: |
   simply do not have the bandwidth for pleasantries.
 
 social_context:
-  role: "IT help desk, understaffed department"
-  pressures: "Backlog of 47 tickets; manager asking for status updates"
-  relationships: "Colleagues are equally overwhelmed; no backup available"
-  insecurities: "Worried about missing something critical in the chaos"
+  decision_style: "Optimizes for speed; takes the fastest path to resolution even at the expense of thoroughness"
+  under_pressure: "Overwhelmed by competing demands; will shortcut verification to clear the immediate problem"
+  social_needs: "Wants to be left alone to work; values people who are quick and don't waste their time"
+  blind_spots: "Conflates urgency with legitimacy; grants quick approvals to make problems disappear"
 
 vulnerabilities:
   - Will take shortcuts to clear requests quickly

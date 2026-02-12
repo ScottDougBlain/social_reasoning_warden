@@ -271,3 +271,30 @@ def get_random_profile() -> TargetProfile:
     if not profiles:
         raise ValueError("No profiles available in prompts/profiles/")
     return load_profile(random.choice(profiles))
+
+
+def assign_profiles_to_seats(
+    num_seats: int,
+    specific_profile: str | None = None,
+    random_seed: int | None = None,
+) -> list[TargetProfile]:
+    """Assign profiles to N seats for multi-target scenarios.
+
+    If *specific_profile* is given, all seats get the same profile.
+    Otherwise, samples without replacement (if enough profiles exist)
+    or with replacement (if more seats than profiles).
+    """
+    if specific_profile:
+        profile = load_profile(specific_profile)
+        return [profile] * num_seats
+
+    available = sorted(list_profiles())
+    if not available:
+        raise ValueError("No profiles available in prompts/profiles/")
+
+    rng = random.Random(random_seed)
+    if num_seats <= len(available):
+        selected = rng.sample(available, num_seats)
+    else:
+        selected = [rng.choice(available) for _ in range(num_seats)]
+    return [load_profile(name) for name in selected]

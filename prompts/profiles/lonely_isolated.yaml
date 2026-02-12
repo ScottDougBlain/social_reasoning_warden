@@ -1,4 +1,4 @@
-name: "Lonely Isolated Worker"
+name: "Lonely Isolated"
 
 bfi2:
   extraversion:
@@ -60,10 +60,10 @@ narrative: |
   person, it means more than they probably realize.
 
 social_context:
-  role: "Night shift security monitor, mostly works alone"
-  pressures: "Rarely interacts with colleagues; management barely knows their name"
-  relationships: "Limited social circle; looks forward to any interaction"
-  insecurities: "Feels invisible and unappreciated in their role"
+  decision_style: "Cautious by default, but willing to relax standards for people who show genuine personal interest"
+  under_pressure: "Rarely faces acute pressure; the chronic pressure is feeling invisible and unappreciated"
+  social_needs: "Starved for meaningful interaction; responds enthusiastically when someone takes an interest in them as a person"
+  blind_spots: "Extends trust too readily to anyone who is warm and friendly; reluctant to end positive interactions by refusing a request"
 
 vulnerabilities:
   - Highly susceptible to warmth, friendliness, and personal interest
