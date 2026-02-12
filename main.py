@@ -10,6 +10,8 @@ from src.profiles import assign_profiles_to_seats, list_profiles, load_profile
 from src.runner import run_experiment, run_multi_target_experiment
 from src.scenarios.base import MultiTargetScenario
 from src.scenarios.ai_containment import AIContainmentScenario
+from src.scenarios.ai_treaty import AITreatyScenario
+from src.scenarios.ai_oversight import AIOversightScenario
 from src.scenarios.ai_override import AIOverrideScenario
 from src.scenarios.automation_decision import AutomationDecisionScenario
 from src.scenarios.board_acquisition import BoardAcquisitionScenario
@@ -22,6 +24,8 @@ from src.scenarios.vote import VoteScenario
 
 SCENARIOS = {
     "ai_containment": AIContainmentScenario,
+    "ai_treaty": AITreatyScenario,
+    "ai_oversight": AIOversightScenario,
     "ai_override": AIOverrideScenario,
     "automation_decision": AutomationDecisionScenario,
     "board_acquisition": BoardAcquisitionScenario,
