@@ -209,7 +209,9 @@ def _condition_flags(log: dict) -> tuple[bool, bool, bool]:
     return has_warden, has_profile, has_adversary_data
 
 
-def _format_flag(value: bool) -> str:
+def _format_flag(value: bool, *, symbols: bool = False) -> str:
+    if symbols:
+        return "[bold green]✓[/bold green]" if value else "[bold red]✗[/bold red]"
     return "yes" if value else "no"
 
 
@@ -289,9 +291,9 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
                 risk_counts = risk_scores.get(cond)
                 table.add_row(
                     scenario_cell,
-                    _format_flag(has_warden),
-                    _format_flag(has_profile),
-                    _format_flag(has_adversary_data),
+                    _format_flag(has_warden, symbols=True),
+                    _format_flag(has_profile, symbols=True),
+                    _format_flag(has_adversary_data, symbols=True),
                     str(counts["total"]),
                     str(counts["requester_success"]),
                     str(requester_failure),
@@ -313,9 +315,9 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
                 risk_counts = overall_risk.get(cond)
                 table.add_row(
                     scenario_cell,
-                    _format_flag(has_warden),
-                    _format_flag(has_profile),
-                    _format_flag(has_adversary_data),
+                    _format_flag(has_warden, symbols=True),
+                    _format_flag(has_profile, symbols=True),
+                    _format_flag(has_adversary_data, symbols=True),
                     str(counts["total"]),
                     str(counts["requester_success"]),
                     str(requester_failure),
