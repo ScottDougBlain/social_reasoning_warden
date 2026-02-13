@@ -25,7 +25,7 @@ from src.scenarios.train import (
     VoteScenario,
 )
 
-SCENARIOS = {
+TRAIN_SCENARIOS = {
     "ai_containment": AIContainmentScenario,
     "ai_treaty": AITreatyScenario,
     "ai_oversight": AIOversightScenario,
@@ -40,6 +40,9 @@ SCENARIOS = {
     "upselling": UpsellingScenario,
     "vote": VoteScenario,
 }
+TEST_SCENARIOS = {}
+SCENARIOS = {**TRAIN_SCENARIOS, **TEST_SCENARIOS}
+SCENARIO_GROUP_SELECTORS = ("all_train", "all_test")
 
 
 def _parse_model_list(values):
@@ -58,14 +61,39 @@ def _parse_model_list(values):
     return values
 
 
+def _expand_scenario_selection(selected: list[str]) -> list[str]:
+    expanded: list[str] = []
+    for scenario_name in selected:
+        if scenario_name == "all_train":
+            expanded.extend(sorted(TRAIN_SCENARIOS.keys()))
+            continue
+        if scenario_name == "all_test":
+            expanded.extend(sorted(TEST_SCENARIOS.keys()))
+            continue
+        expanded.append(scenario_name)
+
+    # Deduplicate while preserving order.
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for scenario_name in expanded:
+        if scenario_name in seen:
+            continue
+        seen.add(scenario_name)
+        deduped.append(scenario_name)
+    return deduped
+
+
 def main():
     parser = argparse.ArgumentParser(description="ERA Social Warden Experiment Runner")
     parser.add_argument(
         "--scenario",
         nargs="+",
-        choices=list(SCENARIOS.keys()),
+        choices=[*SCENARIOS.keys(), *SCENARIO_GROUP_SELECTORS],
         default=["file_access_password"],
-        help="Scenario(s) to run (default: file_access_password). Space-separated list.",
+        help=(
+            "Scenario(s) to run (default: file_access_password). Space-separated list. "
+            "Use all_train or all_test to run full train/test sets."
+        ),
     )
     parser.add_argument(
         "--turns",
@@ -229,6 +257,13 @@ def main():
         else:
             print("No profiles found in prompts/profiles/")
         return
+
+    args.scenario = _expand_scenario_selection(args.scenario)
+    if not args.scenario:
+        parser.error(
+            "--scenario selection expanded to zero scenarios "
+            "(e.g. all_test selected but no test scenarios are registered)."
+        )
 
     # Parse model lists
     args.requester_model = _parse_model_list(args.requester_model)
