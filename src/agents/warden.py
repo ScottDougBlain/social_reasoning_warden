@@ -8,7 +8,7 @@ from src.client import chat
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 _WARDEN_PROMPTS_DIR = _PROMPTS_DIR / "warden"
-_DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system.yaml"
+_DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system_1.yaml"
 
 
 def _resolve_system_prompt_path(system_prompt_file: str) -> Path:

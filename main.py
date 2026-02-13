@@ -55,7 +55,7 @@ TEST_SCENARIOS = {}
 SCENARIOS = {**TRAIN_SCENARIOS, **TEST_SCENARIOS}
 SCENARIO_GROUP_SELECTORS = ("all_train", "all_test")
 WARDEN_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "warden"
-DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system.yaml"
+DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system_1.yaml"
 
 
 def _parse_model_list(values):
