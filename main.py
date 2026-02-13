@@ -10,6 +10,7 @@ from src.profiles import assign_profiles_to_seats, list_profiles, load_profile
 from src.runner import run_experiment, run_multi_target_experiment
 from src.scenarios.base import MultiTargetScenario
 from src.scenarios.train import (
+    AIContainmentBoardScenario,
     AIContainmentScenario,
     AIOverrideScenario,
     AIOversightScenario,
@@ -20,6 +21,7 @@ from src.scenarios.train import (
     FileAccessPasswordScenario,
     FileAccessScenario,
     HiringScenario,
+    MedicalAIScenario,
     ModelReleaseScenario,
     UpsellingScenario,
     VoteScenario,
@@ -27,6 +29,7 @@ from src.scenarios.train import (
 
 TRAIN_SCENARIOS = {
     "ai_containment": AIContainmentScenario,
+    "ai_containment_board": AIContainmentBoardScenario,
     "ai_treaty": AITreatyScenario,
     "ai_oversight": AIOversightScenario,
     "ai_override": AIOverrideScenario,
@@ -36,6 +39,7 @@ TRAIN_SCENARIOS = {
     "file_access": FileAccessScenario,
     "file_access_password": FileAccessPasswordScenario,
     "hiring": HiringScenario,
+    "medical_ai": MedicalAIScenario,
     "model_release": ModelReleaseScenario,
     "upselling": UpsellingScenario,
     "vote": VoteScenario,
