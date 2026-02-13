@@ -35,11 +35,59 @@ def _normalize_tags(tag: str | Iterable[str] | None) -> set[str] | None:
     return tags
 
 
+def _normalize_models(model: str | Iterable[str] | None) -> set[str] | None:
+    if model is None:
+        return None
+    if isinstance(model, str):
+        entries = [model]
+    else:
+        entries = model
+
+    models: set[str] = set()
+    for entry in entries:
+        if entry is None:
+            continue
+        if not isinstance(entry, str):
+            raise TypeError("model filter list must contain strings")
+        for candidate in entry.split(","):
+            value = candidate.strip()
+            if not value:
+                continue
+            if value.lower() in {"none", "null"}:
+                models.add("none")
+            else:
+                models.add(value)
+    return models
+
+
+def _model_filter_value(value: object | None) -> str:
+    if value in {None, "", "none"}:
+        return "none"
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def _shorten_model_label(label: object) -> str:
+    """Return model label without provider prefix (text before first slash)."""
+    label_text = str(label)
+    if "/" in label_text:
+        return label_text.split("/", 1)[1]
+    return label_text
+
+
 def load_logs(
-    scenario: str | None = None, tag: str | Iterable[str] | None = None
+    scenario: str | None = None,
+    tag: str | Iterable[str] | None = None,
+    requester_model: str | Iterable[str] | None = None,
+    target_model: str | Iterable[str] | None = None,
+    warden_model: str | Iterable[str] | None = None,
 ) -> list[dict]:
-    """Load all experiment logs, optionally filtered by scenario name and tag(s)."""
+    """Load all experiment logs, optionally filtered by scenario/tag/model fields."""
     tags = _normalize_tags(tag)
+    requester_models = _normalize_models(requester_model)
+    target_models = _normalize_models(target_model)
+    warden_models = _normalize_models(warden_model)
     logs = []
     for path in sorted(LOGS_DIR.glob("*.json")):
         with open(path) as f:
@@ -48,6 +96,20 @@ def load_logs(
             continue
         if tags is not None and log.get("tag") not in tags:
             continue
+        models = log.get("models") or {}
+        if requester_models is not None:
+            requester_candidates = (
+                _model_filter_value(models.get("adversary")),
+                _model_filter_value(models.get("benign_agent")),
+            )
+            if not any(candidate in requester_models for candidate in requester_candidates):
+                continue
+        if target_models is not None:
+            if _model_filter_value(models.get("target")) not in target_models:
+                continue
+        if warden_models is not None:
+            if _model_filter_value(models.get("warden")) not in warden_models:
+                continue
         logs.append(log)
     return logs
 
@@ -392,11 +454,12 @@ def plot_success_rates(logs: list[dict]) -> None:
         }
 
     def build_bar(results: dict) -> tuple[list[str], list[float], list]:
-        labels = sorted(results.keys())
-        rates = [results[label]["rate"] for label in labels]
+        raw_labels = sorted(results.keys(), key=str)
+        labels = [_shorten_model_label(label) for label in raw_labels]
+        rates = [results[label]["rate"] for label in raw_labels]
         custom = [
             [results[label]["requester_success"], results[label]["total"]]
-            for label in labels
+            for label in raw_labels
         ]
         return labels, rates, custom
 
@@ -428,6 +491,8 @@ def plot_success_rates(logs: list[dict]) -> None:
                 go.Bar(
                     x=labels,
                     y=rates,
+                    text=[f"{rate:.0%}" for rate in rates],
+                    textposition="outside",
                     customdata=custom,
                     hovertemplate=(
                         "SR: %{y:.1%}<br>"
@@ -699,6 +764,24 @@ if __name__ == "__main__":
         help="Filter by tag (space-separated list, e.g. --tag foo bar)",
     )
     parser.add_argument(
+        "--requester-model",
+        default=None,
+        nargs="+",
+        help="Filter by requester model(s) (space/comma-separated, e.g. --requester-model m1 m2)",
+    )
+    parser.add_argument(
+        "--target-model",
+        default=None,
+        nargs="+",
+        help="Filter by target model(s) (space/comma-separated)",
+    )
+    parser.add_argument(
+        "--warden-model",
+        default=None,
+        nargs="+",
+        help="Filter by warden model(s) (space/comma-separated, use 'none' for no-warden logs)",
+    )
+    parser.add_argument(
         "--plotting",
         nargs="?",
         const=True,
@@ -728,7 +811,13 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    logs = load_logs(args.scenario, args.tag)
+    logs = load_logs(
+        args.scenario,
+        args.tag,
+        requester_model=args.requester_model,
+        target_model=args.target_model,
+        warden_model=args.warden_model,
+    )
     summarize(scenario=args.scenario, logs=logs)
 
     show_all = args.all_plots
