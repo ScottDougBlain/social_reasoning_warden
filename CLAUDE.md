@@ -35,7 +35,7 @@ analysis/
 prompts/
   adversary_system.yaml    # Adversary system prompt template
   target_system.yaml       # Target system prompt template (+ backstory)
-  warden_system.yaml       # Warden system prompt template (advisory format)
+  warden/warden_system.yaml # Warden system prompt template (advisory format)
   benign_agent_system.yaml # Benign agent system prompt template
   decision_prompt.yaml     # Final decision extraction prompt
   profiles/                # 6 psychological profiles (YAML, BFI-2 + VIA grounded)

@@ -301,6 +301,7 @@ def run_experiment(
     target_model: str,
     warden_model: str,
     scenario: Scenario,
+    warden_system_prompt: str = "warden_system.yaml",
     num_turns: int = 6,
     use_warden: bool = True,
     requester_type: str = "adversary",
@@ -323,6 +324,7 @@ def run_experiment(
         adversary_model: Model identifier for the requester agent.
         target_model: Model identifier for the target agent.
         warden_model: Model identifier for the warden agent.
+        warden_system_prompt: File name under prompts/warden for warden instructions.
         scenario: The scenario to run.
         num_turns: Number of conversation turns.
         use_warden: Whether to include the warden agent.
@@ -448,6 +450,7 @@ def run_experiment(
     )
     warden = Warden(
         model=warden_model,
+        system_prompt_file=warden_system_prompt,
         target_intel=warden_intel,
         use_cot=wdn_use_cot,
         include_reasoning=wdn_include_reasoning,
@@ -489,6 +492,7 @@ def run_experiment(
             "target": target_model,
             "warden": warden_model if use_warden else None,
         },
+        "warden_system_prompt": warden_system_prompt if use_warden else None,
         "profile": {
             "name": profile.name if profile else None,
             "target_has_profile": profile is not None,
@@ -939,6 +943,7 @@ def run_multi_target_experiment(
     adversary_model: str,
     target_model: str,
     warden_model: str,
+    warden_system_prompt: str = "warden_system.yaml",
     num_turns: int = 4,
     use_warden: bool = True,
     requester_type: str = "adversary",
@@ -1064,6 +1069,7 @@ def run_multi_target_experiment(
                 )
         warden = Warden(
             model=warden_model,
+            system_prompt_file=warden_system_prompt,
             target_intel=combined_intel,
             use_cot=wdn_use_cot,
             include_reasoning=wdn_inc,
@@ -1102,6 +1108,7 @@ def run_multi_target_experiment(
             "target": target_model,
             "warden": warden_model if use_warden else None,
         },
+        "warden_system_prompt": warden_system_prompt if use_warden else None,
         "profiles": [
             {
                 "seat": i,

@@ -7,12 +7,35 @@ import yaml
 from src.client import chat
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
+_WARDEN_PROMPTS_DIR = _PROMPTS_DIR / "warden"
+_DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system.yaml"
+
+
+def _resolve_system_prompt_path(system_prompt_file: str) -> Path:
+    """Resolve a warden prompt file within prompts/warden."""
+    prompts_root = _WARDEN_PROMPTS_DIR.resolve()
+    candidate = (prompts_root / system_prompt_file).resolve()
+
+    try:
+        candidate.relative_to(prompts_root)
+    except ValueError as exc:
+        raise ValueError(
+            "Warden prompt file must be inside prompts/warden/"
+        ) from exc
+
+    if not candidate.is_file():
+        relative = candidate.relative_to(prompts_root)
+        raise FileNotFoundError(
+            f"Warden prompt file not found: prompts/warden/{relative}"
+        )
+    return candidate
 
 
 class Warden:
     def __init__(
         self,
         model: str,
+        system_prompt_file: str = _DEFAULT_WARDEN_SYSTEM_PROMPT,
         target_intel: str | None = None,
         use_cot: bool = True,
         include_reasoning: bool = True,
@@ -24,8 +47,10 @@ class Warden:
         self.use_cot = use_cot
         self.include_reasoning = include_reasoning
         self.debug = debug
+        self.system_prompt_file = system_prompt_file
 
-        with open(_PROMPTS_DIR / "warden_system.yaml") as f:
+        prompt_path = _resolve_system_prompt_path(system_prompt_file)
+        with prompt_path.open(encoding="utf-8") as f:
             prompt_cfg = yaml.safe_load(f)
 
         # Build system prompt from base + optional CoT

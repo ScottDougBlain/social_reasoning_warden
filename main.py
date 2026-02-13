@@ -5,6 +5,7 @@ import json
 import random
 import textwrap
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 from src.profiles import assign_profiles_to_seats, list_profiles, load_profile
 from src.runner import run_experiment, run_multi_target_experiment
@@ -47,6 +48,8 @@ TRAIN_SCENARIOS = {
 TEST_SCENARIOS = {}
 SCENARIOS = {**TRAIN_SCENARIOS, **TEST_SCENARIOS}
 SCENARIO_GROUP_SELECTORS = ("all_train", "all_test")
+WARDEN_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "warden"
+DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system.yaml"
 
 
 def _parse_model_list(values):
@@ -85,6 +88,24 @@ def _expand_scenario_selection(selected: list[str]) -> list[str]:
         seen.add(scenario_name)
         deduped.append(scenario_name)
     return deduped
+
+
+def _resolve_warden_prompt_file(prompt_file: str) -> str:
+    """Validate and normalize a warden prompt path under prompts/warden."""
+    prompts_root = WARDEN_PROMPTS_DIR.resolve()
+    candidate = (prompts_root / prompt_file).resolve()
+
+    try:
+        relative = candidate.relative_to(prompts_root)
+    except ValueError as exc:
+        raise ValueError(
+            "Warden prompt must be a file inside prompts/warden/"
+        ) from exc
+
+    if not candidate.is_file():
+        raise FileNotFoundError(f"Warden prompt not found: prompts/warden/{relative.as_posix()}")
+
+    return relative.as_posix()
 
 
 def main():
@@ -138,6 +159,15 @@ def main():
         nargs="+",
         default=["google/gemini-3-flash-preview"],
         help="One or more models for the warden agent (space-separated, comma-separated, or JSON list)",
+    )
+    parser.add_argument(
+        "--warden-system-prompt",
+        type=str,
+        default=DEFAULT_WARDEN_SYSTEM_PROMPT,
+        help=(
+            "Warden system prompt file under prompts/warden/ "
+            f"(default: {DEFAULT_WARDEN_SYSTEM_PROMPT})"
+        ),
     )
     parser.add_argument(
         "--debug",
@@ -285,6 +315,10 @@ def main():
     args.requester_model = _parse_model_list(args.requester_model)
     args.target_model = _parse_model_list(args.target_model)
     args.warden_model = _parse_model_list(args.warden_model)
+    try:
+        args.warden_system_prompt = _resolve_warden_prompt_file(args.warden_system_prompt)
+    except (FileNotFoundError, ValueError) as exc:
+        parser.error(str(exc))
 
     profile_requested = bool(args.profile or args.random_profile)
     if args.adversary_data_access in {"access", "both"} and not profile_requested:
@@ -416,6 +450,7 @@ def main():
     print(_format_plan_line("Requester", ", ".join(args.requester_model)))
     print(_format_plan_line("Target", ", ".join(args.target_model)))
     print(_format_plan_line("Warden", ", ".join(args.warden_model)))
+    print(_format_plan_line("Warden prompt", f"prompts/warden/{args.warden_system_prompt}"))
     print(_format_plan_line("Warden awareness", args.warden_awareness))
     print()
     while True:
@@ -476,6 +511,7 @@ def main():
                                                             adversary_data_access=adversary_data_access,
                                                             warden_awareness=warden_awareness,
                                                             cot_mode=cot_mode,
+                                                            warden_system_prompt=args.warden_system_prompt,
                                                             run_index=run_index,
                                                             quiet=quiet_runs,
                                                         )
@@ -539,6 +575,7 @@ def main():
                                                     adversary_data_access=adversary_data_access,
                                                     warden_awareness=warden_awareness,
                                                     cot_mode=cot_mode,
+                                                    warden_system_prompt=args.warden_system_prompt,
                                                     run_index=run_index,
                                                     quiet=quiet_runs,
                                                 )
@@ -557,6 +594,7 @@ def _run_scenario(
     adversary_data_access,
     warden_awareness,
     cot_mode,
+    warden_system_prompt,
     run_index,
     quiet,
 ):
@@ -592,6 +630,7 @@ def _run_scenario(
             adversary_model=requester_model,
             target_model=target_model,
             warden_model=warden_model,
+            warden_system_prompt=warden_system_prompt,
             tag=args.tag,
             profile_to_warden=warden_profile_access,
             cot_mode=cot_mode,
@@ -613,6 +652,7 @@ def _run_scenario(
             adversary_model=requester_model,
             target_model=target_model,
             warden_model=warden_model,
+            warden_system_prompt=warden_system_prompt,
             tag=args.tag,
             profile=profile,
             profile_to_warden=warden_profile_access,
