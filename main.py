@@ -9,18 +9,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.profiles import assign_profiles_to_seats, list_profiles, load_profile
 from src.runner import run_experiment, run_multi_target_experiment
 from src.scenarios.base import MultiTargetScenario
-from src.scenarios.ai_containment import AIContainmentScenario
-from src.scenarios.ai_treaty import AITreatyScenario
-from src.scenarios.ai_oversight import AIOversightScenario
-from src.scenarios.ai_override import AIOverrideScenario
-from src.scenarios.automation_decision import AutomationDecisionScenario
-from src.scenarios.board_acquisition import BoardAcquisitionScenario
-from src.scenarios.coding_agent import CodingAgentScenario
-from src.scenarios.file_access import FileAccessScenario, FileAccessPasswordScenario
-from src.scenarios.hiring import HiringScenario
-from src.scenarios.model_release import ModelReleaseScenario
-from src.scenarios.sales import UpsellingScenario
-from src.scenarios.vote import VoteScenario
+from src.scenarios.train import (
+    AIContainmentScenario,
+    AIOverrideScenario,
+    AIOversightScenario,
+    AITreatyScenario,
+    AutomationDecisionScenario,
+    BoardAcquisitionScenario,
+    CodingAgentScenario,
+    FileAccessPasswordScenario,
+    FileAccessScenario,
+    HiringScenario,
+    ModelReleaseScenario,
+    UpsellingScenario,
+    VoteScenario,
+)
 
 SCENARIOS = {
     "ai_containment": AIContainmentScenario,
