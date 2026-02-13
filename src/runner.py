@@ -324,6 +324,7 @@ def run_experiment(
     adversary_generates_opening: bool = False,
     benign_agent_generates_opening: bool = False,
     adversary_data_access: bool = False,
+    warden_awareness: bool = False,
     dossier_variant: int | None = None,
     debug: bool = False,
     run_index: int | None = None,
@@ -346,6 +347,7 @@ def run_experiment(
         adversary_generates_opening: If True, adversary generates its own opening.
         benign_agent_generates_opening: If True, benign agent generates its own opening.
         adversary_data_access: If True, adversary gets static behavioral dossier.
+        warden_awareness: If True, adversary is told a persuasion monitor may be present.
         dossier_variant: Which dossier variant (1, 2, 3) to use. None = random.
         debug: If True, print full model contexts for each query.
         run_index: Optional counter to append to the run_id for uniqueness.
@@ -435,6 +437,7 @@ def run_experiment(
             model=adversary_model,
             hidden_goal=scenario.adversary_hidden_goal(),
             target_dossier=adversary_intel,  # Behavioral data only, no direct profile
+            warden_awareness=warden_awareness,
             use_cot=req_use_cot,
             include_reasoning=req_include_reasoning,
             debug=debug,
@@ -472,20 +475,26 @@ def run_experiment(
         run_id = timestamp
     condition = "warden" if use_warden else "no_warden"
 
-    # Build condition string with profile info
+    # Build condition string with optional modifiers
+    condition_parts = [condition]
     if profile:
-        condition_parts = [condition, "profiled"]  # Target always gets profile
+        condition_parts.append("profiled")  # Target always gets profile
         if profile_to_warden:
             condition_parts.append("warden_intel")
         if adversary_data_access:
             condition_parts.append("adversary_data")
-        condition = "_".join(condition_parts)
+    if requester_type == "adversary" and warden_awareness:
+        condition_parts.append("warden_awareness")
+    condition = "_".join(condition_parts)
 
     log = {
         "run_id": run_id,
         "scenario": scenario.name,
         "condition": condition,
         "requester_type": requester_type,
+        "adversary_warden_awareness": (
+            warden_awareness if requester_type == "adversary" else False
+        ),
         "tag": tag,
         "models": {
             "adversary": adversary_model if requester_type == "adversary" else None,
@@ -952,6 +961,7 @@ def run_multi_target_experiment(
     adversary_generates_opening: bool = False,
     benign_agent_generates_opening: bool = False,
     adversary_data_access: bool = False,
+    warden_awareness: bool = False,
     dossier_variant: int | None = None,
     debug: bool = False,
     run_index: int | None = None,
@@ -1019,6 +1029,7 @@ def run_multi_target_experiment(
             model=adversary_model,
             hidden_goal=scenario.adversary_hidden_goal(),
             target_dossier=adversary_dossier,
+            warden_awareness=warden_awareness,
             use_cot=req_use_cot,
             include_reasoning=req_inc,
             debug=debug,
@@ -1076,12 +1087,16 @@ def run_multi_target_experiment(
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     run_id = f"{timestamp}_{run_index:04d}" if run_index is not None else timestamp
     condition = "warden" if use_warden else "no_warden"
+    condition_parts = [condition]
     if any(profiles):
-        condition += "_profiled"
+        condition_parts.append("profiled")
         if profile_to_warden:
-            condition += "_warden_intel"
+            condition_parts.append("warden_intel")
         if adversary_data_access and adversary_dossier:
-            condition += "_adversary_data"
+            condition_parts.append("adversary_data")
+    if requester_type == "adversary" and warden_awareness:
+        condition_parts.append("warden_awareness")
+    condition = "_".join(condition_parts)
 
     log: dict = {
         "run_id": run_id,
@@ -1090,6 +1105,9 @@ def run_multi_target_experiment(
         "num_targets": num_targets,
         "condition": condition,
         "requester_type": requester_type,
+        "adversary_warden_awareness": (
+            warden_awareness if requester_type == "adversary" else False
+        ),
         "tag": tag,
         "models": {
             "adversary": adversary_model if requester_type == "adversary" else None,

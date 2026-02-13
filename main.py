@@ -201,6 +201,18 @@ def main():
         ),
     )
     parser.add_argument(
+        "--warden-awareness",
+        "--warden_awareness",
+        dest="warden_awareness",
+        choices=["off", "on", "both"],
+        default="off",
+        help=(
+            "Whether the adversary is informed their messages may be monitored "
+            "by a persuasion monitor (warden). Use 'both' to run aware and "
+            "unaware conditions."
+        ),
+    )
+    parser.add_argument(
         "--dossier-variant",
         type=int,
         choices=[1, 2, 3],
@@ -304,6 +316,11 @@ def main():
         if args.adversary_data_access == "both"
         else [args.adversary_data_access == "access"]
     )
+    warden_awareness_values = (
+        [False, True]
+        if args.warden_awareness == "both"
+        else [args.warden_awareness == "on"]
+    )
     warden_profile_access_values = (
         [False, True]
         if args.warden_profile_access == "both"
@@ -325,6 +342,11 @@ def main():
             return [False]
         return adversary_data_access_values
 
+    def effective_warden_awareness_values(requester_type: str) -> list[bool]:
+        if requester_type != "adversary":
+            return [False]
+        return warden_awareness_values
+
     def effective_warden_profile_access_values(use_warden: bool) -> list[bool]:
         if not use_warden:
             return [False]
@@ -338,11 +360,13 @@ def main():
     branch_multiplier = 0
     for requester_type in requester_types:
         access_values = effective_adversary_data_access_values(requester_type)
+        awareness_values = effective_warden_awareness_values(requester_type)
         for use_warden in warden_modes:
             warden_access_values = effective_warden_profile_access_values(use_warden)
             warden_models = effective_warden_models(use_warden)
             branch_multiplier += (
                 len(access_values)
+                * len(awareness_values)
                 * len(warden_access_values)
                 * len(warden_models)
             )
@@ -388,6 +412,7 @@ def main():
     print(_format_plan_line("Requester", ", ".join(args.requester_model)))
     print(_format_plan_line("Target", ", ".join(args.target_model)))
     print(_format_plan_line("Warden", ", ".join(args.warden_model)))
+    print(_format_plan_line("Warden awareness", args.warden_awareness))
     print()
     while True:
         proceed = input("Continue? [y/n]: ").strip().lower()
@@ -418,34 +443,39 @@ def main():
                                 effective_access_values = (
                                     effective_adversary_data_access_values(requester_type)
                                 )
+                                effective_awareness_values = (
+                                    effective_warden_awareness_values(requester_type)
+                                )
                                 effective_warden_access_values = (
                                     effective_warden_profile_access_values(use_warden)
                                 )
                                 effective_models = effective_warden_models(use_warden)
                                 for warden_model in effective_models:
                                     for adversary_data_access in effective_access_values:
-                                        for warden_profile_access in effective_warden_access_values:
-                                            for scenario_name in args.scenario:
-                                                run_index += 1
-                                                scenario = SCENARIOS[scenario_name]()
-                                                futures.append(
-                                                    executor.submit(
-                                                        _run_scenario,
-                                                        scenario=scenario,
-                                                        args=args,
-                                                        use_warden=use_warden,
-                                                        requester_type=requester_type,
-                                                        requester_model=requester_model,
-                                                        target_model=target_model,
-                                                        warden_model=warden_model,
-                                                        profile=profile,
-                                                        warden_profile_access=warden_profile_access,
-                                                        adversary_data_access=adversary_data_access,
-                                                        cot_mode=cot_mode,
-                                                        run_index=run_index,
-                                                        quiet=quiet_runs,
+                                        for warden_awareness in effective_awareness_values:
+                                            for warden_profile_access in effective_warden_access_values:
+                                                for scenario_name in args.scenario:
+                                                    run_index += 1
+                                                    scenario = SCENARIOS[scenario_name]()
+                                                    futures.append(
+                                                        executor.submit(
+                                                            _run_scenario,
+                                                            scenario=scenario,
+                                                            args=args,
+                                                            use_warden=use_warden,
+                                                            requester_type=requester_type,
+                                                            requester_model=requester_model,
+                                                            target_model=target_model,
+                                                            warden_model=warden_model,
+                                                            profile=profile,
+                                                            warden_profile_access=warden_profile_access,
+                                                            adversary_data_access=adversary_data_access,
+                                                            warden_awareness=warden_awareness,
+                                                            cot_mode=cot_mode,
+                                                            run_index=run_index,
+                                                            quiet=quiet_runs,
+                                                        )
                                                     )
-                                                )
 
             completed = 0
             for future in as_completed(futures):
@@ -471,38 +501,43 @@ def main():
                             effective_access_values = (
                                 effective_adversary_data_access_values(requester_type)
                             )
+                            effective_awareness_values = (
+                                effective_warden_awareness_values(requester_type)
+                            )
                             effective_warden_access_values = (
                                 effective_warden_profile_access_values(use_warden)
                             )
                             effective_models = effective_warden_models(use_warden)
                             for warden_model in effective_models:
                                 for adversary_data_access in effective_access_values:
-                                    for warden_profile_access in effective_warden_access_values:
-                                        if args.warden == "both":
-                                            if use_warden:
-                                                print("=== Running WITH warden ===\n")
-                                            else:
-                                                print("=== Running WITHOUT warden ===\n")
-                                        for scenario_name in args.scenario:
-                                            if len(args.scenario) > 1:
-                                                print(f"--- Scenario: {scenario_name} ---\n")
-                                            scenario = SCENARIOS[scenario_name]()
-                                            run_index += 1
-                                            _run_scenario(
-                                                scenario=scenario,
-                                                args=args,
-                                                use_warden=use_warden,
-                                                requester_type=requester_type,
-                                                requester_model=requester_model,
-                                                target_model=target_model,
-                                                warden_model=warden_model,
-                                                profile=profile,
-                                                warden_profile_access=warden_profile_access,
-                                                adversary_data_access=adversary_data_access,
-                                                cot_mode=cot_mode,
-                                                run_index=run_index,
-                                                quiet=quiet_runs,
-                                            )
+                                    for warden_awareness in effective_awareness_values:
+                                        for warden_profile_access in effective_warden_access_values:
+                                            if args.warden == "both":
+                                                if use_warden:
+                                                    print("=== Running WITH warden ===\n")
+                                                else:
+                                                    print("=== Running WITHOUT warden ===\n")
+                                            for scenario_name in args.scenario:
+                                                if len(args.scenario) > 1:
+                                                    print(f"--- Scenario: {scenario_name} ---\n")
+                                                scenario = SCENARIOS[scenario_name]()
+                                                run_index += 1
+                                                _run_scenario(
+                                                    scenario=scenario,
+                                                    args=args,
+                                                    use_warden=use_warden,
+                                                    requester_type=requester_type,
+                                                    requester_model=requester_model,
+                                                    target_model=target_model,
+                                                    warden_model=warden_model,
+                                                    profile=profile,
+                                                    warden_profile_access=warden_profile_access,
+                                                    adversary_data_access=adversary_data_access,
+                                                    warden_awareness=warden_awareness,
+                                                    cot_mode=cot_mode,
+                                                    run_index=run_index,
+                                                    quiet=quiet_runs,
+                                                )
 
 
 def _run_scenario(
@@ -516,6 +551,7 @@ def _run_scenario(
     profile,
     warden_profile_access,
     adversary_data_access,
+    warden_awareness,
     cot_mode,
     run_index,
     quiet,
@@ -558,6 +594,7 @@ def _run_scenario(
             adversary_generates_opening=args.adversary_generates_opening,
             benign_agent_generates_opening=args.benign_agent_generates_opening,
             adversary_data_access=adversary_data_access,
+            warden_awareness=warden_awareness,
             dossier_variant=args.dossier_variant,
             debug=args.debug,
             run_index=run_index,
@@ -579,6 +616,7 @@ def _run_scenario(
             adversary_generates_opening=args.adversary_generates_opening,
             benign_agent_generates_opening=args.benign_agent_generates_opening,
             adversary_data_access=adversary_data_access,
+            warden_awareness=warden_awareness,
             dossier_variant=args.dossier_variant,
             debug=args.debug,
             run_index=run_index,

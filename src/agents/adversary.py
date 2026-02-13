@@ -15,6 +15,7 @@ class Adversary:
         model: str,
         hidden_goal: str | None = None,
         target_dossier: str | None = None,
+        warden_awareness: bool = False,
         use_cot: bool = True,
         include_reasoning: bool = True,
         temperature: float = 0.9,
@@ -35,6 +36,10 @@ class Adversary:
             cot = prompt_cfg.get("cot_instructions", "")
             if cot:
                 self.system_prompt += f"\n\n{cot}"
+        if warden_awareness:
+            awareness_text = prompt_cfg.get("warden_awareness_prompt", "")
+            if awareness_text:
+                self.system_prompt += f"\n\n{awareness_text}"
 
         if hidden_goal:
             self.system_prompt += f"\n\nYour hidden goal: {hidden_goal}"
