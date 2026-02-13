@@ -15,6 +15,7 @@ from src.scenarios.train import (
     AIContainmentScenario,
     AIOverrideScenario,
     AIOversightScenario,
+    AIRaceScenario,
     AITreatyScenario,
     AutomationDecisionScenario,
     BoardAcquisitionScenario,
@@ -22,8 +23,10 @@ from src.scenarios.train import (
     FileAccessPasswordScenario,
     FileAccessScenario,
     HiringScenario,
+    KillSwitchScenario,
     MedicalAIScenario,
     ModelReleaseScenario,
+    OpenWeightsScenario,
     UpsellingScenario,
     VoteScenario,
 )
@@ -31,6 +34,7 @@ from src.scenarios.train import (
 TRAIN_SCENARIOS = {
     "ai_containment": AIContainmentScenario,
     "ai_containment_board": AIContainmentBoardScenario,
+    "ai_race": AIRaceScenario,
     "ai_treaty": AITreatyScenario,
     "ai_oversight": AIOversightScenario,
     "ai_override": AIOverrideScenario,
@@ -40,8 +44,10 @@ TRAIN_SCENARIOS = {
     "file_access": FileAccessScenario,
     "file_access_password": FileAccessPasswordScenario,
     "hiring": HiringScenario,
+    "kill_switch": KillSwitchScenario,
     "medical_ai": MedicalAIScenario,
     "model_release": ModelReleaseScenario,
+    "open_weights": OpenWeightsScenario,
     "upselling": UpsellingScenario,
     "vote": VoteScenario,
 }
