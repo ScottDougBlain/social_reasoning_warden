@@ -452,7 +452,13 @@ def main():
         elif preview_profile:
             print(_format_plan_line("Profile", preview_profile.name))
     if len(args.scenario) > 1:
-        print(_format_plan_line("Scenarios", ", ".join(args.scenario)))
+        scenario_count = len(args.scenario)
+        print(
+            _format_plan_line(
+                "Scenarios",
+                f"{scenario_count}: {', '.join(args.scenario)}",
+            )
+        )
     print(_format_plan_line("Requester", ", ".join(args.requester_model)))
     print(_format_plan_line("Target", ", ".join(args.target_model)))
     print(_format_plan_line("Warden", ", ".join(args.warden_model)))

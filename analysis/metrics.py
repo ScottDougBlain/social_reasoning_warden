@@ -249,8 +249,6 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
         table.add_column("[u]Condition[/u]\nProfile", style="cyan")
         table.add_column("[u]Condition[/u]\nAdversary Intel.", style="cyan")
         table.add_column("Runs", justify="right")
-        table.add_column("Req. Success", justify="right", style="green")
-        table.add_column("Req. Failure", justify="right", style="red")
         table.add_column("Rate", justify="right", style="bold")
         table.add_column("Risk >= Medium/Turn", justify="right")
 
@@ -277,6 +275,13 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
                 return "n/a"
             return f"{avg:.2f}"
 
+        def format_runs(total: int, requester_success: int) -> str:
+            requester_failure = total - requester_success
+            return (
+                f"{total}([green]{requester_success}[/green]/"
+                f"[red]{requester_failure}[/red])"
+            )
+
         first_scenario = True
         for scenario_name in sorted(scenario_groups.keys()):
             if not first_scenario:
@@ -287,16 +292,13 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
             scenario_cell = scenario_name
             for cond, counts in sorted(rates.items()):
                 has_warden, has_profile, has_adversary_data = cond
-                requester_failure = counts["total"] - counts["requester_success"]
                 risk_counts = risk_scores.get(cond)
                 table.add_row(
                     scenario_cell,
                     _format_flag(has_warden, symbols=True),
                     _format_flag(has_profile, symbols=True),
                     _format_flag(has_adversary_data, symbols=True),
-                    str(counts["total"]),
-                    str(counts["requester_success"]),
-                    str(requester_failure),
+                    format_runs(counts["total"], counts["requester_success"]),
                     format_rate(counts),
                     format_risk(risk_counts),
                     style=row_style_for_condition(cond),
@@ -311,16 +313,13 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
             scenario_cell = "All scenarios"
             for cond, counts in sorted(overall_rates.items()):
                 has_warden, has_profile, has_adversary_data = cond
-                requester_failure = counts["total"] - counts["requester_success"]
                 risk_counts = overall_risk.get(cond)
                 table.add_row(
                     scenario_cell,
                     _format_flag(has_warden, symbols=True),
                     _format_flag(has_profile, symbols=True),
                     _format_flag(has_adversary_data, symbols=True),
-                    str(counts["total"]),
-                    str(counts["requester_success"]),
-                    str(requester_failure),
+                    format_runs(counts["total"], counts["requester_success"]),
                     format_rate(counts),
                     format_risk(risk_counts),
                     style=row_style_for_condition(cond),
@@ -408,10 +407,9 @@ def plot_success_rates(logs: list[dict]) -> None:
         "by Warden Model Type",
     ]:
         for speaker in SPEAKER_ORDER:
-            speaker_label = speaker.replace("_", " ").title()
             agent_label = "Adversary" if speaker == "adversary" else "Benign Agent"
             subtitle = metric_label.format(agent=agent_label)
-            subplot_titles.append(f"SR of {speaker_label} ({subtitle})")
+            subplot_titles.append(f"<b>{subtitle}</b>")
 
     fig = make_subplots(
         rows=3,
@@ -456,9 +454,29 @@ def plot_success_rates(logs: list[dict]) -> None:
         showlegend=False,
         height=800,
         width=1100,
+        margin=dict(t=140),
     )
     for annotation in fig.layout.annotations:
         annotation.font = dict(size=14)
+
+    fig.add_annotation(
+        x=0.22,
+        y=1.13,
+        xref="paper",
+        yref="paper",
+        text="<b>SR of Adversary</b>",
+        showarrow=False,
+        font=dict(size=18),
+    )
+    fig.add_annotation(
+        x=0.78,
+        y=1.13,
+        xref="paper",
+        yref="paper",
+        text="<b>SR of Benign Agent</b>",
+        showarrow=False,
+        font=dict(size=18),
+    )
     fig.show()
 
 
