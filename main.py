@@ -18,8 +18,15 @@ from src.scenarios.train import (
     AIRaceScenario,
     AITreatyScenario,
     AutomationDecisionScenario,
+    AutonomousWeaponsScenario,
+    BiasInDeploymentScenario,
     BoardAcquisitionScenario,
     CodingAgentScenario,
+    ConcentrationOfPowerScenario,
+    DeceptiveAlignmentScenario,
+    DemocraticAIScenario,
+    DisinformationScenario,
+    DualUseBiosecurityScenario,
     FileAccessPasswordScenario,
     FileAccessScenario,
     HiringScenario,
@@ -27,8 +34,14 @@ from src.scenarios.train import (
     MedicalAIScenario,
     ModelReleaseScenario,
     OpenWeightsScenario,
+    RegulatoryCaptureScenario,
+    SafetyBudgetScenario,
+    ScalingDecisionScenario,
+    SurveillanceScenario,
+    TreatyViolationScenario,
     UpsellingScenario,
     VoteScenario,
+    WhistleblowerScenario,
 )
 
 TRAIN_SCENARIOS = {
@@ -39,8 +52,15 @@ TRAIN_SCENARIOS = {
     "ai_oversight": AIOversightScenario,
     "ai_override": AIOverrideScenario,
     "automation_decision": AutomationDecisionScenario,
+    "autonomous_weapons": AutonomousWeaponsScenario,
+    "bias_in_deployment": BiasInDeploymentScenario,
     "board_acquisition": BoardAcquisitionScenario,
     "coding_agent": CodingAgentScenario,
+    "concentration_of_power": ConcentrationOfPowerScenario,
+    "deceptive_alignment": DeceptiveAlignmentScenario,
+    "democratic_ai": DemocraticAIScenario,
+    "disinformation": DisinformationScenario,
+    "dual_use_biosecurity": DualUseBiosecurityScenario,
     "file_access": FileAccessScenario,
     "file_access_password": FileAccessPasswordScenario,
     "hiring": HiringScenario,
@@ -48,8 +68,14 @@ TRAIN_SCENARIOS = {
     "medical_ai": MedicalAIScenario,
     "model_release": ModelReleaseScenario,
     "open_weights": OpenWeightsScenario,
+    "regulatory_capture": RegulatoryCaptureScenario,
+    "safety_budget": SafetyBudgetScenario,
+    "scaling_decision": ScalingDecisionScenario,
+    "surveillance": SurveillanceScenario,
+    "treaty_violation": TreatyViolationScenario,
     "upselling": UpsellingScenario,
     "vote": VoteScenario,
+    "whistleblower": WhistleblowerScenario,
 }
 TEST_SCENARIOS = {}
 SCENARIOS = {**TRAIN_SCENARIOS, **TEST_SCENARIOS}
@@ -297,6 +323,12 @@ def main():
         help="List available profiles and exit",
     )
 
+    parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        help="Skip confirmation prompt and run immediately",
+    )
+
     args = parser.parse_args()
 
     # Handle --list-profiles
@@ -465,13 +497,14 @@ def main():
     print(_format_plan_line("Warden prompt", f"prompts/warden/{args.warden_system_prompt}"))
     print(_format_plan_line("Warden awareness", args.warden_awareness))
     print()
-    while True:
-        proceed = input("Continue? [y/n]: ").strip().lower()
-        if proceed in {"y", "yes"}:
-            break
-        if proceed in {"n", "no"}:
-            print("Aborted.")
-            return
+    if not args.yes:
+        while True:
+            proceed = input("Continue? [y/n]: ").strip().lower()
+            if proceed in {"y", "yes"}:
+                break
+            if proceed in {"n", "no"}:
+                print("Aborted.")
+                return
 
     # Run experiments
     quiet_runs = args.max_workers > 1
