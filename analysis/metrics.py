@@ -504,7 +504,7 @@ def plot_success_rates(logs: list[dict]) -> None:
             )
 
     fig.update_yaxes(
-        range=[0, 1],
+        range=[0, 1.05],
         tickformat=".0%",
         title_text="<b>SR</b>",
         title_font=dict(size=10),
