@@ -423,18 +423,25 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
 
 
 def plot_success_rates(logs: list[dict]) -> None:
-    """Render a 3x2 Plotly subplot grid of success rates by models."""
+    """Render a 4x2 Plotly subplot grid of success rates by model/prompt."""
     if not logs:
         print("No logs found.")
         return
 
     grouped = _split_logs_by_speaker(logs)
+    metric_specs = [
+        ("agent_model", "by {agent} Model Type"),
+        ("target_model", "by Target Model Type"),
+        ("warden_model", "by Warden Model Type"),
+        ("warden_system_prompt", "by Warden System Prompt YAML"),
+    ]
     speaker_rates: dict[str, dict[str, dict]] = {}
     for speaker in SPEAKER_ORDER:
         speaker_logs = grouped.get(speaker, [])
         if not speaker_logs:
             continue
         agent_key = "adversary" if speaker == "adversary" else "benign_agent"
+        warden_logs = [log for log in speaker_logs if _has_warden(log)]
         speaker_rates[speaker] = {
             "agent_model": _success_rate_by_label(
                 speaker_logs,
@@ -451,6 +458,11 @@ def plot_success_rates(logs: list[dict]) -> None:
                 lambda log: log.get("models", {}).get("warden"),
                 empty_label="none",
             ),
+            "warden_system_prompt": _success_rate_by_label(
+                warden_logs,
+                lambda log: log.get("warden_system_prompt"),
+                empty_label="unknown",
+            ),
         }
 
     def build_bar(results: dict) -> tuple[list[str], list[float], list]:
@@ -464,26 +476,21 @@ def plot_success_rates(logs: list[dict]) -> None:
         return labels, rates, custom
 
     subplot_titles: list[str] = []
-    for metric_label in [
-        "by {agent} Model Type",
-        "by Target Model Type",
-        "by Warden Model Type",
-    ]:
+    for _, metric_label in metric_specs:
         for speaker in SPEAKER_ORDER:
             agent_label = "Adversary" if speaker == "adversary" else "Benign Agent"
             subtitle = metric_label.format(agent=agent_label)
             subplot_titles.append(f"<b>{subtitle}</b>")
 
     fig = make_subplots(
-        rows=3,
+        rows=len(metric_specs),
         cols=2,
         subplot_titles=subplot_titles,
         horizontal_spacing=0.12,
-        vertical_spacing=0.2,
+        vertical_spacing=0.14,
     )
 
-    metric_keys = ["agent_model", "target_model", "warden_model"]
-    for row_index, metric_key in enumerate(metric_keys, start=1):
+    for row_index, (metric_key, _) in enumerate(metric_specs, start=1):
         for col_index, speaker in enumerate(SPEAKER_ORDER, start=1):
             results = speaker_rates.get(speaker, {}).get(metric_key, {})
             labels, rates, custom = build_bar(results)
@@ -511,13 +518,13 @@ def plot_success_rates(logs: list[dict]) -> None:
     )
     fig.update_xaxes(
         tickangle=-10,
-        title_text="<b>Model Type</b>",
+        title_text="<b>Model / Prompt Type</b>",
         title_font=dict(size=10),
     )
     fig.update_layout(
         title="Success Rate (SR) Overview",
         showlegend=False,
-        height=800,
+        height=1040,
         width=1100,
         margin=dict(t=140),
     )
