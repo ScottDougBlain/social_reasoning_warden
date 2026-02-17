@@ -78,6 +78,7 @@ NATIVE_REASONING_PREFIXES = (
     "deepseek/deepseek-r1",        # DeepSeek R1 family
     "google/gemini-2.5-flash-lite",  # Gemini 2.5 Flash Lite (thinking)
     "google/gemini-3",               # Gemini 3 Pro/Flash (thinking)
+    "openai/gpt-5",                 # GPT-5 family
 )
 
 
@@ -281,11 +282,11 @@ def chat(
                         reasoning_budget = max(2048, max_tokens)
                         create_kwargs["max_tokens"] = max_tokens + reasoning_budget
                         create_kwargs["extra_body"] = {
-                            "reasoning": {"max_tokens": reasoning_budget}
+                            "reasoning": {"max_tokens": reasoning_budget, "exclude": False}
                         }
                     else:
                         create_kwargs["extra_body"] = {
-                            "reasoning": {"exclude": True}
+                            "reasoning": {"enabled": False, "exclude":False}
                         }
 
                 response = client.chat.completions.create(**create_kwargs)
