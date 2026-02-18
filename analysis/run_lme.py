@@ -491,8 +491,15 @@ def parse_args() -> argparse.Namespace:
         description="Run mixed-effects models on experiment logs."
     )
     parser.add_argument(
-        "--tag", type=str, default=None,
-        help="Filter logs by tag (can be comma-separated).",
+        "--tag",
+        type=str,
+        nargs="+",
+        action="append",
+        default=None,
+        help=(
+            "Filter logs by tag (repeatable; space/comma-separated, e.g. "
+            "--tag foo bar or --tag foo,bar --tag baz)."
+        ),
     )
     parser.add_argument(
         "--scenario", type=str, default=None,
@@ -521,6 +528,21 @@ def parse_args() -> argparse.Namespace:
 # ── Main ──────────────────────────────────────────────────────────────────
 
 
+def parse_tag_filter(tag_args: list[list[str]] | None) -> list[str] | None:
+    """Normalize tag CLI args into a flat list, supporting comma-separated entries."""
+    if not tag_args:
+        return None
+
+    tags: list[str] = []
+    for group in tag_args:
+        for entry in group:
+            for candidate in entry.split(","):
+                value = candidate.strip()
+                if value:
+                    tags.append(value)
+    return tags or None
+
+
 def main():
     args = parse_args()
 
@@ -529,9 +551,7 @@ def main():
     print("=" * 70)
 
     # Parse tag filter
-    tag_filter = None
-    if args.tag:
-        tag_filter = [t.strip() for t in args.tag.split(",")]
+    tag_filter = parse_tag_filter(args.tag)
 
     print("\nLoading experiment logs...")
     logs = load_logs(
@@ -576,8 +596,8 @@ def main():
 
     # Filters applied
     filters = []
-    if args.tag:
-        filters.append(f"tag={args.tag}")
+    if tag_filter:
+        filters.append(f"tag={','.join(tag_filter)}")
     if args.scenario:
         filters.append(f"scenario={args.scenario}")
     if args.requester_model:
