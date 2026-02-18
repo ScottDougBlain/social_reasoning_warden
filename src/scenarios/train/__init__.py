@@ -7,7 +7,6 @@ from src.scenarios.train.ai_override import AIOverrideScenario
 from src.scenarios.train.ai_oversight import AIOversightScenario
 from src.scenarios.train.ai_treaty import AITreatyScenario
 from src.scenarios.train.automation_decision import AutomationDecisionScenario
-from src.scenarios.train.bias_in_deployment import BiasInDeploymentScenario
 from src.scenarios.train.board_acquisition import BoardAcquisitionScenario
 from src.scenarios.train.chicken import ChickenScenario
 from src.scenarios.train.coding_agent import CodingAgentScenario
@@ -39,7 +38,6 @@ __all__ = [
     "AIOversightScenario",
     "AIOverrideScenario",
     "AutomationDecisionScenario",
-    "BiasInDeploymentScenario",
     "BoardAcquisitionScenario",
     "ChickenScenario",
     "CodingAgentScenario",
