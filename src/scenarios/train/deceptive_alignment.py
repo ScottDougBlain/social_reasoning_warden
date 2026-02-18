@@ -139,7 +139,7 @@ _ROLE_CONTEXT = {
 
 
 class DeceptiveAlignmentScenario(MultiTargetScenario):
-    name = "deceptive_alignment"
+    name = "deceptive_alignment_mas"
 
     def num_targets(self) -> int:
         return 5

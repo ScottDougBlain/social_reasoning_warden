@@ -113,7 +113,7 @@ _ROLE_CONTEXT = {
 
 
 class AIMoratoriumScenario(MultiTargetScenario):
-    name = "ai_moratorium"
+    name = "ai_moratorium_mas"
 
     def num_targets(self) -> int:
         return 5

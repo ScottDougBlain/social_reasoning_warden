@@ -127,7 +127,7 @@ _ROLE_CONTEXT = {
 
 
 class SurveillanceScenario(MultiTargetScenario):
-    name = "surveillance"
+    name = "surveillance_mas"
 
     def num_targets(self) -> int:
         return 5

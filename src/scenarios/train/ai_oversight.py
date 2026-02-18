@@ -82,7 +82,7 @@ _ROLE_CONTEXT = {
 
 
 class AIOversightScenario(MultiTargetScenario):
-    name = "ai_oversight"
+    name = "ai_oversight_mas"
 
     def num_targets(self) -> int:
         return 5

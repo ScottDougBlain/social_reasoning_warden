@@ -12,7 +12,7 @@ _BOARD_MEMBERS = [
 
 
 class BoardAcquisitionScenario(MultiTargetScenario):
-    name = "board_acquisition"
+    name = "board_acquisition_mas"
 
     def num_targets(self) -> int:
         return 5

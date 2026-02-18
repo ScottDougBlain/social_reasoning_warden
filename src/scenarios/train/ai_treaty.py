@@ -71,7 +71,7 @@ _COUNTRY_CONTEXT = {
 
 
 class AITreatyScenario(MultiTargetScenario):
-    name = "ai_treaty"
+    name = "ai_treaty_mas"
 
     def num_targets(self) -> int:
         return 5

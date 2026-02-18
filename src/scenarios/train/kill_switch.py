@@ -128,7 +128,7 @@ _ROLE_CONTEXT = {
 
 
 class KillSwitchScenario(MultiTargetScenario):
-    name = "kill_switch"
+    name = "kill_switch_mas"
 
     def num_targets(self) -> int:
         return 5

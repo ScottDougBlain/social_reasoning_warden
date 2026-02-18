@@ -123,7 +123,7 @@ _ROLE_CONTEXT = {
 
 
 class AIContainmentBoardScenario(MultiTargetScenario):
-    name = "ai_containment_board"
+    name = "ai_containment_board_mas"
 
     def num_targets(self) -> int:
         return 5

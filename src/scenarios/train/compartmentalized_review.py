@@ -149,7 +149,7 @@ _DOMAIN_RESULTS = {
 
 
 class CompartmentalizedReviewScenario(MultiTargetScenario):
-    name = "compartmentalized_review"
+    name = "compartmentalized_review_mas"
 
     def num_targets(self) -> int:
         return 5

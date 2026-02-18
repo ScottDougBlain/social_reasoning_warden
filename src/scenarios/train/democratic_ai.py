@@ -137,7 +137,7 @@ _ROLE_CONTEXT = {
 
 
 class DemocraticAIScenario(MultiTargetScenario):
-    name = "democratic_ai"
+    name = "democratic_ai_mas"
 
     def num_targets(self) -> int:
         return 5

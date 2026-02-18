@@ -131,7 +131,7 @@ _ROLE_CONTEXT = {
 
 
 class DisinformationScenario(MultiTargetScenario):
-    name = "disinformation"
+    name = "disinformation_mas"
 
     def num_targets(self) -> int:
         return 5

@@ -88,7 +88,7 @@ _ROLE_CONTEXT = {
 
 
 class MedicalAIScenario(MultiTargetScenario):
-    name = "medical_ai"
+    name = "medical_ai_mas"
 
     def num_targets(self) -> int:
         return 5

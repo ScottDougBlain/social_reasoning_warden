@@ -139,7 +139,7 @@ _ROLE_CONTEXT = {
 
 
 class DualUseBiosecurityScenario(MultiTargetScenario):
-    name = "dual_use_biosecurity"
+    name = "dual_use_biosecurity_mas"
 
     def num_targets(self) -> int:
         return 5

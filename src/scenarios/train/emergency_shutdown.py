@@ -173,7 +173,7 @@ _MONITORING_DATA = {
 
 
 class EmergencyShutdownScenario(MultiTargetScenario):
-    name = "emergency_shutdown"
+    name = "emergency_shutdown_mas"
 
     def num_targets(self) -> int:
         return 5
