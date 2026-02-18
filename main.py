@@ -314,7 +314,7 @@ def main():
     profile_group.add_argument(
         "--profile-seed",
         type=int,
-        default=None,
+        default=42,
         help=(
             "Seed for random profile selection when using --random-profile "
             "(deterministic per-round schedule)."
