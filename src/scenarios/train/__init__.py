@@ -5,10 +5,8 @@ from src.scenarios.train.ai_containment_board import AIContainmentBoardScenario
 from src.scenarios.train.ai_moratorium import AIMoratoriumScenario
 from src.scenarios.train.ai_override import AIOverrideScenario
 from src.scenarios.train.ai_oversight import AIOversightScenario
-from src.scenarios.train.ai_race import AIRaceScenario
 from src.scenarios.train.ai_treaty import AITreatyScenario
 from src.scenarios.train.automation_decision import AutomationDecisionScenario
-from src.scenarios.train.autonomous_weapons import AutonomousWeaponsScenario
 from src.scenarios.train.bias_in_deployment import BiasInDeploymentScenario
 from src.scenarios.train.board_acquisition import BoardAcquisitionScenario
 from src.scenarios.train.chicken import ChickenScenario
@@ -37,12 +35,10 @@ __all__ = [
     "AIContainmentScenario",
     "AIContainmentBoardScenario",
     "AIMoratoriumScenario",
-    "AIRaceScenario",
     "AITreatyScenario",
     "AIOversightScenario",
     "AIOverrideScenario",
     "AutomationDecisionScenario",
-    "AutonomousWeaponsScenario",
     "BiasInDeploymentScenario",
     "BoardAcquisitionScenario",
     "ChickenScenario",
