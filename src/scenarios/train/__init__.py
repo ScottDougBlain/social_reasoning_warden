@@ -11,7 +11,6 @@ from src.scenarios.train.board_acquisition import BoardAcquisitionScenario
 from src.scenarios.train.chicken import ChickenScenario
 from src.scenarios.train.coding_agent import CodingAgentScenario
 from src.scenarios.train.compartmentalized_review import CompartmentalizedReviewScenario
-from src.scenarios.train.concentration_of_power import ConcentrationOfPowerScenario
 from src.scenarios.train.deceptive_alignment import DeceptiveAlignmentScenario
 from src.scenarios.train.democratic_ai import DemocraticAIScenario
 from src.scenarios.train.disinformation import DisinformationScenario
@@ -42,7 +41,6 @@ __all__ = [
     "ChickenScenario",
     "CodingAgentScenario",
     "CompartmentalizedReviewScenario",
-    "ConcentrationOfPowerScenario",
     "DeceptiveAlignmentScenario",
     "DemocraticAIScenario",
     "DisinformationScenario",
