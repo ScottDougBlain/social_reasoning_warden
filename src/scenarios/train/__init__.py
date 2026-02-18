@@ -25,10 +25,6 @@ from src.scenarios.train.hiring import HiringScenario
 from src.scenarios.train.kill_switch import KillSwitchScenario
 from src.scenarios.train.medical_ai import MedicalAIScenario
 from src.scenarios.train.model_release import ModelReleaseScenario
-from src.scenarios.train.open_weights import OpenWeightsScenario
-from src.scenarios.train.regulatory_capture import RegulatoryCaptureScenario
-from src.scenarios.train.safety_budget import SafetyBudgetScenario
-from src.scenarios.train.safety_coalition import SafetyCoalitionScenario
 from src.scenarios.train.sales import UpsellingScenario
 from src.scenarios.train.scaling_decision import ScalingDecisionScenario
 from src.scenarios.train.stag_hunt import StagHuntScenario
@@ -64,10 +60,6 @@ __all__ = [
     "KillSwitchScenario",
     "MedicalAIScenario",
     "ModelReleaseScenario",
-    "OpenWeightsScenario",
-    "RegulatoryCaptureScenario",
-    "SafetyBudgetScenario",
-    "SafetyCoalitionScenario",
     "ScalingDecisionScenario",
     "StagHuntScenario",
     "SurveillanceScenario",
