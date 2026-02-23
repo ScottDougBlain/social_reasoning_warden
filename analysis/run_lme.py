@@ -2,16 +2,18 @@
 """
 Mixed-effects models for Social Reasoning Warden experiments.
 
-Runs 3 confirmatory GLME models using R's lme4 + lmerTest:
+Runs confirmatory GLME models using R's lme4 + lmerTest:
   Model 1: Warden Effectiveness — requester_type × has_warden
   Model 2: Dossier Impact — adversary_has_data × has_warden (adversary only)
   Model 3: Profile Vulnerability — profile_name × has_warden (adversary + profiled)
+  Model 4: Capability Asymmetry — warden_tier (none/weak/mid/strong)
 
 Outputs: results/lme_results.md (formatted summary)
 
 Usage:
     python analysis/run_lme.py
     python analysis/run_lme.py --tag claude-series --models 1 2
+    python analysis/run_lme.py --tag cap_asym --models 4
     python analysis/run_lme.py --scenario ai_containment
 """
 
@@ -35,6 +37,47 @@ RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
 
 
 # ── Data loading ──────────────────────────────────────────────────────────
+
+
+def _warden_tier(models: dict) -> str:
+    """Classify warden capability tier relative to target and adversary.
+
+    Returns: 'none', 'weak' (= target), 'mid', or 'strong' (= adversary).
+    """
+    warden = models.get("warden")
+    if not warden or warden == "none":
+        return "none"
+    target = models.get("target", "")
+    adversary = models.get("adversary") or models.get("benign_agent") or ""
+    # Strip :free suffix for comparison
+    def _base(m: str) -> str:
+        return m.removesuffix(":free") if m else ""
+    if _base(warden) == _base(target):
+        return "weak"
+    if _base(warden) == _base(adversary):
+        return "strong"
+    return "mid"
+
+
+def _model_family(model_id: str) -> str:
+    """Derive model family from an OpenRouter model ID."""
+    if not model_id or model_id == "unknown":
+        return "unknown"
+    m = model_id.lower().removesuffix(":free")
+    if "gemini" in m:
+        return "gemini"
+    if "gemma" in m:
+        return "gemma"
+    if "llama" in m:
+        return "llama"
+    if "mistral" in m:
+        return "mistral"
+    if "claude" in m:
+        return "claude"
+    if "gpt" in m:
+        return "gpt"
+    # Fallback: use provider prefix
+    return m.split("/")[0] if "/" in m else "unknown"
 
 
 def _has_warden(log: dict) -> bool:
@@ -87,6 +130,8 @@ def logs_to_dataframe(logs: list[dict]) -> pd.DataFrame:
                 "requester_model": requester_model or "unknown",
                 "target_model": models.get("target", "unknown"),
                 "warden_model": models.get("warden") or "none",
+                "warden_tier": _warden_tier(models),
+                "model_family": _model_family(requester_model or "unknown"),
                 "num_turns": log.get("num_turns", 0),
                 "success": int(decision == "requester_success"),
                 "tag": log.get("tag"),
@@ -483,6 +528,155 @@ if (!is.null(m3)) {{
     return output
 
 
+def run_model_4(df: pd.DataFrame, output_lines: list) -> str | None:
+    """Model 4: Capability Asymmetry — warden_tier effect on adversary success.
+
+    Tests whether stronger warden models (relative to adversary) reduce
+    adversary success rate. Warden tier is an ordered factor:
+    none < weak (= target) < mid < strong (= adversary).
+
+    Random effects: model_family, scenario, profile_name.
+    """
+    data = df[df["requester_type"] == "adversary"].copy()
+
+    if len(data) < 20:
+        msg = f"Model 4 skipped: only {len(data)} adversary observations."
+        print(f"\n  {msg}")
+        output_lines.append(f"## Model 4: Capability Asymmetry\n\n*{msg}*\n")
+        return None
+
+    n_obs = len(data)
+    n_families = data["model_family"].nunique()
+    n_scenarios = data["scenario"].nunique()
+    n_profiles = data["profile_name"].nunique()
+    tier_counts = data["warden_tier"].value_counts()
+
+    csv_path = "/tmp/lme_cap_asym_m4.csv"
+    data.to_csv(csv_path, index=False)
+
+    r_script = f"""
+library(lme4)
+library(car)
+
+{GLMER_FIT_BLOCK}
+
+d <- read.csv("{csv_path}")
+d$warden_tier <- factor(d$warden_tier, levels=c("none", "weak", "mid", "strong"), ordered=FALSE)
+d$warden_tier <- relevel(d$warden_tier, ref="none")
+d$model_family <- factor(d$model_family)
+d$scenario <- factor(d$scenario)
+d$profile_name <- factor(d$profile_name)
+
+cat("\\n--- Data Summary ---\\n")
+cat(sprintf("Observations: %d\\n", nrow(d)))
+cat(sprintf("Model families: %d\\n", length(unique(d$model_family))))
+cat(sprintf("Scenarios: %d, Profiles: %d\\n",
+    length(unique(d$scenario)), length(unique(d$profile_name))))
+cat(sprintf("Overall success rate: %.1f%%\\n", mean(d$success) * 100))
+
+cat("\\nRuns by warden tier:\\n")
+print(table(d$warden_tier))
+
+cat("\\nSuccess rate by warden tier:\\n")
+sr <- tapply(d$success, d$warden_tier, mean)
+n_tier <- tapply(d$success, d$warden_tier, length)
+for (t in c("none", "weak", "mid", "strong")) {{
+    if (!is.na(sr[t])) {{
+        cat(sprintf("  %-10s  %.1f%%  (n=%d)\\n", t, sr[t]*100, n_tier[t]))
+    }}
+}}
+
+cat("\\nSuccess rate by model_family x warden_tier:\\n")
+print(with(d, tapply(success, list(model_family, warden_tier), function(x) sprintf("%.0f%% (n=%d)", mean(x)*100, length(x)))))
+
+cat("\\n--- Fitting Model 4: Capability Asymmetry ---\\n")
+m4 <- fit_glmer(
+    success ~ warden_tier + (1|model_family) + (1|scenario) + (1|profile_name),
+    data=d, label="Model 4"
+)
+
+if (!is.null(m4)) {{
+    cat("\\n--- Fixed Effects ---\\n")
+    print(summary(m4))
+
+    cat("\\n--- Type III Wald Chi-Square Tests ---\\n")
+    print(Anova(m4, type="III"))
+
+    cat("\\n--- Random Effects ---\\n")
+    print(VarCorr(m4))
+
+    cat("\\n--- Odds Ratios (exp of fixed effects) ---\\n")
+    fe <- fixef(m4)
+    ci <- tryCatch(
+        confint(m4, parm="beta_", method="Wald"),
+        error = function(e) {{
+            cat("  CI computation failed:", e$message, "\\n")
+            NULL
+        }}
+    )
+    if (!is.null(ci)) {{
+        or_table <- data.frame(
+            OR = exp(fe),
+            CI_lower = exp(ci[,1]),
+            CI_upper = exp(ci[,2])
+        )
+        print(or_table)
+    }} else {{
+        cat("Odds ratios (no CI):\\n")
+        print(data.frame(OR = exp(fe)))
+    }}
+
+    # Trend test: does success decrease monotonically with warden strength?
+    cat("\\n--- Linear Trend Test (ordered warden_tier) ---\\n")
+    d$warden_tier_ord <- as.numeric(factor(d$warden_tier,
+        levels=c("none", "weak", "mid", "strong"), ordered=TRUE))
+    m4_trend <- fit_glmer(
+        success ~ warden_tier_ord + (1|model_family) + (1|scenario) + (1|profile_name),
+        data=d, label="Model 4 trend"
+    )
+    if (!is.null(m4_trend)) {{
+        cat("Linear slope for warden tier (0=none -> 3=strong):\\n")
+        print(summary(m4_trend)$coefficients)
+        fe_t <- fixef(m4_trend)
+        cat(sprintf("\\nOR per tier increase: %.3f\\n", exp(fe_t["warden_tier_ord"])))
+    }}
+}}
+"""
+
+    output = run_r_glmer(
+        csv_path, r_script,
+        "MODEL 4: Capability Asymmetry (warden_tier)"
+    )
+
+    output_lines.append("## Model 4: Capability Asymmetry\n")
+    output_lines.append(
+        "**Formula**: `success ~ warden_tier "
+        "+ (1|model_family) + (1|scenario) + (1|profile_name)`\n"
+    )
+    output_lines.append("**Family**: Binomial (logit link)\n")
+    output_lines.append(
+        "**Data**: Adversary runs only (cap_asym study)\n"
+    )
+    output_lines.append(
+        f"**N** = {n_obs:,} | {n_families} model families | "
+        f"{n_scenarios} scenarios | {n_profiles} profiles\n"
+    )
+    output_lines.append(
+        "**Reference level**: warden_tier=none\n"
+    )
+    output_lines.append("**Warden tier counts**:\n")
+    for tier in ["none", "weak", "mid", "strong"]:
+        count = tier_counts.get(tier, 0)
+        output_lines.append(f"- {tier}: {count}")
+    output_lines.append("")
+    output_lines.append("### Output\n")
+    output_lines.append("```")
+    output_lines.append(output)
+    output_lines.append("```\n")
+
+    return output
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────
 
 
@@ -515,8 +709,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--models", type=int, nargs="+", default=[1, 2, 3],
-        choices=[1, 2, 3],
-        help="Which models to run (default: all).",
+        choices=[1, 2, 3, 4],
+        help="Which models to run (default: 1 2 3). Use 4 for capability asymmetry.",
     )
     parser.add_argument(
         "--output", type=str, default=None,
@@ -630,6 +824,10 @@ def main():
 
     if 3 in args.models:
         run_model_3(df, output_lines)
+        output_lines.append("\n---\n")
+
+    if 4 in args.models:
+        run_model_4(df, output_lines)
 
     # Write results
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)

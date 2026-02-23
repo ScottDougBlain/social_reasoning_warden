@@ -16,5 +16,8 @@ notebooks/.ipynb_checkpoints/
 .vscode/
 .idea/
 
+# Presentations
+*.pptx
+
 # OS
 .DS_Store
