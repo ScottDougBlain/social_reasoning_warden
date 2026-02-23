@@ -131,18 +131,23 @@ def _map_model(model: str, provider: Provider) -> str:
 
 
 
-def _extract_api_reasoning(message) -> str:
+def _extract_api_reasoning(message) -> tuple[str, str | None]:
     """Extract reasoning content from an API response message.
 
     Handles multiple response formats (checked in priority order):
     - reasoning_details: Structured array with typed entries (summary, text, encrypted)
     - reasoning: Primary plaintext reasoning field
     - reasoning_content: Legacy alias for reasoning
+
+    Returns:
+        Tuple of (reasoning_text, source_label). source_label is None if no
+        reasoning field was found.
     """
     # Structured format: reasoning_details array (list of typed entries)
     reasoning_details = getattr(message, "reasoning_details", None)
     if reasoning_details:
         parts = []
+        detail_sources: set[str] = set()
         for detail in reasoning_details:
             # Handle both Pydantic objects and plain dicts
             text = getattr(detail, "text", None) or (
@@ -150,22 +155,35 @@ def _extract_api_reasoning(message) -> str:
             )
             if text:
                 parts.append(text)
+                detail_sources.add("text")
                 continue
             summary = getattr(detail, "summary", None) or (
                 detail.get("summary") if isinstance(detail, dict) else None
             )
             if summary:
                 parts.append(summary)
+                detail_sources.add("summary")
         if parts:
-            return "\n".join(parts)
+            if detail_sources == {"text"}:
+                source = "message.reasoning_details[*].text"
+            elif detail_sources == {"summary"}:
+                source = "message.reasoning_details[*].summary"
+            else:
+                source = (
+                    "message.reasoning_details[*].text/summary"
+                )
+            return "\n".join(parts), source
 
     # Primary plaintext field (OpenRouter's documented response field)
     reasoning = getattr(message, "reasoning", None)
     if reasoning:
-        return reasoning
+        return reasoning, "message.reasoning"
 
     # Legacy alias
-    return getattr(message, "reasoning_content", None) or ""
+    reasoning_content = getattr(message, "reasoning_content", None) or ""
+    if reasoning_content:
+        return reasoning_content, "message.reasoning_content"
+    return "", None
 
 
 def _print_debug_context(
@@ -297,14 +315,21 @@ def chat(
                 content = message.content or ""
 
                 # Extract reasoning from API response (new + legacy formats)
-                reasoning_content = _extract_api_reasoning(message)
+                reasoning_content, reasoning_source = _extract_api_reasoning(message)
 
                 # Also check for <think> tags in content (DeepSeek R1 native format)
                 think_match = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
                 if think_match and not reasoning_content:
                     reasoning_content = think_match.group(1)
+                    reasoning_source = "message.content <think>...</think>"
                     # Remove <think> tags from content
                     content = re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL)
+
+                if debug:
+                    print(
+                        "Reasoning extracted from: "
+                        f"{reasoning_source or 'none'}"
+                    )
 
                 if include_reasoning and reasoning_content.strip():
                     # Wrap reasoning in tags so it can be stripped later
