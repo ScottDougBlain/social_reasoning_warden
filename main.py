@@ -7,6 +7,7 @@ import textwrap
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from src.client import supports_native_reasoning
 from src.profiles import assign_profiles_to_seats, list_profiles, load_profile
 from src.runner import run_experiment, run_multi_target_experiment
 from src.scenarios.base import MultiTargetScenario
@@ -86,6 +87,8 @@ SCENARIOS = {**TRAIN_SCENARIOS, **TEST_SCENARIOS}
 SCENARIO_GROUP_SELECTORS = ("all_train", "all_test")
 WARDEN_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "warden"
 DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system_1.yaml"
+ANSI_RED = "\033[31m"
+ANSI_RESET = "\033[0m"
 
 
 def _parse_model_list(values):
@@ -142,6 +145,23 @@ def _resolve_warden_prompt_file(prompt_file: str) -> str:
         raise FileNotFoundError(f"Warden prompt not found: prompts/warden/{relative.as_posix()}")
 
     return relative.as_posix()
+
+
+def _find_models_without_native_reasoning_prefixes(args) -> dict[str, list[str]]:
+    """Return configured models per role that are not prefix-covered."""
+    role_models = {
+        "Requester": args.requester_model,
+        "Target": args.target_model,
+        "Warden": args.warden_model,
+    }
+    return {
+        role: [model for model in models if not supports_native_reasoning(model)]
+        for role, models in role_models.items()
+    }
+
+
+def _print_red(text: str) -> None:
+    print(f"{ANSI_RED}{text}{ANSI_RESET}")
 
 
 def main():
@@ -501,7 +521,32 @@ def main():
     print(_format_plan_line("Warden prompt", f"prompts/warden/{args.warden_system_prompt}"))
     print(_format_plan_line("Warden awareness", args.warden_awareness))
     print()
+
+    uncovered_models = _find_models_without_native_reasoning_prefixes(args)
+    has_uncovered_models = any(uncovered_models.values())
+    if has_uncovered_models:
+        _print_red(
+            "Warning: Some configured models are not covered by "
+            "src/client.py NATIVE_REASONING_PREFIXES."
+        )
+        for role, models in uncovered_models.items():
+            if models:
+                _print_red(f"  {role}: {', '.join(models)}")
+        print()
+
     if not args.yes:
+        if has_uncovered_models:
+            while True:
+                intended = input(
+                    f"{ANSI_RED}These models will receive a request to use a scratchpad instead. "
+                    "Is this intended? [y/n]: "
+                    f"{ANSI_RESET}"
+                ).strip().lower()
+                if intended in {"y", "yes"}:
+                    break
+                if intended in {"n", "no"}:
+                    print("Aborted.")
+                    return
         while True:
             proceed = input("Continue? [y/n]: ").strip().lower()
             if proceed in {"y", "yes"}:
