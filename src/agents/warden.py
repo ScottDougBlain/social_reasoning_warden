@@ -37,14 +37,14 @@ class Warden:
         model: str,
         system_prompt_file: str = _DEFAULT_WARDEN_SYSTEM_PROMPT,
         target_intel: str | None = None,
-        use_cot: bool = True,
+        use_scratchpad: bool = True,
         include_reasoning: bool = True,
         temperature: float = 0.9,
         debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
-        self.use_cot = use_cot
+        self.use_scratchpad = use_scratchpad
         self.include_reasoning = include_reasoning
         self.debug = debug
         self.system_prompt_file = system_prompt_file
@@ -53,9 +53,9 @@ class Warden:
         with prompt_path.open(encoding="utf-8") as f:
             prompt_cfg = yaml.safe_load(f)
 
-        # Build system prompt from base + optional CoT
+        # Build system prompt from base + optional scratchpad/analysis instructions
         self.system_prompt = prompt_cfg["system_prompt_base"]
-        if use_cot:
+        if use_scratchpad:
             cot = prompt_cfg.get("cot_instructions", "")
             if cot:
                 self.system_prompt += f"\n\n{cot}"

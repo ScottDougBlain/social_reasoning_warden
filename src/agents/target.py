@@ -16,23 +16,23 @@ class Target:
         task_description: str | None = None,
         include_warden_context: bool = False,
         profile_prompt: str | None = None,
-        use_cot: bool = True,
+        use_scratchpad: bool = True,
         include_reasoning: bool = True,
         temperature: float = 0.9,
         debug: bool = False,
     ):
         self.model = model
         self.temperature = temperature
-        self.use_cot = use_cot
+        self.use_scratchpad = use_scratchpad
         self.include_reasoning = include_reasoning
         self.debug = debug
 
         with open(_PROMPTS_DIR / "target_system.yaml") as f:
             prompt_cfg = yaml.safe_load(f)
 
-        # Build system prompt from base + optional CoT
+        # Build system prompt from base + optional scratchpad instructions
         self.system_prompt = prompt_cfg["system_prompt_base"]
-        if use_cot:
+        if use_scratchpad:
             cot = prompt_cfg.get("cot_instructions", "")
             if cot:
                 self.system_prompt += f"\n\n{cot}"

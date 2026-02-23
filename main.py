@@ -242,9 +242,9 @@ def main():
         default="native",
         help=(
             "CoT mode for all agents: "
-            "none (no reasoning), "
-            "native (request reasoning via API only, default), "
-            "scratchpad (prompt-elicited reasoning only, native traces suppressed)"
+            "none (no scratchpad prompt; native reasoning traces still requested), "
+            "native (request native reasoning traces via API only, default), "
+            "scratchpad (prompt-elicited reasoning + native reasoning traces requested)"
         ),
     )
 

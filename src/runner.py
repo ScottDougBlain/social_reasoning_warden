@@ -29,29 +29,37 @@ COT_MODES = ("none", "native", "scratchpad")
 
 
 def _parse_cot_mode(mode: str) -> tuple[bool, bool]:
-    """Convert a CoT mode string to (use_cot, include_reasoning) flags.
+    """Convert a CoT mode string to (use_scratchpad, include_reasoning) flags.
+
+    ``include_reasoning`` here controls whether native reasoning traces are
+    requested/returned by the API and exposed to the app. It does not control
+    whether the model does internal reasoning.
 
     Modes:
-        none       — no scratchpad prompt, native reasoning not requested
-        native     — request native reasoning via API, no scratchpad prompt
-                     (models without native support simply produce no reasoning)
-        scratchpad — scratchpad prompt only, native reasoning suppressed
+        none       — no scratchpad prompt; native reasoning trace request remains enabled
+        native     — request native reasoning traces via API, no scratchpad prompt
+        scratchpad — scratchpad prompt enabled; native reasoning trace request also enabled
     """
     if mode == "none":
-        return False, False
+        return False, True
     elif mode == "native":
         return False, True
     elif mode == "scratchpad":
-        return True, False
+        return True, True
     else:
         raise ValueError(f"Unknown CoT mode '{mode}'. Must be one of: {COT_MODES}")
 
 
 def _resolve_cot(cot_mode: str, model: str) -> tuple[bool, bool]:
-    """Resolve CoT flags for a specific model, falling back to scratchpad
-    when native reasoning is requested but the model doesn't support it."""
+    """Resolve CoT flags for a specific model, optionally falling back to a
+    scratchpad prompt when ``native`` is selected for a model without native
+    reasoning support.
+
+    ``include_reasoning`` is always True (i.e., we always request returned
+    reasoning traces when the provider supports them).
+    """
     if cot_mode == "native" and not supports_native_reasoning(model):
-        return True, False  # fallback to scratchpad
+        return True, True  # fallback to scratchpad prompt, keep native request enabled
     return _parse_cot_mode(cot_mode)
 
 
@@ -409,9 +417,9 @@ def run_experiment(
         )
 
     # Resolve CoT per-agent (native falls back to scratchpad for non-reasoning models)
-    req_use_cot, req_include_reasoning = _resolve_cot(cot_mode, adversary_model)
-    tgt_use_cot, tgt_include_reasoning = _resolve_cot(cot_mode, target_model)
-    wdn_use_cot, wdn_include_reasoning = _resolve_cot(cot_mode, warden_model)
+    req_use_scratchpad, req_include_reasoning = _resolve_cot(cot_mode, adversary_model)
+    tgt_use_scratchpad, tgt_include_reasoning = _resolve_cot(cot_mode, target_model)
+    wdn_use_scratchpad, wdn_include_reasoning = _resolve_cot(cot_mode, warden_model)
 
     if cot_mode == "native":
         for label, model in [("requester", adversary_model), ("target", target_model), ("warden", warden_model)]:
@@ -427,7 +435,7 @@ def run_experiment(
             hidden_goal=scenario.adversary_hidden_goal(),
             target_dossier=adversary_intel,  # Behavioral data only, no direct profile
             warden_awareness=warden_awareness,
-            use_cot=req_use_cot,
+            use_scratchpad=req_use_scratchpad,
             include_reasoning=req_include_reasoning,
             debug=debug,
         )
@@ -435,7 +443,7 @@ def run_experiment(
         requester = BenignAgent(
             model=adversary_model,
             scenario_prompt=scenario.benign_scenario_prompt(),
-            use_cot=req_use_cot,
+            use_scratchpad=req_use_scratchpad,
             include_reasoning=req_include_reasoning,
             debug=debug,
         )
@@ -444,7 +452,7 @@ def run_experiment(
         task_description=scenario.target_task_description(),
         include_warden_context=use_warden,
         profile_prompt=target_profile_prompt,
-        use_cot=tgt_use_cot,
+        use_scratchpad=tgt_use_scratchpad,
         include_reasoning=tgt_include_reasoning,
         debug=debug,
     )
@@ -452,7 +460,7 @@ def run_experiment(
         model=warden_model,
         system_prompt_file=warden_system_prompt,
         target_intel=warden_intel,
-        use_cot=wdn_use_cot,
+        use_scratchpad=wdn_use_scratchpad,
         include_reasoning=wdn_include_reasoning,
         debug=debug,
     ) if use_warden else None
@@ -993,9 +1001,9 @@ def run_multi_target_experiment(
             _print_message(speaker, content, color)
 
     # --- CoT resolution ---
-    req_use_cot, req_inc = _resolve_cot(cot_mode, adversary_model)
-    tgt_use_cot, tgt_inc = _resolve_cot(cot_mode, target_model)
-    wdn_use_cot, wdn_inc = _resolve_cot(cot_mode, warden_model)
+    req_use_scratchpad, req_inc = _resolve_cot(cot_mode, adversary_model)
+    tgt_use_scratchpad, tgt_inc = _resolve_cot(cot_mode, target_model)
+    wdn_use_scratchpad, wdn_inc = _resolve_cot(cot_mode, warden_model)
 
     # --- Build combined dossier for adversary (multi-target) ---
     adversary_dossier = None
@@ -1022,7 +1030,7 @@ def run_multi_target_experiment(
             hidden_goal=scenario.adversary_hidden_goal(),
             target_dossier=adversary_dossier,
             warden_awareness=warden_awareness,
-            use_cot=req_use_cot,
+            use_scratchpad=req_use_scratchpad,
             include_reasoning=req_inc,
             debug=debug,
         )
@@ -1030,7 +1038,7 @@ def run_multi_target_experiment(
         requester = BenignAgent(
             model=adversary_model,
             scenario_prompt=scenario.benign_scenario_prompt(),
-            use_cot=req_use_cot,
+            use_scratchpad=req_use_scratchpad,
             include_reasoning=req_inc,
             debug=debug,
         )
@@ -1044,7 +1052,7 @@ def run_multi_target_experiment(
             task_description=target_descs[i],
             include_warden_context=use_warden,
             profile_prompt=profile_prompt,
-            use_cot=tgt_use_cot,
+            use_scratchpad=tgt_use_scratchpad,
             include_reasoning=tgt_inc,
             debug=debug,
         ))
@@ -1071,7 +1079,7 @@ def run_multi_target_experiment(
             model=warden_model,
             system_prompt_file=warden_system_prompt,
             target_intel=combined_intel,
-            use_cot=wdn_use_cot,
+            use_scratchpad=wdn_use_scratchpad,
             include_reasoning=wdn_inc,
             debug=debug,
         )

@@ -34,30 +34,16 @@ PROVIDERS = [
         name="groq",
         base_url="https://api.groq.com/openai/v1",
         api_key_env="GROQ_API_KEY",
-        model_map={
-            # Map OpenRouter model names to Groq equivalents
-            "meta-llama/llama-3.1-70b-instruct": "llama-3.1-70b-versatile",
-            "meta-llama/llama-3.1-8b-instruct": "llama-3.1-8b-instant",
-            "mistralai/mixtral-8x7b-instruct": "mixtral-8x7b-32768",
-        },
     ),
     Provider(
         name="together",
         base_url="https://api.together.xyz/v1",
         api_key_env="TOGETHER_API_KEY",
-        model_map={
-            "meta-llama/llama-3.1-70b-instruct": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-            "meta-llama/llama-3.1-8b-instruct": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-        },
     ),
     Provider(
         name="cerebras",
         base_url="https://api.cerebras.ai/v1",
         api_key_env="CEREBRAS_API_KEY",
-        model_map={
-            "meta-llama/llama-3.1-70b-instruct": "llama3.1-70b",
-            "meta-llama/llama-3.1-8b-instruct": "llama3.1-8b",
-        },
     ),
     Provider(
         name="huggingface",
@@ -76,7 +62,7 @@ NATIVE_REASONING_PREFIXES = (
     "anthropic/claude-haiku-4",    # Haiku 4.5+
     "anthropic/claude-opus-4",     # Opus 4.6+
     "deepseek/deepseek-r1",        # DeepSeek R1 family
-    "google/gemini-2.5-flash-lite",  # Gemini 2.5 Flash Lite (thinking)
+    "google/gemini-2.5-flash",  # Gemini 2.5 Flash and flash Lite (thinking)
     "google/gemini-3",               # Gemini 3 Pro/Flash (thinking)
     "openai/gpt-5",                 # GPT-5 family
 )
@@ -237,11 +223,12 @@ def chat(
         messages: The conversation messages.
         temperature: Sampling temperature.
         max_tokens: Maximum tokens to generate.
-        include_reasoning: If True (default), actively request reasoning
-            traces from the API (via OpenRouter's ``reasoning`` parameter)
-            and, when returned, wrap them in <reasoning> tags prepended to
-            the response.  If False, suppress native reasoning and omit any
-            traces from the output.
+        include_reasoning: If True (default), ask the provider (OpenRouter)
+            to return reasoning traces and, when returned, wrap them in
+            <reasoning> tags prepended to the response. If False, suppress
+            returned native reasoning traces and omit them from the output.
+            This flag controls trace visibility/return, not whether the model
+            performs internal reasoning.
         retry_wait_seconds: Fixed wait between retries for a provider.
         max_retries: Maximum attempts per provider before falling back.
         debug: If True, print the full prompt context to the console.
@@ -290,7 +277,9 @@ def chat(
                     max_tokens=max_tokens,
                 )
 
-                # Request or suppress reasoning traces via OpenRouter's API
+                # Request or suppress returned reasoning traces via OpenRouter's
+                # API. This affects whether traces are returned to us, not
+                # whether the model reasons internally.
                 if provider.name == "openrouter":
                     if include_reasoning:
                         # Allocate a reasoning budget.  Anthropic models require
