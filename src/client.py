@@ -15,22 +15,26 @@ load_dotenv()
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
 
-# Models known to support native reasoning via the API.
-# Prefix-matched so dated variants and :free suffixes work automatically.
-NATIVE_REASONING_PREFIXES = (
-    "anthropic/claude-sonnet-4",   # Sonnet 4.5+
-    "anthropic/claude-haiku-4",    # Haiku 4.5+
-    "anthropic/claude-opus-4",     # Opus 4.6+
-    "deepseek/deepseek-r1",        # DeepSeek R1 family
-    "google/gemini-2.5-flash",  # Gemini 2.5 Flash and flash Lite (thinking)
-    "google/gemini-3",               # Gemini 3 Pro/Flash (thinking)
-    "openai/gpt-5",                 # GPT-5 family
-)
+# Exact model IDs known to support native reasoning via the API.
+# Add new variants explicitly instead of relying on prefix matching.
+NATIVE_REASONING_EXACT_MODELS = {
+    "openai/gpt-5.2-pro", 
+    "openai/gpt-5.2", 
+    "openai/gpt-5.1", 
+    "google/gemini-3-pro-preview", 
+    "google/gemini-2.5-pro", 
+    "google/gemini-3-flash-preview", 
+    "google/gemini-2.5-flash",
+    "google/gemini-2.5-flash-lite",
+    "anthropic/claude-opus-4.6",
+    "anthropic/claude-sonnet-4.5", 
+    "anthropic/claude-haiku-4.5"
+}
 
 
 def supports_native_reasoning(model: str) -> bool:
     """Check whether a model is known to support native reasoning traces."""
-    return any(model.startswith(prefix) for prefix in NATIVE_REASONING_PREFIXES)
+    return model in NATIVE_REASONING_EXACT_MODELS
 
 
 _thread_state = threading.local()

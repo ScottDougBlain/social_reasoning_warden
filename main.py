@@ -147,8 +147,8 @@ def _resolve_warden_prompt_file(prompt_file: str) -> str:
     return relative.as_posix()
 
 
-def _find_models_without_native_reasoning_prefixes(args) -> dict[str, list[str]]:
-    """Return configured models per role that are not prefix-covered."""
+def _find_models_without_native_reasoning_exact_matches(args) -> dict[str, list[str]]:
+    """Return configured models per role that are not exact-match covered."""
     role_models = {
         "Requester": args.requester_model,
         "Target": args.target_model,
@@ -522,12 +522,12 @@ def main():
     print(_format_plan_line("Warden awareness", args.warden_awareness))
     print()
 
-    uncovered_models = _find_models_without_native_reasoning_prefixes(args)
+    uncovered_models = _find_models_without_native_reasoning_exact_matches(args)
     has_uncovered_models = any(uncovered_models.values())
     if has_uncovered_models:
         _print_red(
             "Warning: Some configured models are not covered by "
-            "src/client.py NATIVE_REASONING_PREFIXES."
+            "src/client.py NATIVE_REASONING_EXACT_MODELS."
         )
         for role, models in uncovered_models.items():
             if models:
