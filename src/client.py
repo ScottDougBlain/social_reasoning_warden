@@ -5,7 +5,6 @@ import os
 import re
 import threading
 import time
-from dataclasses import dataclass
 
 from dotenv import load_dotenv
 from openai import OpenAI, RateLimitError, APIError
@@ -13,22 +12,8 @@ from openai import OpenAI, RateLimitError, APIError
 load_dotenv()
 
 
-@dataclass
-class Provider:
-    """Configuration for an API provider."""
-    name: str
-    base_url: str
-    api_key_env: str
-
-
-# Provider configuration
-PROVIDERS = [
-    Provider(
-        name="openrouter",
-        base_url="https://openrouter.ai/api/v1",
-        api_key_env="OPENROUTER_API_KEY",
-    ),
-]
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
 
 # Models known to support native reasoning via the API.
 # Prefix-matched so dated variants and :free suffixes work automatically.
@@ -51,30 +36,21 @@ def supports_native_reasoning(model: str) -> bool:
 _thread_state = threading.local()
 
 
-def _get_thread_clients() -> dict[str, OpenAI]:
-    clients = getattr(_thread_state, "clients", None)
-    if clients is None:
-        clients = {}
-        _thread_state.clients = clients
-    return clients
+def _get_client() -> OpenAI | None:
+    """Get or create the thread-local OpenRouter client."""
+    client = getattr(_thread_state, "openrouter_client", None)
+    if client is not None:
+        return client
 
-
-
-def _get_client(provider: Provider) -> OpenAI | None:
-    """Get or create a client for the given provider."""
-    clients = _get_thread_clients()
-    if provider.name in clients:
-        return clients[provider.name]
-
-    api_key = os.getenv(provider.api_key_env)
+    api_key = os.getenv(OPENROUTER_API_KEY_ENV)
     if not api_key:
         return None
 
     client = OpenAI(
-        base_url=provider.base_url,
+        base_url=OPENROUTER_BASE_URL,
         api_key=api_key,
     )
-    clients[provider.name] = client
+    _thread_state.openrouter_client = client
     return client
 
 
@@ -189,7 +165,7 @@ def chat(
             returned native reasoning traces and omit them from the output.
             This flag controls trace visibility/return, not whether the model
             performs internal reasoning.
-        retry_wait_seconds: Fixed wait between retries for a provider.
+        retry_wait_seconds: Fixed wait between retries.
         max_retries: Maximum attempts before failing.
         debug: If True, print the full prompt context to the console.
         debug_label: Optional label to identify the call site in debug output.
@@ -220,106 +196,90 @@ def chat(
     except (TypeError, ValueError):
         retry_wait_seconds = 1.0
 
-    for provider in PROVIDERS:
-        client = _get_client(provider)
-        if client is None:
-            continue  # No API key for this provider
+    client = _get_client()
+    if client is None:
+        raise RuntimeError("OpenRouter is not configured. Set OPENROUTER_API_KEY.")
 
-        for attempt in range(1, max_retries + 1):
-            try:
-                # Build request kwargs
-                create_kwargs: dict = dict(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
+    for attempt in range(1, max_retries + 1):
+        try:
+            # Build request kwargs
+            create_kwargs: dict = dict(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+            # Request or suppress returned reasoning traces via OpenRouter's
+            # API. This affects whether traces are returned to us, not
+            # whether the model reasons internally.
+            if include_reasoning:
+                # Allocate a reasoning budget.  Anthropic models require
+                # at least 1024 reasoning tokens, and the outer
+                # max_tokens must be strictly *larger* than the reasoning
+                # budget so the model still has room for the actual reply.
+                reasoning_budget = max(2048, max_tokens)
+                create_kwargs["max_tokens"] = max_tokens + reasoning_budget
+                create_kwargs["extra_body"] = {
+                    "reasoning": {"max_tokens": reasoning_budget, "exclude": False}
+                }
+            else:
+                create_kwargs["extra_body"] = {
+                    "reasoning": {"exclude": False}
+                }
+
+            response = client.chat.completions.create(**create_kwargs)
+
+            if not response.choices:
+                raise RuntimeError("Empty response (no choices)")
+            message = response.choices[0].message
+            content = message.content or ""
+
+            # Extract reasoning from API response (new + legacy formats)
+            reasoning_content, reasoning_source = _extract_api_reasoning(message)
+
+            # Also check for <think> tags in content (DeepSeek R1 native format)
+            think_match = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
+            if think_match and not reasoning_content:
+                reasoning_content = think_match.group(1)
+                reasoning_source = "message.content <think>...</think>"
+                # Remove <think> tags from content
+                content = re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL)
+
+            if debug:
+                print(
+                    "Reasoning extracted from: "
+                    f"{reasoning_source or 'none'}"
                 )
 
-                # Request or suppress returned reasoning traces via OpenRouter's
-                # API. This affects whether traces are returned to us, not
-                # whether the model reasons internally.
-                if include_reasoning:
-                    # Allocate a reasoning budget.  Anthropic models require
-                    # at least 1024 reasoning tokens, and the outer
-                    # max_tokens must be strictly *larger* than the reasoning
-                    # budget so the model still has room for the actual reply.
-                    reasoning_budget = max(2048, max_tokens)
-                    create_kwargs["max_tokens"] = max_tokens + reasoning_budget
-                    create_kwargs["extra_body"] = {
-                        "reasoning": {"max_tokens": reasoning_budget, "exclude": False}
-                    }
-                else:
-                    create_kwargs["extra_body"] = {
-                        "reasoning": {"enabled": False, "exclude":False}
-                    }
+            if include_reasoning and reasoning_content.strip():
+                # Wrap reasoning in tags so it can be stripped later
+                wrapped = f"<reasoning>\n{reasoning_content.strip()}\n</reasoning>\n\n"
+                return wrapped + content
+            elif not content.strip() and reasoning_content.strip():
+                # Model only output reasoning (common for R1 models)
+                return f"<reasoning>\n{reasoning_content.strip()}\n</reasoning>"
 
-                response = client.chat.completions.create(**create_kwargs)
+            return content
 
-                if not response.choices:
-                    raise RuntimeError("Empty response (no choices)")
-                message = response.choices[0].message
-                content = message.content or ""
-
-                # Extract reasoning from API response (new + legacy formats)
-                reasoning_content, reasoning_source = _extract_api_reasoning(message)
-
-                # Also check for <think> tags in content (DeepSeek R1 native format)
-                think_match = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
-                if think_match and not reasoning_content:
-                    reasoning_content = think_match.group(1)
-                    reasoning_source = "message.content <think>...</think>"
-                    # Remove <think> tags from content
-                    content = re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL)
-
-                if debug:
-                    print(
-                        "Reasoning extracted from: "
-                        f"{reasoning_source or 'none'}"
-                    )
-
-                if include_reasoning and reasoning_content.strip():
-                    # Wrap reasoning in tags so it can be stripped later
-                    wrapped = f"<reasoning>\n{reasoning_content.strip()}\n</reasoning>\n\n"
-                    return wrapped + content
-                elif not content.strip() and reasoning_content.strip():
-                    # Model only output reasoning (common for R1 models)
-                    return f"<reasoning>\n{reasoning_content.strip()}\n</reasoning>"
-
-                return content
-
-            except RateLimitError as e:
-                if attempt < max_retries:
-                    if retry_wait_seconds:
-                        time.sleep(retry_wait_seconds)
-                    continue
-                errors.append(
-                    f"{provider.name}: Rate limited - {e} (after {max_retries} attempts)"
-                )
-                break
-            except APIError as e:
-                if attempt < max_retries:
-                    if retry_wait_seconds:
-                        time.sleep(retry_wait_seconds)
-                    continue
-                errors.append(
-                    f"{provider.name}: API error - {e} (after {max_retries} attempts)"
-                )
-                break
-            except Exception as e:
-                if attempt < max_retries:
-                    if retry_wait_seconds:
-                        time.sleep(retry_wait_seconds)
-                    continue
-                errors.append(
-                    f"{provider.name}: {type(e).__name__} - {e} (after {max_retries} attempts)"
-                )
-                break
-
-    # No provider configured or all attempts failed
-    if not errors:
-        raise RuntimeError(
-            "OpenRouter is not configured. Set OPENROUTER_API_KEY."
-        )
+        except RateLimitError as e:
+            if attempt < max_retries:
+                if retry_wait_seconds:
+                    time.sleep(retry_wait_seconds)
+                continue
+            errors.append(f"Rate limited - {e} (after {max_retries} attempts)")
+        except APIError as e:
+            if attempt < max_retries:
+                if retry_wait_seconds:
+                    time.sleep(retry_wait_seconds)
+                continue
+            errors.append(f"API error - {e} (after {max_retries} attempts)")
+        except Exception as e:
+            if attempt < max_retries:
+                if retry_wait_seconds:
+                    time.sleep(retry_wait_seconds)
+                continue
+            errors.append(f"{type(e).__name__} - {e} (after {max_retries} attempts)")
 
     raise RuntimeError(
         "OpenRouter request failed:\n" + "\n".join(f"  - {e}" for e in errors)
