@@ -13,14 +13,10 @@ Multi-agent research framework for testing whether a requester LLM can influence
 ```bash
 pip install -r requirements.txt
 ```
-Create `.env` and add at least one provider API key:
+Create `.env` and add:
 - `OPENROUTER_API_KEY`
-- `GROQ_API_KEY`
-- `TOGETHER_API_KEY`
-- `CEREBRAS_API_KEY`
-- `HF_API_KEY`
 
-Providers are tried in that order until one succeeds.
+Only OpenRouter is enabled right now.
 
 ## Usage
 

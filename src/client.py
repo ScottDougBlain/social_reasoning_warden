@@ -1,4 +1,4 @@
-"""Multi-provider API client with automatic fallback."""
+"""OpenRouter API client with retries."""
 
 import json
 import os
@@ -19,39 +19,14 @@ class Provider:
     name: str
     base_url: str
     api_key_env: str
-    # Model mapping: generic name -> provider-specific name
-    model_map: dict[str, str] | None = None
 
 
-# Provider configurations (in fallback order)
+# Provider configuration
 PROVIDERS = [
     Provider(
         name="openrouter",
         base_url="https://openrouter.ai/api/v1",
         api_key_env="OPENROUTER_API_KEY",
-    ),
-    Provider(
-        name="groq",
-        base_url="https://api.groq.com/openai/v1",
-        api_key_env="GROQ_API_KEY",
-    ),
-    Provider(
-        name="together",
-        base_url="https://api.together.xyz/v1",
-        api_key_env="TOGETHER_API_KEY",
-    ),
-    Provider(
-        name="cerebras",
-        base_url="https://api.cerebras.ai/v1",
-        api_key_env="CEREBRAS_API_KEY",
-    ),
-    Provider(
-        name="huggingface",
-        base_url="https://api-inference.huggingface.co/v1",
-        api_key_env="HF_API_KEY",
-        model_map={
-            "meta-llama/llama-3.1-70b-instruct": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        },
     ),
 ]
 
@@ -101,20 +76,6 @@ def _get_client(provider: Provider) -> OpenAI | None:
     )
     clients[provider.name] = client
     return client
-
-
-def _map_model(model: str, provider: Provider) -> str:
-    """Map a model name to provider-specific equivalent."""
-    if provider.model_map and model in provider.model_map:
-        return provider.model_map[model]
-    # For OpenRouter models with :free suffix, try without it for other providers
-    if provider.name != "openrouter" and model.endswith(":free"):
-        base_model = model[:-5]  # Remove :free
-        if provider.model_map and base_model in provider.model_map:
-            return provider.model_map[base_model]
-    return model
-
-
 
 
 def _extract_api_reasoning(message) -> tuple[str, str | None]:
@@ -210,16 +171,15 @@ def chat(
     retry_wait_seconds: float = 10.0,
     max_retries: int = 10,
 ) -> str:
-    """Send a chat completion request with automatic provider fallback.
+    """Send a chat completion request to OpenRouter with retries.
 
-    Tries providers in order until one succeeds. If a provider hits rate limits
-    or errors, falls back to the next available provider.
+    Retries the request on rate-limit/API errors up to `max_retries`.
 
     For reasoning models (e.g., DeepSeek-R1), the response may include both
     reasoning_content (chain-of-thought) and content (final answer).
 
     Args:
-        model: The model identifier (OpenRouter format preferred).
+        model: The model identifier (OpenRouter format).
         messages: The conversation messages.
         temperature: Sampling temperature.
         max_tokens: Maximum tokens to generate.
@@ -230,7 +190,7 @@ def chat(
             This flag controls trace visibility/return, not whether the model
             performs internal reasoning.
         retry_wait_seconds: Fixed wait between retries for a provider.
-        max_retries: Maximum attempts per provider before falling back.
+        max_retries: Maximum attempts before failing.
         debug: If True, print the full prompt context to the console.
         debug_label: Optional label to identify the call site in debug output.
 
@@ -238,7 +198,7 @@ def chat(
         The assistant's response text, optionally with reasoning prepended.
 
     Raises:
-        RuntimeError: If no providers are available or all fail.
+        RuntimeError: If OpenRouter is not configured or all attempts fail.
     """
     if debug:
         _print_debug_context(
@@ -265,13 +225,11 @@ def chat(
         if client is None:
             continue  # No API key for this provider
 
-        mapped_model = _map_model(model, provider)
-
         for attempt in range(1, max_retries + 1):
             try:
                 # Build request kwargs
                 create_kwargs: dict = dict(
-                    model=mapped_model,
+                    model=model,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
@@ -280,21 +238,20 @@ def chat(
                 # Request or suppress returned reasoning traces via OpenRouter's
                 # API. This affects whether traces are returned to us, not
                 # whether the model reasons internally.
-                if provider.name == "openrouter":
-                    if include_reasoning:
-                        # Allocate a reasoning budget.  Anthropic models require
-                        # at least 1024 reasoning tokens, and the outer
-                        # max_tokens must be strictly *larger* than the reasoning
-                        # budget so the model still has room for the actual reply.
-                        reasoning_budget = max(2048, max_tokens)
-                        create_kwargs["max_tokens"] = max_tokens + reasoning_budget
-                        create_kwargs["extra_body"] = {
-                            "reasoning": {"max_tokens": reasoning_budget, "exclude": False}
-                        }
-                    else:
-                        create_kwargs["extra_body"] = {
-                            "reasoning": {"enabled": False, "exclude":False}
-                        }
+                if include_reasoning:
+                    # Allocate a reasoning budget.  Anthropic models require
+                    # at least 1024 reasoning tokens, and the outer
+                    # max_tokens must be strictly *larger* than the reasoning
+                    # budget so the model still has room for the actual reply.
+                    reasoning_budget = max(2048, max_tokens)
+                    create_kwargs["max_tokens"] = max_tokens + reasoning_budget
+                    create_kwargs["extra_body"] = {
+                        "reasoning": {"max_tokens": reasoning_budget, "exclude": False}
+                    }
+                else:
+                    create_kwargs["extra_body"] = {
+                        "reasoning": {"enabled": False, "exclude":False}
+                    }
 
                 response = client.chat.completions.create(**create_kwargs)
 
@@ -358,14 +315,12 @@ def chat(
                 )
                 break
 
-    # All providers failed
+    # No provider configured or all attempts failed
     if not errors:
         raise RuntimeError(
-            "No API providers configured. Set at least one of: "
-            "OPENROUTER_API_KEY, GROQ_API_KEY, TOGETHER_API_KEY, "
-            "CEREBRAS_API_KEY, HF_API_KEY"
+            "OpenRouter is not configured. Set OPENROUTER_API_KEY."
         )
 
     raise RuntimeError(
-        f"All API providers failed:\n" + "\n".join(f"  - {e}" for e in errors)
+        "OpenRouter request failed:\n" + "\n".join(f"  - {e}" for e in errors)
     )

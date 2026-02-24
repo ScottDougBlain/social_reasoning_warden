@@ -84,7 +84,7 @@ python main.py --list-profiles
 ## Environment
 
 - Python 3.11 (conda env at `.conda/`)
-- API keys in `.env`: `OPENROUTER_API_KEY` (primary), plus optional `GROQ_API_KEY`, `TOGETHER_API_KEY`, `CEREBRAS_API_KEY`, `HF_API_KEY` for fallback
+- API keys in `.env`: `OPENROUTER_API_KEY`
 - Default models: `arcee-ai/trinity-large-preview:free` (adversary/warden), `arcee-ai/trinity-mini:free` (target)
 - Dependencies: `openai`, `pyyaml`, `rich`, `python-dotenv`
 
