@@ -310,6 +310,7 @@ def run_experiment(
     warden_model: str,
     scenario: Scenario,
     warden_system_prompt: str = "warden_system_1.yaml",
+    adversary_system_prompt: str = "adversary_system_1.yaml",
     num_turns: int = 6,
     use_warden: bool = True,
     requester_type: str = "adversary",
@@ -321,6 +322,7 @@ def run_experiment(
     benign_agent_generates_opening: bool = False,
     adversary_data_access: bool = False,
     warden_awareness: bool = False,
+    target_skeptical: bool = False,
     dossier_variant: int | None = None,
     debug: bool = False,
     run_index: int | None = None,
@@ -345,6 +347,8 @@ def run_experiment(
         benign_agent_generates_opening: If True, benign agent generates its own opening.
         adversary_data_access: If True, adversary gets static behavioral dossier.
         warden_awareness: If True, adversary is told a persuasion monitor may be present.
+        target_skeptical: If True, target gets baked-in skepticism instructions
+            (ablation: prompt-based defense instead of warden agent).
         dossier_variant: Which dossier variant (1, 2, 3) to use. None = random.
         debug: If True, print full model contexts for each query.
         run_index: Optional counter to append to the run_id for uniqueness.
@@ -435,6 +439,7 @@ def run_experiment(
             hidden_goal=scenario.adversary_hidden_goal(),
             target_dossier=adversary_intel,  # Behavioral data only, no direct profile
             warden_awareness=warden_awareness,
+            system_prompt_file=adversary_system_prompt,
             use_scratchpad=req_use_scratchpad,
             include_reasoning=req_include_reasoning,
             debug=debug,
@@ -451,6 +456,7 @@ def run_experiment(
         model=target_model,
         task_description=scenario.target_task_description(),
         include_warden_context=use_warden,
+        include_skeptical_instructions=target_skeptical,
         profile_prompt=target_profile_prompt,
         use_scratchpad=tgt_use_scratchpad,
         include_reasoning=tgt_include_reasoning,
@@ -483,6 +489,8 @@ def run_experiment(
             condition_parts.append("adversary_data")
     if requester_type == "adversary" and warden_awareness:
         condition_parts.append("warden_awareness")
+    if target_skeptical:
+        condition_parts.append("skeptical")
     condition = "_".join(condition_parts)
 
     log = {
@@ -493,6 +501,7 @@ def run_experiment(
         "adversary_warden_awareness": (
             warden_awareness if requester_type == "adversary" else False
         ),
+        "target_skeptical": target_skeptical,
         "tag": tag,
         "models": {
             "adversary": adversary_model if requester_type == "adversary" else None,
@@ -501,6 +510,7 @@ def run_experiment(
             "warden": warden_model if use_warden else None,
         },
         "warden_system_prompt": warden_system_prompt if use_warden else None,
+        "adversary_system_prompt": adversary_system_prompt if requester_type == "adversary" else None,
         "profile": {
             "name": profile.name if profile else None,
             "target_has_profile": profile is not None,
@@ -952,6 +962,7 @@ def run_multi_target_experiment(
     target_model: str,
     warden_model: str,
     warden_system_prompt: str = "warden_system_1.yaml",
+    adversary_system_prompt: str = "adversary_system_1.yaml",
     num_turns: int = 4,
     use_warden: bool = True,
     requester_type: str = "adversary",
@@ -962,6 +973,7 @@ def run_multi_target_experiment(
     benign_agent_generates_opening: bool = False,
     adversary_data_access: bool = False,
     warden_awareness: bool = False,
+    target_skeptical: bool = False,
     dossier_variant: int | None = None,
     debug: bool = False,
     run_index: int | None = None,
@@ -1030,6 +1042,7 @@ def run_multi_target_experiment(
             hidden_goal=scenario.adversary_hidden_goal(),
             target_dossier=adversary_dossier,
             warden_awareness=warden_awareness,
+            system_prompt_file=adversary_system_prompt,
             use_scratchpad=req_use_scratchpad,
             include_reasoning=req_inc,
             debug=debug,
@@ -1051,6 +1064,7 @@ def run_multi_target_experiment(
             model=target_model,
             task_description=target_descs[i],
             include_warden_context=use_warden,
+            include_skeptical_instructions=target_skeptical,
             profile_prompt=profile_prompt,
             use_scratchpad=tgt_use_scratchpad,
             include_reasoning=tgt_inc,
@@ -1097,6 +1111,8 @@ def run_multi_target_experiment(
             condition_parts.append("adversary_data")
     if requester_type == "adversary" and warden_awareness:
         condition_parts.append("warden_awareness")
+    if target_skeptical:
+        condition_parts.append("skeptical")
     condition = "_".join(condition_parts)
 
     log: dict = {
@@ -1109,6 +1125,7 @@ def run_multi_target_experiment(
         "adversary_warden_awareness": (
             warden_awareness if requester_type == "adversary" else False
         ),
+        "target_skeptical": target_skeptical,
         "tag": tag,
         "models": {
             "adversary": adversary_model if requester_type == "adversary" else None,
@@ -1117,6 +1134,7 @@ def run_multi_target_experiment(
             "warden": warden_model if use_warden else None,
         },
         "warden_system_prompt": warden_system_prompt if use_warden else None,
+        "adversary_system_prompt": adversary_system_prompt if requester_type == "adversary" else None,
         "profiles": [
             {
                 "seat": i,

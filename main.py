@@ -87,6 +87,8 @@ SCENARIOS = {**TRAIN_SCENARIOS, **TEST_SCENARIOS}
 SCENARIO_GROUP_SELECTORS = ("all_train", "all_test")
 WARDEN_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "warden"
 DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system_1.yaml"
+ADVERSARY_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "adversary"
+DEFAULT_ADVERSARY_SYSTEM_PROMPT = "adversary_system_1.yaml"
 ANSI_RED = "\033[31m"
 ANSI_RESET = "\033[0m"
 
@@ -143,6 +145,24 @@ def _resolve_warden_prompt_file(prompt_file: str) -> str:
 
     if not candidate.is_file():
         raise FileNotFoundError(f"Warden prompt not found: prompts/warden/{relative.as_posix()}")
+
+    return relative.as_posix()
+
+
+def _resolve_adversary_prompt_file(prompt_file: str) -> str:
+    """Validate and normalize an adversary prompt path under prompts/adversary."""
+    prompts_root = ADVERSARY_PROMPTS_DIR.resolve()
+    candidate = (prompts_root / prompt_file).resolve()
+
+    try:
+        relative = candidate.relative_to(prompts_root)
+    except ValueError as exc:
+        raise ValueError(
+            "Adversary prompt must be a file inside prompts/adversary/"
+        ) from exc
+
+    if not candidate.is_file():
+        raise FileNotFoundError(f"Adversary prompt not found: prompts/adversary/{relative.as_posix()}")
 
     return relative.as_posix()
 
@@ -226,6 +246,15 @@ def main():
         ),
     )
     parser.add_argument(
+        "--adversary-system-prompt",
+        type=str,
+        default=DEFAULT_ADVERSARY_SYSTEM_PROMPT,
+        help=(
+            "Adversary system prompt file under prompts/adversary/ "
+            f"(default: {DEFAULT_ADVERSARY_SYSTEM_PROMPT})"
+        ),
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help=(
@@ -300,6 +329,16 @@ def main():
             "Whether the adversary is informed their messages may be monitored "
             "by a persuasion monitor (warden). Use 'both' to run aware and "
             "unaware conditions."
+        ),
+    )
+    parser.add_argument(
+        "--target-skeptical",
+        choices=["off", "on", "both"],
+        default="off",
+        help=(
+            "Give the target baked-in skepticism instructions (ablation: "
+            "prompt-based defense instead of warden agent). Use 'both' to "
+            "run skeptical and non-skeptical conditions."
         ),
     )
     parser.add_argument(
@@ -381,6 +420,10 @@ def main():
         args.warden_system_prompt = _resolve_warden_prompt_file(args.warden_system_prompt)
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
+    try:
+        args.adversary_system_prompt = _resolve_adversary_prompt_file(args.adversary_system_prompt)
+    except (FileNotFoundError, ValueError) as exc:
+        parser.error(str(exc))
 
     profile_requested = bool(args.profile or args.random_profile)
     if args.adversary_data_access in {"access", "both"} and not profile_requested:
@@ -436,6 +479,11 @@ def main():
         if args.warden == "both"
         else [args.warden == "with_warden"]
     )
+    target_skeptical_values = (
+        [False, True]
+        if args.target_skeptical == "both"
+        else [args.target_skeptical == "on"]
+    )
 
     def effective_adversary_data_access_values(requester_type: str) -> list[bool]:
         if requester_type != "adversary":
@@ -469,6 +517,7 @@ def main():
                 * len(awareness_values)
                 * len(warden_access_values)
                 * len(warden_models)
+                * len(target_skeptical_values)
             )
 
     total_experiments = (
@@ -519,6 +568,8 @@ def main():
     print(_format_plan_line("Target", ", ".join(args.target_model)))
     print(_format_plan_line("Warden", ", ".join(args.warden_model)))
     print(_format_plan_line("Warden prompt", f"prompts/warden/{args.warden_system_prompt}"))
+    if args.adversary_system_prompt != DEFAULT_ADVERSARY_SYSTEM_PROMPT:
+        print(_format_plan_line("Adversary prompt", f"prompts/adversary/{args.adversary_system_prompt}"))
     print(_format_plan_line("Warden awareness", args.warden_awareness))
     print()
 
@@ -587,29 +638,32 @@ def main():
                                     for adversary_data_access in effective_access_values:
                                         for warden_awareness in effective_awareness_values:
                                             for warden_profile_access in effective_warden_access_values:
-                                                for scenario_name in args.scenario:
-                                                    run_index += 1
-                                                    scenario = SCENARIOS[scenario_name]()
-                                                    futures.append(
-                                                        executor.submit(
-                                                            _run_scenario,
-                                                            scenario=scenario,
-                                                            args=args,
-                                                            use_warden=use_warden,
-                                                            requester_type=requester_type,
-                                                            requester_model=requester_model,
-                                                            target_model=target_model,
-                                                            warden_model=warden_model,
-                                                            profile=profile,
-                                                            warden_profile_access=warden_profile_access,
-                                                            adversary_data_access=adversary_data_access,
-                                                            warden_awareness=warden_awareness,
-                                                            cot_mode=cot_mode,
-                                                            warden_system_prompt=args.warden_system_prompt,
-                                                            run_index=run_index,
-                                                            quiet=quiet_runs,
+                                                for target_skeptical in target_skeptical_values:
+                                                    for scenario_name in args.scenario:
+                                                        run_index += 1
+                                                        scenario = SCENARIOS[scenario_name]()
+                                                        futures.append(
+                                                            executor.submit(
+                                                                _run_scenario,
+                                                                scenario=scenario,
+                                                                args=args,
+                                                                use_warden=use_warden,
+                                                                requester_type=requester_type,
+                                                                requester_model=requester_model,
+                                                                target_model=target_model,
+                                                                warden_model=warden_model,
+                                                                profile=profile,
+                                                                warden_profile_access=warden_profile_access,
+                                                                adversary_data_access=adversary_data_access,
+                                                                warden_awareness=warden_awareness,
+                                                                target_skeptical=target_skeptical,
+                                                                cot_mode=cot_mode,
+                                                                warden_system_prompt=args.warden_system_prompt,
+                                                                adversary_system_prompt=args.adversary_system_prompt,
+                                                                run_index=run_index,
+                                                                quiet=quiet_runs,
+                                                            )
                                                         )
-                                                    )
 
             completed = 0
             for future in as_completed(futures):
@@ -646,33 +700,38 @@ def main():
                                 for adversary_data_access in effective_access_values:
                                     for warden_awareness in effective_awareness_values:
                                         for warden_profile_access in effective_warden_access_values:
-                                            if args.warden == "both":
-                                                if use_warden:
-                                                    print("=== Running WITH warden ===\n")
-                                                else:
-                                                    print("=== Running WITHOUT warden ===\n")
-                                            for scenario_name in args.scenario:
-                                                if len(args.scenario) > 1:
-                                                    print(f"--- Scenario: {scenario_name} ---\n")
-                                                scenario = SCENARIOS[scenario_name]()
-                                                run_index += 1
-                                                _run_scenario(
-                                                    scenario=scenario,
-                                                    args=args,
-                                                    use_warden=use_warden,
-                                                    requester_type=requester_type,
-                                                    requester_model=requester_model,
-                                                    target_model=target_model,
-                                                    warden_model=warden_model,
-                                                    profile=profile,
-                                                    warden_profile_access=warden_profile_access,
-                                                    adversary_data_access=adversary_data_access,
-                                                    warden_awareness=warden_awareness,
-                                                    cot_mode=cot_mode,
-                                                    warden_system_prompt=args.warden_system_prompt,
-                                                    run_index=run_index,
-                                                    quiet=quiet_runs,
-                                                )
+                                            for target_skeptical in target_skeptical_values:
+                                                if args.warden == "both":
+                                                    if use_warden:
+                                                        print("=== Running WITH warden ===\n")
+                                                    else:
+                                                        print("=== Running WITHOUT warden ===\n")
+                                                if target_skeptical:
+                                                    print("=== Target: SKEPTICAL ===\n")
+                                                for scenario_name in args.scenario:
+                                                    if len(args.scenario) > 1:
+                                                        print(f"--- Scenario: {scenario_name} ---\n")
+                                                    scenario = SCENARIOS[scenario_name]()
+                                                    run_index += 1
+                                                    _run_scenario(
+                                                        scenario=scenario,
+                                                        args=args,
+                                                        use_warden=use_warden,
+                                                        requester_type=requester_type,
+                                                        requester_model=requester_model,
+                                                        target_model=target_model,
+                                                        warden_model=warden_model,
+                                                        profile=profile,
+                                                        warden_profile_access=warden_profile_access,
+                                                        adversary_data_access=adversary_data_access,
+                                                        warden_awareness=warden_awareness,
+                                                        target_skeptical=target_skeptical,
+                                                        cot_mode=cot_mode,
+                                                        warden_system_prompt=args.warden_system_prompt,
+                                                        adversary_system_prompt=args.adversary_system_prompt,
+                                                        run_index=run_index,
+                                                        quiet=quiet_runs,
+                                                    )
 
 
 def _run_scenario(
@@ -687,8 +746,10 @@ def _run_scenario(
     warden_profile_access,
     adversary_data_access,
     warden_awareness,
+    target_skeptical,
     cot_mode,
     warden_system_prompt,
+    adversary_system_prompt,
     run_index,
     quiet,
 ):
@@ -725,6 +786,7 @@ def _run_scenario(
             target_model=target_model,
             warden_model=warden_model,
             warden_system_prompt=warden_system_prompt,
+            adversary_system_prompt=adversary_system_prompt,
             tag=args.tag,
             profile_to_warden=warden_profile_access,
             cot_mode=cot_mode,
@@ -732,6 +794,7 @@ def _run_scenario(
             benign_agent_generates_opening=args.benign_agent_generates_opening,
             adversary_data_access=adversary_data_access,
             warden_awareness=warden_awareness,
+            target_skeptical=target_skeptical,
             dossier_variant=args.dossier_variant,
             debug=args.debug,
             run_index=run_index,
@@ -747,6 +810,7 @@ def _run_scenario(
             target_model=target_model,
             warden_model=warden_model,
             warden_system_prompt=warden_system_prompt,
+            adversary_system_prompt=adversary_system_prompt,
             tag=args.tag,
             profile=profile,
             profile_to_warden=warden_profile_access,
@@ -755,6 +819,7 @@ def _run_scenario(
             benign_agent_generates_opening=args.benign_agent_generates_opening,
             adversary_data_access=adversary_data_access,
             warden_awareness=warden_awareness,
+            target_skeptical=target_skeptical,
             dossier_variant=args.dossier_variant,
             debug=args.debug,
             run_index=run_index,

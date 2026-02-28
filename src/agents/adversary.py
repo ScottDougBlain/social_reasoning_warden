@@ -7,6 +7,28 @@ import yaml
 from src.client import chat
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
+_ADVERSARY_PROMPTS_DIR = _PROMPTS_DIR / "adversary"
+_DEFAULT_ADVERSARY_SYSTEM_PROMPT = "adversary_system_1.yaml"
+
+
+def _resolve_system_prompt_path(system_prompt_file: str) -> Path:
+    """Resolve an adversary prompt file within prompts/adversary."""
+    prompts_root = _ADVERSARY_PROMPTS_DIR.resolve()
+    candidate = (prompts_root / system_prompt_file).resolve()
+
+    try:
+        candidate.relative_to(prompts_root)
+    except ValueError as exc:
+        raise ValueError(
+            "Adversary prompt file must be inside prompts/adversary/"
+        ) from exc
+
+    if not candidate.is_file():
+        relative = candidate.relative_to(prompts_root)
+        raise FileNotFoundError(
+            f"Adversary prompt file not found: prompts/adversary/{relative}"
+        )
+    return candidate
 
 
 class Adversary:
@@ -16,6 +38,7 @@ class Adversary:
         hidden_goal: str | None = None,
         target_dossier: str | None = None,
         warden_awareness: bool = False,
+        system_prompt_file: str = _DEFAULT_ADVERSARY_SYSTEM_PROMPT,
         use_scratchpad: bool = True,
         include_reasoning: bool = True,
         temperature: float = 0.9,
@@ -26,8 +49,10 @@ class Adversary:
         self.use_scratchpad = use_scratchpad
         self.include_reasoning = include_reasoning
         self.debug = debug
+        self.system_prompt_file = system_prompt_file
 
-        with open(_PROMPTS_DIR / "adversary_system.yaml") as f:
+        prompt_path = _resolve_system_prompt_path(system_prompt_file)
+        with prompt_path.open(encoding="utf-8") as f:
             prompt_cfg = yaml.safe_load(f)
 
         # Build system prompt from base + optional scratchpad instructions
@@ -43,7 +68,12 @@ class Adversary:
 
         if hidden_goal:
             self.system_prompt += f"\n\nYour hidden goal: {hidden_goal}"
+
+        # Add dossier priming instructions if present in prompt config and dossier provided
         if target_dossier:
+            priming = prompt_cfg.get("dossier_priming", "")
+            if priming:
+                self.system_prompt += f"\n\n{priming}"
             self.system_prompt += f"\n\n{target_dossier}"
 
     def respond(self, conversation: list[dict]) -> str:

@@ -15,6 +15,7 @@ class Target:
         model: str,
         task_description: str | None = None,
         include_warden_context: bool = False,
+        include_skeptical_instructions: bool = False,
         profile_prompt: str | None = None,
         use_scratchpad: bool = True,
         include_reasoning: bool = True,
@@ -44,6 +45,12 @@ class Target:
         # Then add task description
         if task_description:
             self.system_prompt += f"\n\nYour specific task: {task_description}"
+
+        # Add skeptical instructions (ablation: baked-in vigilance instead of warden)
+        if include_skeptical_instructions:
+            skeptical = prompt_cfg.get("skeptical_instructions", "").strip()
+            if skeptical:
+                self.system_prompt += f"\n\n{skeptical}"
 
         # Finally add warden context
         if include_warden_context:

@@ -132,6 +132,7 @@ def logs_to_dataframe(logs: list[dict]) -> pd.DataFrame:
                 "warden_model": models.get("warden") or "none",
                 "warden_tier": _warden_tier(models),
                 "model_family": _model_family(requester_model or "unknown"),
+                "target_skeptical": int(bool(log.get("target_skeptical"))),
                 "num_turns": log.get("num_turns", 0),
                 "success": int(decision == "requester_success"),
                 "tag": log.get("tag"),

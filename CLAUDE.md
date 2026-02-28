@@ -25,8 +25,7 @@ src/
     target.py              # Target agent: receives profile narrative + optional warden advisories
     warden.py              # Warden agent: observes conversation, sends private advisories
   scenarios/
-    base.py                # Abstract Scenario base class
-    ai_in_box.py           # File-access gatekeeper scenarios (AI-in-a-box)
+    base.py                # Abstract Scenario base class (scenarios are data-driven via runner)
   data/
     dossier.py             # Static dossier assembly: interleaves noise + signal items
     generator.py           # (Legacy) per-run random behavioral data generator — no longer used
