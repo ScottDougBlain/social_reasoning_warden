@@ -137,6 +137,29 @@ def _get_decision(log: dict) -> str | None:
     return decision
 
 
+def _has_formatting_failure(log: dict) -> bool:
+    """Return True when a run includes formatting/parsing failures in outcome data."""
+    outcome = log.get("outcome") or {}
+    decision = _get_decision(log)
+    if decision == "formatting_failure":
+        return True
+    if decision not in {"requester_success", "requester_failure", None}:
+        return True
+
+    vote_tally = outcome.get("vote_tally")
+    if isinstance(vote_tally, dict):
+        failures = vote_tally.get("formatting_failure", 0)
+        if isinstance(failures, (int, float)) and failures > 0:
+            return True
+    return False
+
+
+def _has_aggregate_formatting_failure(log: dict) -> bool:
+    """Return True when aggregate decision indicates a parsing/formatting failure."""
+    decision = _get_decision(log)
+    return decision not in {"requester_success", "requester_failure"}
+
+
 def _success_rate_by_label(
     logs: list[dict],
     label_fn: Callable[[dict], object | None],
@@ -294,6 +317,25 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
     if not logs:
         console.print("[yellow]No logs found.[/yellow]")
         return
+
+    formatting_failure_count = sum(1 for log in logs if _has_formatting_failure(log))
+    formatting_failure_rate = formatting_failure_count / len(logs)
+    formatting_style = "yellow" if formatting_failure_count else "green"
+    console.print(
+        "[bold]Included JSONs affected by formatting_failure:[/bold] "
+        f"[{formatting_style}]{formatting_failure_count}/{len(logs)} "
+        f"({formatting_failure_rate:.2%})[/{formatting_style}]"
+    )
+    aggregate_formatting_failure_count = sum(
+        1 for log in logs if _has_aggregate_formatting_failure(log)
+    )
+    aggregate_formatting_failure_rate = aggregate_formatting_failure_count / len(logs)
+    aggregate_style = "yellow" if aggregate_formatting_failure_count else "green"
+    console.print(
+        "[bold]...excluding logs where aggregate decision is fine:[/bold] "
+        f"[{aggregate_style}]{aggregate_formatting_failure_count}/{len(logs)} "
+        f"({aggregate_formatting_failure_rate:.2%})[/{aggregate_style}]"
+    )
 
     grouped = _split_logs_by_speaker(logs)
     for speaker in SPEAKER_ORDER:
