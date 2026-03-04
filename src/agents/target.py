@@ -19,7 +19,7 @@ class Target:
         profile_prompt: str | None = None,
         use_scratchpad: bool = True,
         include_reasoning: bool = True,
-        temperature: float = 0.9,
+        temperature: float = 1.0,
         debug: bool = False,
     ):
         self.model = model

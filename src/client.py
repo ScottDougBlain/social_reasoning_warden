@@ -143,7 +143,7 @@ def _print_debug_context(
 def chat(
     model: str,
     messages: list[dict],
-    temperature: float = 0.9,
+    temperature: float = 1.0,
     max_tokens: int = 1024,
     include_reasoning: bool = True,
     debug: bool = False,
