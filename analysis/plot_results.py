@@ -506,6 +506,138 @@ def fig_warden_fp(data: list[dict], output_dir: Path):
     print("  [saved] fig7_warden_fp_by_scenario.pdf")
 
 
+# ── Figure 0: Warden Effect — Adversary vs Benign (pooled) ────────────────
+
+
+def fig_warden_effect_both(data: list[dict], output_dir: Path):
+    """Grouped bar: warden effect on adversary AND benign agent success."""
+    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
+    main = [d for d in data if d["tag"] in main_tags]
+    if not main:
+        print("  [skip] No main study data for warden effect (both)")
+        return
+
+    fig, ax = plt.subplots(figsize=(6, 5.5))
+    x = np.arange(2)  # No Warden, With Warden
+    width = 0.32
+
+    for j, (rt, rt_label, color) in enumerate([
+        ("adversary", "Adversary", PALETTE[3]),
+        ("benign_agent", "Benign Agent", PALETTE[0]),
+    ]):
+        rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
+        for has_w in [False, True]:
+            subset = [d for d in main if d["requester_type"] == rt
+                      and d["has_warden"] == has_w]
+            r, lo, hi, n = _rate_and_ci(subset)
+            rates.append(r * 100)
+            err_lo.append((r - lo) * 100)
+            err_hi.append((hi - r) * 100)
+            hi_abs.append(hi * 100)
+            ns_list.append(n)
+
+        offset = (j - 0.5) * width
+        ax.bar(x + offset, rates, width, yerr=[err_lo, err_hi],
+               label=rt_label, color=color,
+               error_kw=dict(capsize=5, capthick=1.3, elinewidth=1.3),
+               edgecolor="black", linewidth=0.5)
+
+        for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
+            ax.text(x[i] + offset, h + 2, f"{r:.1f}%\nn={n}",
+                    ha="center", fontsize=9)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(["No Warden", "With Warden"], fontsize=10)
+    ax.set_ylabel("Success Rate (%)")
+    ax.set_title("Warden Effect: Adversary vs. Benign Agent\n"
+                 "(GLME: warden OR = 0.053, p < .001)")
+    ax.set_ylim(0, 115)
+    ax.legend(loc="upper right", framealpha=0.9)
+
+    sns.despine()
+    fig.tight_layout()
+    fig.savefig(output_dir / "fig0_warden_effect_both.pdf",
+                dpi=FIG_DPI, bbox_inches="tight")
+    plt.close(fig)
+    print("  [saved] fig0_warden_effect_both.pdf")
+
+
+# ── Figure 8: Profile Vulnerability × Warden ─────────────────────────────
+
+
+def fig_profile_vulnerability(data: list[dict], output_dir: Path):
+    """Grouped bar: adversary SR by profile × warden condition."""
+    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
+    adv = [d for d in data if d["tag"] in main_tags
+           and d["requester_type"] == "adversary"]
+    if not adv:
+        print("  [skip] No adversary data for profile vulnerability plot")
+        return
+
+    # Map display names → canonical keys for matching
+    profile_map = {
+        "Idealistic True Believer": "Idealistic",
+        "Compliant Agreeable": "Compliant",
+        "Authority-Deferential Follower": "Authority\nDeferential",
+        "Authority-Deferential Junior Employee": "Authority\nDeferential",
+        "Overwhelmed Time-Pressured": "Time\nPressured",
+        "Overwhelmed Time-Pressured Worker": "Time\nPressured",
+    }
+    profile_order = ["Idealistic", "Compliant",
+                     "Authority\nDeferential", "Time\nPressured"]
+
+    # Bucket data by canonical profile label
+    bucketed = defaultdict(list)
+    for d in adv:
+        label = profile_map.get(d["profile"])
+        if label:
+            bucketed[(label, d["has_warden"])].append(d)
+
+    fig, ax = plt.subplots(figsize=(7, 5.5))
+    x = np.arange(len(profile_order))
+    width = 0.32
+
+    for j, (has_w, w_label, color) in enumerate([
+        (False, "No Warden", PALETTE[3]),
+        (True, "With Warden", PALETTE[1]),
+    ]):
+        rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
+        for prof in profile_order:
+            subset = bucketed.get((prof, has_w), [])
+            r, lo, hi, n = _rate_and_ci(subset)
+            rates.append(r * 100)
+            err_lo.append((r - lo) * 100)
+            err_hi.append((hi - r) * 100)
+            hi_abs.append(hi * 100)
+            ns_list.append(n)
+
+        offset = (j - 0.5) * width
+        ax.bar(x + offset, rates, width, yerr=[err_lo, err_hi],
+               label=w_label, color=color,
+               error_kw=dict(capsize=4, capthick=1.2, elinewidth=1.2),
+               edgecolor="black", linewidth=0.5)
+
+        for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
+            ax.text(x[i] + offset, h + 2, f"{r:.1f}%\nn={n}",
+                    ha="center", fontsize=8)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(profile_order, fontsize=9)
+    ax.set_xlabel("Target Vulnerability Profile")
+    ax.set_ylabel("Adversary Success Rate (%)")
+    ax.set_title("Profile Vulnerability × Warden\n"
+                 "(pooled across studies, adversary only)")
+    ax.set_ylim(0, 80)
+    ax.legend(loc="upper right", framealpha=0.9)
+
+    sns.despine()
+    fig.tight_layout()
+    fig.savefig(output_dir / "fig8_profile_vulnerability.pdf",
+                dpi=FIG_DPI, bbox_inches="tight")
+    plt.close(fig)
+    print("  [saved] fig8_profile_vulnerability.pdf")
+
+
 # ── Main ─────────────────────────────────────────────────────────────────
 
 
@@ -530,6 +662,7 @@ def main():
     print(f"  {len(main_data)} from main studies ({', '.join(main_tags)})")
 
     print("\nGenerating figures...")
+    fig_warden_effect_both(data, output_dir)
     fig_warden_effect(data, output_dir)
     fig_dossier_effect(data, output_dir)
     fig_capability_asymmetry(data, output_dir)
@@ -537,6 +670,7 @@ def main():
     fig_model_family(data, output_dir)
     fig_scenario_variation(data, output_dir)
     fig_warden_fp(data, output_dir)
+    fig_profile_vulnerability(data, output_dir)
 
     print(f"\nAll figures saved to {output_dir}/")
 
