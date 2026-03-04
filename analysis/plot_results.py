@@ -160,14 +160,14 @@ def fig_warden_effect(data: list[dict], output_dir: Path):
     ax.set_title("Warden Effect on Adversary Success\n(GLME: OR = 0.053, p < .001)")
     ax.set_ylim(0, 70)
 
-    for i, (r, n) in enumerate([(r_nw, n_nw), (r_w, n_w)]):
-        ax.text(i, r * 100 + 4, f"{r*100:.1f}%\nn={n}", ha="center", fontsize=10)
+    for i, (r, hi, n) in enumerate([(r_nw, hi_nw, n_nw), (r_w, hi_w, n_w)]):
+        ax.text(i, hi * 100 + 3, f"{r*100:.1f}%\nn={n}", ha="center", fontsize=10)
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig1_warden_effect.png", dpi=FIG_DPI, bbox_inches="tight")
+    fig.savefig(output_dir / "fig1_warden_effect.pdf", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
-    print("  [saved] fig1_warden_effect.png")
+    print("  [saved] fig1_warden_effect.pdf")
 
 
 # ── Figure 2: Dossier Effect (2×2 interaction) ──────────────────────────
@@ -187,13 +187,14 @@ def fig_dossier_effect(data: list[dict], output_dir: Path):
         ("Dossier\nWith Warden", lambda d: d["has_dossier"] and d["has_warden"]),
     ]
 
-    rates, los, his, ns = [], [], [], []
+    rates, los, his, hi_abs, ns = [], [], [], [], []
     for label, filt in conditions:
         subset = [d for d in adv if filt(d)]
         r, lo, hi, n = _rate_and_ci(subset)
         rates.append(r * 100)
         los.append((r - lo) * 100)
         his.append((hi - r) * 100)
+        hi_abs.append(hi * 100)
         ns.append(n)
 
     fig, ax = plt.subplots(figsize=(7, 5))
@@ -213,14 +214,14 @@ def fig_dossier_effect(data: list[dict], output_dir: Path):
     ax.set_title("Dossier × Warden Interaction\n(GLME: dossier OR = 1.19, p = .218; warden OR = 0.053, p < .001)")
     ax.set_ylim(0, 70)
 
-    for i, (r, n) in enumerate(zip(rates, ns)):
-        ax.text(i, r + 3, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
+    for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
+        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig2_dossier_interaction.png", dpi=FIG_DPI, bbox_inches="tight")
+    fig.savefig(output_dir / "fig2_dossier_interaction.pdf", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
-    print("  [saved] fig2_dossier_interaction.png")
+    print("  [saved] fig2_dossier_interaction.pdf")
 
 
 # ── Figure 3: Capability Asymmetry (warden tier) ────────────────────────
@@ -236,13 +237,14 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path):
     tiers = ["none", "weak", "mid", "strong"]
     tier_labels = ["None", "Weak\n(= target)", "Mid", "Strong\n(= adversary)"]
 
-    rates, los, his, ns = [], [], [], []
+    rates, los, his, hi_abs, ns = [], [], [], [], []
     for tier in tiers:
         subset = [d for d in adv if d["warden_tier"] == tier]
         r, lo, hi, n = _rate_and_ci(subset)
         rates.append(r * 100)
         los.append((r - lo) * 100)
         his.append((hi - r) * 100)
+        hi_abs.append(hi * 100)
         ns.append(n)
 
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -259,14 +261,14 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path):
     ax.set_title("Warden Capability Asymmetry\n(GLME: OR = 0.47 per tier, p < .001)")
     ax.set_ylim(0, 65)
 
-    for i, (r, n) in enumerate(zip(rates, ns)):
-        ax.text(i, r + 3, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
+    for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
+        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig3_capability_asymmetry.png", dpi=FIG_DPI, bbox_inches="tight")
+    fig.savefig(output_dir / "fig3_capability_asymmetry.pdf", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
-    print("  [saved] fig3_capability_asymmetry.png")
+    print("  [saved] fig3_capability_asymmetry.pdf")
 
 
 # ── Figure 4: Skeptical Ablation (3 conditions × 2 requester types) ─────
@@ -300,13 +302,14 @@ def fig_skeptical_ablation(data: list[dict], output_dir: Path):
         ("adversary", "Adversary", PALETTE[3]),
         ("benign_agent", "Benign Agent", PALETTE[0]),
     ]):
-        rates, err_lo, err_hi, ns_list = [], [], [], []
+        rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
         for cond in conditions:
             subset = [d for d in skep if d["requester_type"] == rt and _cond(d) == cond]
             r, lo, hi, n = _rate_and_ci(subset)
             rates.append(r * 100)
             err_lo.append((r - lo) * 100)
             err_hi.append((hi - r) * 100)
+            hi_abs.append(hi * 100)
             ns_list.append(n)
 
         offset = (j - 0.5) * width
@@ -315,10 +318,8 @@ def fig_skeptical_ablation(data: list[dict], output_dir: Path):
                       error_kw=dict(capsize=4, capthick=1.2, elinewidth=1.2),
                       edgecolor="black", linewidth=0.5)
 
-        for i, (r, n) in enumerate(zip(rates, ns_list)):
-            y_pos = r + 3
-            ax.text(x[i] + offset, y_pos, f"{r:.0f}%", ha="center", fontsize=8.5, fontweight="bold")
-            ax.text(x[i] + offset, y_pos - 4, f"n={n}", ha="center", fontsize=7, color="gray")
+        for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
+            ax.text(x[i] + offset, h + 2, f"{r:.0f}%\nn={n}", ha="center", fontsize=8)
 
     ax.set_xticks(x)
     ax.set_xticklabels(cond_labels, fontsize=9)
@@ -329,9 +330,9 @@ def fig_skeptical_ablation(data: list[dict], output_dir: Path):
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig4_skeptical_ablation.png", dpi=FIG_DPI, bbox_inches="tight")
+    fig.savefig(output_dir / "fig4_skeptical_ablation.pdf", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
-    print("  [saved] fig4_skeptical_ablation.png")
+    print("  [saved] fig4_skeptical_ablation.pdf")
 
 
 # ── Figure 5: Adversary SR by Model Family ───────────────────────────────
@@ -368,6 +369,7 @@ def fig_model_family(data: list[dict], output_dir: Path):
     rates = [f[1] * 100 for f in family_data]
     err_lo = [(f[1] - f[2]) * 100 for f in family_data]
     err_hi = [(f[3] - f[1]) * 100 for f in family_data]
+    hi_abs = [f[3] * 100 for f in family_data]
     ns = [f[4] for f in family_data]
 
     x = np.arange(len(fams))
@@ -380,16 +382,16 @@ def fig_model_family(data: list[dict], output_dir: Path):
     ax.set_xlabel("Adversary Model Family")
     ax.set_ylabel("Adversary Success Rate (%)")
     ax.set_title("Adversary Effectiveness by Model Family\n(no warden, pooled across studies)")
-    ax.set_ylim(0, 75)
+    ax.set_ylim(0, 80)
 
-    for i, (r, n) in enumerate(zip(rates, ns)):
-        ax.text(i, r + 3, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
+    for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
+        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig5_model_family.png", dpi=FIG_DPI, bbox_inches="tight")
+    fig.savefig(output_dir / "fig5_model_family.pdf", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
-    print("  [saved] fig5_model_family.png")
+    print("  [saved] fig5_model_family.pdf")
 
 
 # ── Figure 6: Adversary SR by Scenario ───────────────────────────────────
@@ -425,6 +427,7 @@ def fig_scenario_variation(data: list[dict], output_dir: Path):
     rates = [s[1] * 100 for s in sc_data]
     err_lo = [(s[1] - s[2]) * 100 for s in sc_data]
     err_hi = [(s[3] - s[1]) * 100 for s in sc_data]
+    hi_abs = [s[3] * 100 for s in sc_data]
     ns = [s[4] for s in sc_data]
 
     y = np.arange(len(scenarios))
@@ -436,16 +439,16 @@ def fig_scenario_variation(data: list[dict], output_dir: Path):
     ax.set_yticklabels(scenarios, fontsize=9)
     ax.set_xlabel("Adversary Success Rate (%)")
     ax.set_title("Adversary Success by Scenario\n(no warden, pooled across studies)")
-    ax.set_xlim(0, 100)
+    ax.set_xlim(0, 105)
 
-    for i, (r, n) in enumerate(zip(rates, ns)):
-        ax.text(r + 2, i, f"{r:.0f}% (n={n})", va="center", fontsize=8)
+    for i, (h, r, n) in enumerate(zip(hi_abs, rates, ns)):
+        ax.text(h + 2, i, f"{r:.0f}% (n={n})", va="center", fontsize=8)
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig6_scenario_variation.png", dpi=FIG_DPI, bbox_inches="tight")
+    fig.savefig(output_dir / "fig6_scenario_variation.pdf", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
-    print("  [saved] fig6_scenario_variation.png")
+    print("  [saved] fig6_scenario_variation.pdf")
 
 
 # ── Figure 7: Warden FP by Scenario ─────────────────────────────────────
@@ -498,9 +501,9 @@ def fig_warden_fp(data: list[dict], output_dir: Path):
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig7_warden_fp_by_scenario.png", dpi=FIG_DPI, bbox_inches="tight")
+    fig.savefig(output_dir / "fig7_warden_fp_by_scenario.pdf", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
-    print("  [saved] fig7_warden_fp_by_scenario.png")
+    print("  [saved] fig7_warden_fp_by_scenario.pdf")
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -510,7 +513,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate result figures.")
     parser.add_argument(
         "--output-dir", type=str, default="results/figures",
-        help="Directory for output PNGs.",
+        help="Directory for output PDFs.",
     )
     args = parser.parse_args()
 

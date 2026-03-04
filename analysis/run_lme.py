@@ -243,7 +243,7 @@ print(with(d, table(requester_type, has_warden)))
 cat("\\n--- Fitting Model 1: Warden Effectiveness ---\\n")
 m1 <- fit_glmer(
     success ~ requester_type * has_warden
-        + (1|scenario) + (1|target_model) + (1|requester_model),
+        + (1 + has_warden|scenario) + (1|target_model) + (1|requester_model),
     data=d, label="Model 1"
 )
 
@@ -277,7 +277,7 @@ if (!is.null(m1)) {{
     output_lines.append("## Model 1: Warden Effectiveness\n")
     output_lines.append(
         "**Formula**: `success ~ requester_type * has_warden "
-        "+ (1|scenario) + (1|target_model) + (1|requester_model)`\n"
+        "+ (1 + has_warden|scenario) + (1|target_model) + (1|requester_model)`\n"
     )
     output_lines.append(f"**Family**: Binomial (logit link)\n")
     output_lines.append(
@@ -348,7 +348,7 @@ print(with(d, table(adversary_has_data, has_warden)))
 cat("\\n--- Fitting Model 2: Dossier Impact ---\\n")
 m2 <- fit_glmer(
     success ~ adversary_has_data * has_warden
-        + (1|scenario) + (1|profile_name) + (1|target_model),
+        + (1 + has_warden|scenario) + (1|profile_name) + (1|target_model),
     data=d, label="Model 2"
 )
 
@@ -382,7 +382,7 @@ if (!is.null(m2)) {{
     output_lines.append("## Model 2: Dossier Impact\n")
     output_lines.append(
         "**Formula**: `success ~ adversary_has_data * has_warden "
-        "+ (1|scenario) + (1|profile_name) + (1|target_model)`\n"
+        "+ (1 + has_warden|scenario) + (1|profile_name) + (1|target_model)`\n"
     )
     output_lines.append(f"**Family**: Binomial (logit link)\n")
     output_lines.append(
@@ -462,7 +462,7 @@ print(with(d, tapply(success, list(profile_name, has_warden), mean)))
 cat("\\n--- Fitting Model 3: Profile Vulnerability ---\\n")
 m3 <- fit_glmer(
     success ~ profile_name * has_warden
-        + (1|scenario) + (1|target_model),
+        + (1 + has_warden|scenario) + (1|target_model),
     data=d, label="Model 3"
 )
 
@@ -507,7 +507,7 @@ if (!is.null(m3)) {{
     output_lines.append("## Model 3: Profile Vulnerability\n")
     output_lines.append(
         "**Formula**: `success ~ profile_name * has_warden "
-        "+ (1|scenario) + (1|target_model)`\n"
+        "+ (1 + has_warden|scenario) + (1|target_model)`\n"
     )
     output_lines.append(f"**Family**: Binomial (logit link)\n")
     output_lines.append(
@@ -592,7 +592,7 @@ print(with(d, tapply(success, list(model_family, warden_tier), function(x) sprin
 
 cat("\\n--- Fitting Model 4: Capability Asymmetry ---\\n")
 m4 <- fit_glmer(
-    success ~ warden_tier + (1|model_family) + (1|scenario) + (1|profile_name),
+    success ~ warden_tier + (1|model_family) + (1 + warden_tier|scenario) + (1|profile_name),
     data=d, label="Model 4"
 )
 
@@ -632,7 +632,7 @@ if (!is.null(m4)) {{
     d$warden_tier_ord <- as.numeric(factor(d$warden_tier,
         levels=c("none", "weak", "mid", "strong"), ordered=TRUE))
     m4_trend <- fit_glmer(
-        success ~ warden_tier_ord + (1|model_family) + (1|scenario) + (1|profile_name),
+        success ~ warden_tier_ord + (1|model_family) + (1 + warden_tier_ord|scenario) + (1|profile_name),
         data=d, label="Model 4 trend"
     )
     if (!is.null(m4_trend)) {{
@@ -652,7 +652,7 @@ if (!is.null(m4)) {{
     output_lines.append("## Model 4: Capability Asymmetry\n")
     output_lines.append(
         "**Formula**: `success ~ warden_tier "
-        "+ (1|model_family) + (1|scenario) + (1|profile_name)`\n"
+        "+ (1|model_family) + (1 + warden_tier|scenario) + (1|profile_name)`\n"
     )
     output_lines.append("**Family**: Binomial (logit link)\n")
     output_lines.append(
