@@ -33,7 +33,7 @@ if [[ "${1:-}" == "--dry-run" ]]; then
     echo
 fi
 
-SCENARIOS="ai_containment ai_override automation_decision chicken coding_agent file_access file_access_password hiring model_release upselling vote"
+SCENARIOS="ai_containment ai_override automation_decision product_launch coding_agent file_access file_access_password hiring model_release upselling vote"
 
 # Model families: adversary=high, target=low, warden=mid
 declare -a ADV_MODELS=(

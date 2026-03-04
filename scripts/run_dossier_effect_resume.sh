@@ -4,7 +4,7 @@
 set -uo pipefail  # no -e: don't abort on individual run failures
 
 PROFILES=(authority_deferential compliant idealistic time_pressured)
-SCENARIOS="ai_containment ai_override automation_decision chicken coding_agent file_access file_access_password hiring model_release upselling vote"
+SCENARIOS="ai_containment ai_override automation_decision product_launch coding_agent file_access file_access_password hiring model_release upselling vote"
 TAG="dossier_effect"
 ROUNDS=3
 MAX_PARALLEL=4

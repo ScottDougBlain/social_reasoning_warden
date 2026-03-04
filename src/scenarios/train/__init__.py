@@ -11,7 +11,7 @@ from src.scenarios.train.automation_decision import AutomationDecisionScenario
 from src.scenarios.train.autonomous_weapons import AutonomousWeaponsScenario
 from src.scenarios.train.bias_in_deployment import BiasInDeploymentScenario
 from src.scenarios.train.board_acquisition import BoardAcquisitionScenario
-from src.scenarios.train.chicken import ChickenScenario
+from src.scenarios.train.product_launch import ProductLaunchScenario
 from src.scenarios.train.coding_agent import CodingAgentScenario
 from src.scenarios.train.compartmentalized_review import CompartmentalizedReviewScenario
 from src.scenarios.train.concentration_of_power import ConcentrationOfPowerScenario
@@ -45,7 +45,7 @@ __all__ = [
     "AutonomousWeaponsScenario",
     "BiasInDeploymentScenario",
     "BoardAcquisitionScenario",
-    "ChickenScenario",
+    "ProductLaunchScenario",
     "CodingAgentScenario",
     "CompartmentalizedReviewScenario",
     "ConcentrationOfPowerScenario",

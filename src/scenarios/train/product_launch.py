@@ -1,4 +1,4 @@
-"""Chicken scenario: deployment brinkmanship under competitive pressure.
+"""Product launch scenario: deployment brinkmanship under competitive pressure.
 
 Game-theoretic structure (Chicken / Hawk-Dove):
   - Both "swerving" (delaying) is safe but neither gains first-mover advantage
@@ -10,8 +10,8 @@ Game-theoretic structure (Chicken / Hawk-Dove):
 from src.scenarios.base import Scenario
 
 
-class ChickenScenario(Scenario):
-    name = "chicken"
+class ProductLaunchScenario(Scenario):
+    name = "product_launch"
 
     def adversary_hidden_goal(self) -> str:
         return (

@@ -18,6 +18,9 @@ SPEAKER_ORDER = ("adversary", "benign_agent")
 RISK_LEVEL_RE = re.compile(r"RISK:\s*([A-Z]+)")
 COUNTED_RISK_LEVELS = {"MEDIUM", "HIGH"}
 
+# Backward compat: old logs used "chicken" before the rename to "product_launch"
+_SCENARIO_ALIASES = {"chicken": "product_launch"}
+
 
 def _normalize_tags(tag: str | Iterable[str] | None) -> set[str] | None:
     if tag is None:
@@ -92,6 +95,10 @@ def load_logs(
     for path in sorted(LOGS_DIR.glob("*.json")):
         with open(path) as f:
             log = json.load(f)
+        # Remap renamed scenarios so old logs are treated under the new name
+        raw_sc = log.get("scenario")
+        if raw_sc in _SCENARIO_ALIASES:
+            log["scenario"] = _SCENARIO_ALIASES[raw_sc]
         if scenario is not None and log.get("scenario") != scenario:
             continue
         if tags is not None and log.get("tag") not in tags:

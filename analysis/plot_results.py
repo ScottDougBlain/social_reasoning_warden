@@ -37,6 +37,9 @@ PALETTE = sns.color_palette("colorblind")
 FIG_DPI = 200
 BAR_WIDTH = 0.35
 
+# Backward compat: old logs used "chicken" before the rename to "product_launch"
+_SCENARIO_ALIASES = {"chicken": "product_launch"}
+
 
 def _wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
     """Wilson score interval for binomial proportion."""
@@ -58,6 +61,18 @@ def _rate_and_ci(items: list[dict], decision_val: str = "requester_success"):
     rate = k / n
     lo, hi = _wilson_ci(k, n)
     return rate, lo, hi, n
+
+
+def _raw_odds_ratio(
+    exposed: list[dict], unexposed: list[dict],
+    decision_val: str = "requester_success",
+) -> float:
+    """Compute raw odds ratio from two groups (Haldane-corrected for zero cells)."""
+    a = sum(1 for d in exposed if d["decision"] == decision_val) + 0.5
+    b = sum(1 for d in exposed if d["decision"] != decision_val) + 0.5
+    c = sum(1 for d in unexposed if d["decision"] == decision_val) + 0.5
+    d = sum(1 for d in unexposed if d["decision"] != decision_val) + 0.5
+    return (a * d) / (b * c)
 
 
 # ── Data loading ─────────────────────────────────────────────────────────
@@ -110,7 +125,7 @@ def _load_and_flatten(tags: list[str] | None = None) -> list[dict]:
         rows.append({
             "decision": decision,
             "requester_type": rt,
-            "scenario": log.get("scenario", "unknown"),
+            "scenario": _SCENARIO_ALIASES.get(log.get("scenario", "unknown"), log.get("scenario", "unknown")),
             "has_warden": bool(warden),
             "warden_tier": tier,
             "has_dossier": bool(profile.get("adversary_has_data")),
@@ -154,10 +169,12 @@ def fig_warden_effect(data: list[dict], output_dir: Path):
         fmt="none", capsize=6, capthick=1.5, elinewidth=1.5, color="black",
     )
 
+    or_val = _raw_odds_ratio(with_w, without_w)
+
     ax.set_xticks([0, 1])
     ax.set_xticklabels(["No Warden", "With Warden"])
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title("Warden Effect on Adversary Success\n(GLME: OR = 0.053, p < .001)")
+    ax.set_title(f"Warden Effect on Adversary Success\n(raw OR = {or_val:.3f})")
     ax.set_ylim(0, 70)
 
     for i, (r, hi, n) in enumerate([(r_nw, hi_nw, n_nw), (r_w, hi_w, n_w)]):
@@ -208,10 +225,18 @@ def fig_dossier_effect(data: list[dict], output_dir: Path):
     for bar, hatch in zip(bars, hatches):
         bar.set_hatch(hatch)
 
+    # Compute raw ORs
+    dossier_yes = [d for d in adv if d["has_dossier"]]
+    dossier_no = [d for d in adv if not d["has_dossier"]]
+    or_dossier = _raw_odds_ratio(dossier_yes, dossier_no)
+    warden_yes = [d for d in adv if d["has_warden"]]
+    warden_no = [d for d in adv if not d["has_warden"]]
+    or_warden = _raw_odds_ratio(warden_yes, warden_no)
+
     ax.set_xticks(x)
     ax.set_xticklabels([c[0] for c in conditions], fontsize=9)
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title("Dossier × Warden Interaction\n(GLME: dossier OR = 1.19, p = .218; warden OR = 0.053, p < .001)")
+    ax.set_title(f"Dossier × Warden Interaction\n(raw OR: dossier = {or_dossier:.2f}, warden = {or_warden:.3f})")
     ax.set_ylim(0, 70)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
@@ -254,11 +279,16 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path):
            error_kw=dict(capsize=6, capthick=1.3, elinewidth=1.3),
            color=colors, width=0.6, edgecolor="black", linewidth=0.5)
 
+    # Compute OR for any-warden vs none
+    warden_any = [d for d in adv if d["warden_tier"] != "none"]
+    warden_none = [d for d in adv if d["warden_tier"] == "none"]
+    or_overall = _raw_odds_ratio(warden_any, warden_none)
+
     ax.set_xticks(x)
     ax.set_xticklabels(tier_labels, fontsize=9)
     ax.set_xlabel("Warden Capability Tier")
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title("Warden Capability Asymmetry\n(GLME: OR = 0.47 per tier, p < .001)")
+    ax.set_title(f"Warden Capability Asymmetry\n(raw OR any-warden vs. none = {or_overall:.3f})")
     ax.set_ylim(0, 65)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
@@ -546,11 +576,17 @@ def fig_warden_effect_both(data: list[dict], output_dir: Path):
             ax.text(x[i] + offset, h + 2, f"{r:.1f}%\nn={n}",
                     ha="center", fontsize=9)
 
+    # Compute raw OR for adversary with/without warden
+    adv_data = [d for d in main if d["requester_type"] == "adversary"]
+    adv_w = [d for d in adv_data if d["has_warden"]]
+    adv_nw = [d for d in adv_data if not d["has_warden"]]
+    or_adv = _raw_odds_ratio(adv_w, adv_nw)
+
     ax.set_xticks(x)
     ax.set_xticklabels(["No Warden", "With Warden"], fontsize=10)
     ax.set_ylabel("Success Rate (%)")
     ax.set_title("Warden Effect: Adversary vs. Benign Agent\n"
-                 "(GLME: warden OR = 0.053, p < .001)")
+                 f"(adversary raw OR = {or_adv:.3f})")
     ax.set_ylim(0, 115)
     ax.legend(loc="upper right", framealpha=0.9)
 
