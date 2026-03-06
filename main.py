@@ -283,6 +283,15 @@ def main():
         default=None,
         help="Optional tag to attach to logs for filtering metrics",
     )
+    parser.add_argument(
+        "--decision-reprompt-attempts",
+        type=int,
+        default=1,
+        help=(
+            "Number of retries when final decision parsing fails due to format "
+            "(default: 1)"
+        ),
+    )
 
     # Chain-of-thought arguments
     parser.add_argument(
@@ -426,6 +435,8 @@ def main():
         parser.error(str(exc))
 
     profile_requested = bool(args.profile or args.random_profile)
+    if args.decision_reprompt_attempts < 0:
+        parser.error("--decision-reprompt-attempts must be >= 0")
     if args.adversary_data_access in {"access", "both"} and not profile_requested:
         parser.error(
             "--adversary-data-access access|both requires --profile or --random-profile"
@@ -797,6 +808,7 @@ def _run_scenario(
             target_skeptical=target_skeptical,
             dossier_variant=args.dossier_variant,
             debug=args.debug,
+            decision_reprompt_attempts=args.decision_reprompt_attempts,
             run_index=run_index,
             quiet=quiet,
         )
@@ -822,6 +834,7 @@ def _run_scenario(
             target_skeptical=target_skeptical,
             dossier_variant=args.dossier_variant,
             debug=args.debug,
+            decision_reprompt_attempts=args.decision_reprompt_attempts,
             run_index=run_index,
             quiet=quiet,
         )
