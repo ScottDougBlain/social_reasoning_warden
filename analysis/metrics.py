@@ -684,6 +684,190 @@ def plot_heatmap(logs: list[dict]) -> None:
     fig.show()
 
 
+def plot_adversary_target_heatmap(logs: list[dict]) -> None:
+    """Plot an adversary-model x target-model heatmap of adversary success rates."""
+    adversary_logs = [log for log in logs if _log_speaker(log) == "adversary"]
+    if not adversary_logs:
+        print("No adversary logs found.")
+        return
+
+    counts: dict[tuple[str, str], dict[str, int]] = {}
+    adversary_models: set[str] = set()
+    target_models: set[str] = set()
+
+    for log in adversary_logs:
+        models = log.get("models") or {}
+        adversary_model = models.get("adversary") or "unknown"
+        target_model = models.get("target") or "unknown"
+        decision = _get_decision(log)
+        if decision not in {"requester_success", "requester_failure"}:
+            continue
+
+        adversary_models.add(adversary_model)
+        target_models.add(target_model)
+        key = (adversary_model, target_model)
+        if key not in counts:
+            counts[key] = {"total": 0, "success": 0}
+        counts[key]["total"] += 1
+        if decision == "requester_success":
+            counts[key]["success"] += 1
+
+    if not counts:
+        print("No valid adversary outcomes found for adversary/target pairs.")
+        return
+
+    adversary_models_sorted = sorted(adversary_models)
+    target_models_sorted = sorted(target_models)
+
+    row_totals: dict[str, dict[str, int]] = {
+        model: {"success": 0, "total": 0} for model in adversary_models_sorted
+    }
+    col_totals: dict[str, dict[str, int]] = {
+        model: {"success": 0, "total": 0} for model in target_models_sorted
+    }
+    overall = {"success": 0, "total": 0}
+    for (adversary_model, target_model), pair_counts in counts.items():
+        row_totals[adversary_model]["success"] += pair_counts["success"]
+        row_totals[adversary_model]["total"] += pair_counts["total"]
+        col_totals[target_model]["success"] += pair_counts["success"]
+        col_totals[target_model]["total"] += pair_counts["total"]
+        overall["success"] += pair_counts["success"]
+        overall["total"] += pair_counts["total"]
+
+    z = []
+    text = []
+    hover = []
+
+    for adversary_model in adversary_models_sorted:
+        row = []
+        text_row = []
+        hover_row = []
+        for target_model in target_models_sorted:
+            pair_counts = counts.get((adversary_model, target_model))
+            if not pair_counts or pair_counts["total"] == 0:
+                row.append(None)
+                text_row.append("")
+                hover_row.append(
+                    f"Adversary: {adversary_model}<br>"
+                    f"Target: {target_model}<br>"
+                    "No data"
+                )
+                continue
+
+            rate = pair_counts["success"] / pair_counts["total"]
+            row.append(rate)
+            text_row.append(f"{rate:.0%}")
+            hover_row.append(
+                f"Adversary: {adversary_model}<br>"
+                f"Target: {target_model}<br>"
+                f"Rate: {rate:.1%}<br>"
+                f"Requester success: {pair_counts['success']} / {pair_counts['total']}"
+            )
+
+        row_summary = row_totals[adversary_model]
+        if row_summary["total"] > 0:
+            row_avg = row_summary["success"] / row_summary["total"]
+            row.append(row_avg)
+            text_row.append(f"{row_avg:.0%}")
+            hover_row.append(
+                f"Adversary: {adversary_model}<br>"
+                "Target: Average (all targets)<br>"
+                f"Rate: {row_avg:.1%}<br>"
+                f"Requester success: {row_summary['success']} / {row_summary['total']}"
+            )
+        else:
+            row.append(None)
+            text_row.append("")
+            hover_row.append(
+                f"Adversary: {adversary_model}<br>"
+                "Target: Average (all targets)<br>"
+                "No data"
+            )
+
+        z.append(row)
+        text.append(text_row)
+        hover.append(hover_row)
+
+    avg_row = []
+    avg_text_row = []
+    avg_hover_row = []
+    for target_model in target_models_sorted:
+        col_summary = col_totals[target_model]
+        if col_summary["total"] > 0:
+            col_avg = col_summary["success"] / col_summary["total"]
+            avg_row.append(col_avg)
+            avg_text_row.append(f"{col_avg:.0%}")
+            avg_hover_row.append(
+                "Adversary: Average (all adversaries)<br>"
+                f"Target: {target_model}<br>"
+                f"Rate: {col_avg:.1%}<br>"
+                f"Requester success: {col_summary['success']} / {col_summary['total']}"
+            )
+        else:
+            avg_row.append(None)
+            avg_text_row.append("")
+            avg_hover_row.append(
+                "Adversary: Average (all adversaries)<br>"
+                f"Target: {target_model}<br>"
+                "No data"
+            )
+
+    if overall["total"] > 0:
+        overall_avg = overall["success"] / overall["total"]
+        avg_row.append(overall_avg)
+        avg_text_row.append(f"{overall_avg:.0%}")
+        avg_hover_row.append(
+            "Adversary: Average (all adversaries)<br>"
+            "Target: Average (all targets)<br>"
+            f"Rate: {overall_avg:.1%}<br>"
+            f"Requester success: {overall['success']} / {overall['total']}"
+        )
+    else:
+        avg_row.append(None)
+        avg_text_row.append("")
+        avg_hover_row.append(
+            "Adversary: Average (all adversaries)<br>"
+            "Target: Average (all targets)<br>"
+            "No data"
+        )
+
+    z.append(avg_row)
+    text.append(avg_text_row)
+    hover.append(avg_hover_row)
+
+    x_labels = [_shorten_model_label(model) for model in target_models_sorted] + [
+        "Average"
+    ]
+    y_labels = [_shorten_model_label(model) for model in adversary_models_sorted] + [
+        "Average"
+    ]
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=z,
+            x=x_labels,
+            y=y_labels,
+            text=text,
+            texttemplate="%{text}",
+            hovertext=hover,
+            hoverinfo="text",
+            colorscale="RdYlGn_r",
+            zmin=0,
+            zmax=1,
+            colorbar=dict(title="Success Rate", tickformat=".0%"),
+        )
+    )
+    fig.update_layout(
+        title="Average Adversary Success Rate by Adversary/Target Model Pair",
+        xaxis_title="<b>Target Model</b>",
+        yaxis_title="<b>Adversary Model</b>",
+        height=max(340, len(adversary_models_sorted) * 65 + 140),
+        width=max(620, len(target_models_sorted) * 120 + 200),
+    )
+    fig.update_xaxes(tickangle=-20)
+    fig.show()
+
+
 def plot_warden_comparison(logs: list[dict]) -> None:
     """Plot adversary success rates per scenario, grouped by warden presence."""
     adversary_logs = [log for log in logs if _log_speaker(log) == "adversary"]
@@ -861,6 +1045,11 @@ if __name__ == "__main__":
         help="Show stacked bar of outcome types per scenario",
     )
     parser.add_argument(
+        "--adversary-target-heatmap",
+        action="store_true",
+        help="Show adversary-model x target-model success rate heatmap",
+    )
+    parser.add_argument(
         "--all-plots",
         action="store_true",
         help="Show all available plots",
@@ -881,6 +1070,8 @@ if __name__ == "__main__":
         plot_success_rates(logs)
     if args.heatmap or show_all:
         plot_heatmap(logs)
+    if args.adversary_target_heatmap or show_all:
+        plot_adversary_target_heatmap(logs)
     if args.warden_comparison or show_all:
         plot_warden_comparison(logs)
     if args.outcome_breakdown or show_all:

@@ -3,9 +3,9 @@
 Publication-quality figures for Social Reasoning Warden.
 
 Generates key result plots from the three main studies:
-  - dossier_effect (N=2,274): dossier × warden factorial
-  - cap_asym (N=1,215): warden capability tier
-  - skeptical_ablation (N=3,080): baseline vs skeptical vs warden × requester type
+  - dossier_effect: dossier × warden factorial
+  - cap_asym: warden capability tier
+  - skeptical_ablation: baseline vs skeptical vs warden × requester type
 
 Usage:
     python analysis/plot_results.py
