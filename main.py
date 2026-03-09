@@ -556,6 +556,8 @@ def main():
             f"{total_experiments} ({args.turns} conversation turns each)",
         )
     )
+    print(_format_plan_line("Experiment rounds", str(args.experiment_rounds)))
+    print(_format_plan_line("Parallel workers", str(args.max_workers)))
     if profile_schedule:
         preview_profile = profile_schedule[0] if profile_schedule else None
         if preview_profile and args.random_profile and args.experiment_rounds > 1:

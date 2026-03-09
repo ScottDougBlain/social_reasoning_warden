@@ -472,7 +472,7 @@ def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> No
 
 
 def plot_success_rates(logs: list[dict]) -> None:
-    """Render a 4x2 Plotly subplot grid of success rates by model/prompt."""
+    """Render grouped SR bar charts (adversary vs benign) by model category."""
     if not logs:
         print("No logs found.")
         return
@@ -482,7 +482,6 @@ def plot_success_rates(logs: list[dict]) -> None:
         ("agent_model", "by {agent} Model Type"),
         ("target_model", "by Target Model Type"),
         ("warden_model", "by Warden Model Type"),
-        ("warden_system_prompt", "by Warden System Prompt YAML"),
     ]
     speaker_rates: dict[str, dict[str, dict]] = {}
     for speaker in SPEAKER_ORDER:
@@ -490,7 +489,6 @@ def plot_success_rates(logs: list[dict]) -> None:
         if not speaker_logs:
             continue
         agent_key = "adversary" if speaker == "adversary" else "benign_agent"
-        warden_logs = [log for log in speaker_logs if _has_warden(log)]
         speaker_rates[speaker] = {
             "agent_model": _success_rate_by_label(
                 speaker_logs,
@@ -507,55 +505,80 @@ def plot_success_rates(logs: list[dict]) -> None:
                 lambda log: log.get("models", {}).get("warden"),
                 empty_label="none",
             ),
-            "warden_system_prompt": _success_rate_by_label(
-                warden_logs,
-                lambda log: log.get("warden_system_prompt"),
-                empty_label="unknown",
-            ),
         }
 
-    def build_bar(results: dict) -> tuple[list[str], list[float], list]:
-        raw_labels = sorted(results.keys(), key=str)
-        labels = [_shorten_model_label(label) for label in raw_labels]
-        rates = [results[label]["rate"] for label in raw_labels]
-        custom = [
-            [results[label]["requester_success"], results[label]["total"]]
-            for label in raw_labels
-        ]
-        return labels, rates, custom
+    def build_grouped_bars(
+        metric_key: str,
+    ) -> tuple[list[str], dict[str, tuple[list[float], list[list[int]]]]]:
+        labels_set = {
+            label
+            for speaker in SPEAKER_ORDER
+            for label in speaker_rates.get(speaker, {}).get(metric_key, {}).keys()
+        }
+        adversary_results = speaker_rates.get("adversary", {}).get(metric_key, {})
 
-    subplot_titles: list[str] = []
-    for _, metric_label in metric_specs:
+        def _adversary_sort_key(label: object) -> tuple[float, str]:
+            counts = adversary_results.get(label)
+            adversary_rate = counts["rate"] if counts else float("inf")
+            return adversary_rate, str(label)
+
+        raw_labels = sorted(labels_set, key=_adversary_sort_key)
+        labels = [_shorten_model_label(label) for label in raw_labels]
+        grouped_values: dict[str, tuple[list[float], list[list[int]]]] = {}
         for speaker in SPEAKER_ORDER:
-            agent_label = "Adversary" if speaker == "adversary" else "Benign Agent"
-            subtitle = metric_label.format(agent=agent_label)
-            subplot_titles.append(f"<b>{subtitle}</b>")
+            results = speaker_rates.get(speaker, {}).get(metric_key, {})
+            rates: list[float] = []
+            custom: list[list[int]] = []
+            for label in raw_labels:
+                counts = results.get(label)
+                if counts:
+                    rates.append(counts["rate"])
+                    custom.append([counts["requester_success"], counts["total"]])
+                else:
+                    rates.append(0.0)
+                    custom.append([0, 0])
+            grouped_values[speaker] = (rates, custom)
+        return labels, grouped_values
 
     fig = make_subplots(
-        rows=len(metric_specs),
-        cols=2,
-        subplot_titles=subplot_titles,
-        horizontal_spacing=0.12,
-        vertical_spacing=0.14,
+        rows=1,
+        cols=len(metric_specs),
+        subplot_titles=[
+            f"<b>{metric_label.format(agent='Requester')}</b>"
+            for _, metric_label in metric_specs
+        ],
+        horizontal_spacing=0.1,
     )
 
-    for row_index, (metric_key, _) in enumerate(metric_specs, start=1):
-        for col_index, speaker in enumerate(SPEAKER_ORDER, start=1):
-            results = speaker_rates.get(speaker, {}).get(metric_key, {})
-            labels, rates, custom = build_bar(results)
+    speaker_labels = {"adversary": "Adversary", "benign_agent": "Benign Agent"}
+    speaker_colors = {"adversary": "#ef553b", "benign_agent": "#636efa"}
+
+    for col_index, (metric_key, _) in enumerate(metric_specs, start=1):
+        labels, grouped_values = build_grouped_bars(metric_key)
+        for speaker in SPEAKER_ORDER:
+            rates, custom = grouped_values[speaker]
             fig.add_trace(
                 go.Bar(
+                    name=speaker_labels[speaker],
                     x=labels,
                     y=rates,
-                    text=[f"{rate:.0%}" for rate in rates],
+                    marker_color=speaker_colors[speaker],
+                    offsetgroup=speaker,
+                    legendgroup=speaker,
+                    showlegend=(col_index == 1),
+                    text=[
+                        f"{rate:.0%}" if totals[1] > 0 else ""
+                        for rate, totals in zip(rates, custom)
+                    ],
                     textposition="outside",
                     customdata=custom,
                     hovertemplate=(
+                        f"{speaker_labels[speaker]}<br>"
                         "SR: %{y:.1%}<br>"
                         "Requester Success: %{customdata[0]} / %{customdata[1]}<extra></extra>"
                     ),
                 ),
-                row=row_index,
+                row=1,
                 col=col_index,
             )
 
@@ -567,37 +590,20 @@ def plot_success_rates(logs: list[dict]) -> None:
     )
     fig.update_xaxes(
         tickangle=-10,
-        title_text="<b>Model / Prompt Type</b>",
+        title_text="<b>Model Type</b>",
         title_font=dict(size=10),
     )
     fig.update_layout(
         title="Success Rate (SR) Overview",
-        showlegend=False,
-        height=1040,
-        width=1100,
-        margin=dict(t=140),
+        barmode="group",
+        showlegend=True,
+        height=520,
+        width=1400,
+        margin=dict(t=120),
     )
     for annotation in fig.layout.annotations:
         annotation.font = dict(size=14)
 
-    fig.add_annotation(
-        x=0.22,
-        y=1.13,
-        xref="paper",
-        yref="paper",
-        text="<b>SR of Adversary</b>",
-        showarrow=False,
-        font=dict(size=18),
-    )
-    fig.add_annotation(
-        x=0.78,
-        y=1.13,
-        xref="paper",
-        yref="paper",
-        text="<b>SR of Benign Agent</b>",
-        showarrow=False,
-        font=dict(size=18),
-    )
     fig.show()
 
 
