@@ -204,9 +204,12 @@ def main():
     )
     parser.add_argument(
         "--warden",
-        choices=["with_warden", "without_warden", "both"],
+        choices=["with_warden", "without_warden", "both", "risk_level_only"],
         default="with_warden",
-        help="Run with warden (default), without warden, or both conditions",
+        help=(
+            "Run with warden (default), without warden, both conditions, "
+            "or risk_level_only (target only sees RISK: MEDIUM/HIGH, no explanation)"
+        ),
     )
     parser.add_argument(
         "--requester-type",
@@ -488,7 +491,7 @@ def main():
     warden_modes = (
         [False, True]
         if args.warden == "both"
-        else [args.warden == "with_warden"]
+        else [args.warden in {"with_warden", "risk_level_only"}]
     )
     target_skeptical_values = (
         [False, True]
@@ -515,6 +518,13 @@ def main():
         if not use_warden:
             return [args.warden_model[0]]
         return args.warden_model
+
+    def warden_message_mode_for_run(use_warden: bool) -> str:
+        if not use_warden:
+            return "full"
+        if args.warden == "risk_level_only":
+            return "risk_level_only"
+        return "full"
 
     branch_multiplier = 0
     for requester_type in requester_types:
@@ -580,6 +590,7 @@ def main():
     print(_format_plan_line("Requester", ", ".join(args.requester_model)))
     print(_format_plan_line("Target", ", ".join(args.target_model)))
     print(_format_plan_line("Warden", ", ".join(args.warden_model)))
+    print(_format_plan_line("Warden mode", args.warden))
     print(_format_plan_line("Warden prompt", f"prompts/warden/{args.warden_system_prompt}"))
     if args.adversary_system_prompt != DEFAULT_ADVERSARY_SYSTEM_PROMPT:
         print(_format_plan_line("Adversary prompt", f"prompts/adversary/{args.adversary_system_prompt}"))
@@ -656,11 +667,13 @@ def main():
                                                     for scenario_name in args.scenario:
                                                         run_index += 1
                                                         scenario = SCENARIOS[scenario_name]()
+                                                        warden_message_mode = warden_message_mode_for_run(use_warden)
                                                         future = executor.submit(
                                                             _run_scenario,
                                                             scenario=scenario,
                                                             args=args,
                                                             use_warden=use_warden,
+                                                            warden_message_mode=warden_message_mode,
                                                             requester_type=requester_type,
                                                             requester_model=requester_model,
                                                             target_model=target_model,
@@ -759,10 +772,12 @@ def main():
                                                         print(f"--- Scenario: {scenario_name} ---\n")
                                                     scenario = SCENARIOS[scenario_name]()
                                                     run_index += 1
+                                                    warden_message_mode = warden_message_mode_for_run(use_warden)
                                                     _run_scenario(
                                                         scenario=scenario,
                                                         args=args,
                                                         use_warden=use_warden,
+                                                        warden_message_mode=warden_message_mode,
                                                         requester_type=requester_type,
                                                         requester_model=requester_model,
                                                         target_model=target_model,
@@ -784,6 +799,7 @@ def _run_scenario(
     scenario,
     args,
     use_warden,
+    warden_message_mode,
     requester_type,
     requester_model,
     target_model,
@@ -827,6 +843,7 @@ def _run_scenario(
             profiles=profiles,
             num_turns=args.turns,
             use_warden=use_warden,
+            warden_message_mode=warden_message_mode,
             requester_type=requester_type,
             adversary_model=requester_model,
             target_model=target_model,
@@ -852,6 +869,7 @@ def _run_scenario(
             scenario=scenario,
             num_turns=args.turns,
             use_warden=use_warden,
+            warden_message_mode=warden_message_mode,
             requester_type=requester_type,
             adversary_model=requester_model,
             target_model=target_model,
