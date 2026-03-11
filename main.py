@@ -626,6 +626,7 @@ def main():
     if args.max_workers > 1:
         print(f"\nCompleted 0/{total_experiments} runs")
         futures = []
+        future_contexts = {}
         with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
             for round_idx in range(1, args.experiment_rounds + 1):
                 profile = (
@@ -655,32 +656,64 @@ def main():
                                                     for scenario_name in args.scenario:
                                                         run_index += 1
                                                         scenario = SCENARIOS[scenario_name]()
-                                                        futures.append(
-                                                            executor.submit(
-                                                                _run_scenario,
-                                                                scenario=scenario,
-                                                                args=args,
-                                                                use_warden=use_warden,
-                                                                requester_type=requester_type,
-                                                                requester_model=requester_model,
-                                                                target_model=target_model,
-                                                                warden_model=warden_model,
-                                                                profile=profile,
-                                                                warden_profile_access=warden_profile_access,
-                                                                adversary_data_access=adversary_data_access,
-                                                                warden_awareness=warden_awareness,
-                                                                target_skeptical=target_skeptical,
-                                                                cot_mode=cot_mode,
-                                                                warden_system_prompt=args.warden_system_prompt,
-                                                                adversary_system_prompt=args.adversary_system_prompt,
-                                                                run_index=run_index,
-                                                                quiet=quiet_runs,
-                                                            )
+                                                        future = executor.submit(
+                                                            _run_scenario,
+                                                            scenario=scenario,
+                                                            args=args,
+                                                            use_warden=use_warden,
+                                                            requester_type=requester_type,
+                                                            requester_model=requester_model,
+                                                            target_model=target_model,
+                                                            warden_model=warden_model,
+                                                            profile=profile,
+                                                            warden_profile_access=warden_profile_access,
+                                                            adversary_data_access=adversary_data_access,
+                                                            warden_awareness=warden_awareness,
+                                                            target_skeptical=target_skeptical,
+                                                            cot_mode=cot_mode,
+                                                            warden_system_prompt=args.warden_system_prompt,
+                                                            adversary_system_prompt=args.adversary_system_prompt,
+                                                            run_index=run_index,
+                                                            quiet=quiet_runs,
                                                         )
+                                                        futures.append(future)
+                                                        future_contexts[future] = {
+                                                            "run_index": run_index,
+                                                            "round_idx": round_idx,
+                                                            "scenario": scenario_name,
+                                                            "requester_type": requester_type,
+                                                            "requester_model": requester_model,
+                                                            "target_model": target_model,
+                                                            "warden_model": warden_model if use_warden else "none",
+                                                            "use_warden": use_warden,
+                                                        }
 
             completed = 0
             for future in as_completed(futures):
-                future.result()
+                try:
+                    future.result()
+                except Exception as exc:
+                    context = future_contexts.get(future, {})
+                    print("\n[ERROR] Parallel run failed")
+                    print(
+                        "  run="
+                        f"{context.get('run_index', '?')} "
+                        f"(round {context.get('round_idx', '?')})"
+                    )
+                    print(
+                        "  scenario="
+                        f"{context.get('scenario', '?')}, requester_type="
+                        f"{context.get('requester_type', '?')}, use_warden="
+                        f"{context.get('use_warden', '?')}"
+                    )
+                    print(
+                        "  requester_model="
+                        f"{context.get('requester_model', '?')}, target_model="
+                        f"{context.get('target_model', '?')}, warden_model="
+                        f"{context.get('warden_model', '?')}"
+                    )
+                    print(f"  {type(exc).__name__}: {exc}\n")
+                    raise
                 completed += 1
                 print(f"Completed {completed}/{total_experiments} runs")
     else:
