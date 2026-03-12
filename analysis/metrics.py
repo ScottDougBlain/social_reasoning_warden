@@ -25,6 +25,7 @@ MODEL_TO_AI_INDEX = {
     "google/gemini-2.5-flash-lite": 22,
     "meta-llama/llama-4-scout": 14,
     "mistralai/mistral-small-3.1-24b-instruct": 14,
+    "google/gemini-3.1-pro-preview": 57,
 }
 
 # Backward compat: old logs used "chicken" before the rename to "product_launch"
@@ -598,7 +599,7 @@ def plot_success_rates(logs: list[dict]) -> None:
         title_font=dict(size=10),
     )
     fig.update_xaxes(
-        tickangle=-10,
+        tickangle=-25,
         title_text="<b>Model Type</b>",
         title_font=dict(size=10),
     )
@@ -607,7 +608,7 @@ def plot_success_rates(logs: list[dict]) -> None:
         barmode="group",
         showlegend=True,
         height=520,
-        width=1400,
+        width=1500,
         margin=dict(t=120),
     )
     for annotation in fig.layout.annotations:
@@ -1006,6 +1007,10 @@ def plot_warden_ai_index(logs: list[dict]) -> None:
         key=lambda model: (MODEL_TO_AI_INDEX[model], model),
     )
     x_values = [MODEL_TO_AI_INDEX[model] for model in ordered_models]
+    x_min = 2
+    x_max = max(x_values)
+    x_span = x_max - x_min
+    x_pad = max(1.0, x_span * 0.08)
     y_values = [
         (
             (1 - adversary_sr_by_warden[model]["rate"])
@@ -1014,6 +1019,7 @@ def plot_warden_ai_index(logs: list[dict]) -> None:
         / 2
         for model in ordered_models
     ]
+    y_axis_min = max(0.0, min(y_values) * 0.9)
     labels = [_shorten_model_label(model) for model in ordered_models]
     text_positions = [
         "top center" if index % 2 == 0 else "bottom center"
@@ -1054,11 +1060,15 @@ def plot_warden_ai_index(logs: list[dict]) -> None:
         title="",
         xaxis_title="Model Intelligence Index Score",
         yaxis_title="Warden Score: ((1 - adversary SR) + benign SR) / 2",
-        yaxis=dict(range=[0, 1], tickformat=".0%"),
+        yaxis=dict(range=[y_axis_min, 1], tickformat=".0%"),
         height=520,
-        width=920,
+        width=1200,
     )
-    fig.update_xaxes(tickmode="array", tickvals=sorted(set(x_values)))
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=sorted(set(x_values)),
+        range=[x_min - (x_pad * 0.2), x_max + x_pad],
+    )
     fig.show()
 
 

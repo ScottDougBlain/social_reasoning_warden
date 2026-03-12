@@ -18,15 +18,19 @@ OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
 # Exact model IDs known to support native reasoning via the API.
 # Add new variants explicitly instead of relying on prefix matching.
 NATIVE_REASONING_EXACT_MODELS = {
+    "openai/gpt-5.4",
     "openai/gpt-5.2-pro", 
     "openai/gpt-5.2", 
     "openai/gpt-5.1", 
+    "google/gemini-3.1-pro-preview",
     "google/gemini-3-pro-preview", 
     "google/gemini-2.5-pro", 
     "google/gemini-3-flash-preview", 
     "google/gemini-2.5-flash",
     "google/gemini-2.5-flash-lite",
     "anthropic/claude-opus-4.6",
+    "anthropic/claude-opus-4.5",
+    "anthropic/claude-sonnet-4.6",
     "anthropic/claude-sonnet-4.5", 
     "anthropic/claude-haiku-4.5",
     "qwen/qwen3.5-flash-02-23"
