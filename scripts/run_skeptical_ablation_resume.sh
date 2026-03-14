@@ -58,6 +58,12 @@ declare -a WARD_MODELS=(
 TAG="skeptical_ablation"
 ROUNDS=3
 MAX_PARALLEL=4
+declare -A PROFILE_SEEDS=(
+    [authority_deferential]=101
+    [compliant]=202
+    [idealistic]=303
+    [time_pressured]=404
+)
 
 count=0
 pids=()
@@ -83,11 +89,13 @@ run_or_print() {
 run_all_conditions() {
     # Run all 3 conditions for a given family + profile
     local ADV="$1" TGT="$2" WARD="$3" PROFILE="$4"
+    local PROFILE_SEED="${PROFILE_SEEDS[$PROFILE]}"
 
     # Condition 1: Baseline (no warden, no skepticism)
     run_or_print python main.py \
         --scenario ${SCENARIOS} \
-        --profile "${PROFILE}" \
+        --target-profiles yes \
+        --profile-seed "${PROFILE_SEED}" \
         --warden without_warden \
         --target-skeptical off \
         --requester-type both \
@@ -101,7 +109,8 @@ run_all_conditions() {
     # Condition 2: Skeptical target (no warden)
     run_or_print python main.py \
         --scenario ${SCENARIOS} \
-        --profile "${PROFILE}" \
+        --target-profiles yes \
+        --profile-seed "${PROFILE_SEED}" \
         --warden without_warden \
         --target-skeptical on \
         --requester-type both \
@@ -115,7 +124,8 @@ run_all_conditions() {
     # Condition 3: Warden (no skepticism)
     run_or_print python main.py \
         --scenario ${SCENARIOS} \
-        --profile "${PROFILE}" \
+        --target-profiles yes \
+        --profile-seed "${PROFILE_SEED}" \
         --warden with_warden \
         --target-skeptical off \
         --requester-type both \
@@ -131,10 +141,12 @@ run_single_condition() {
     # Run one specific condition for a given family + profile
     local ADV="$1" TGT="$2" WARD="$3" PROFILE="$4"
     local WARDEN_FLAG="$5" SKEPTICAL_FLAG="$6"
+    local PROFILE_SEED="${PROFILE_SEEDS[$PROFILE]}"
 
     run_or_print python main.py \
         --scenario ${SCENARIOS} \
-        --profile "${PROFILE}" \
+        --target-profiles yes \
+        --profile-seed "${PROFILE_SEED}" \
         --warden "${WARDEN_FLAG}" \
         --target-skeptical "${SKEPTICAL_FLAG}" \
         --requester-type both \

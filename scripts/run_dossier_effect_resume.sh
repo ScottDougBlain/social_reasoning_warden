@@ -4,6 +4,12 @@
 set -uo pipefail  # no -e: don't abort on individual run failures
 
 PROFILES=(authority_deferential compliant idealistic time_pressured)
+declare -A PROFILE_SEEDS=(
+    [authority_deferential]=101
+    [compliant]=202
+    [idealistic]=303
+    [time_pressured]=404
+)
 SCENARIOS="ai_containment ai_override automation_decision product_launch coding_agent file_access file_access_password hiring model_release upselling vote"
 TAG="dossier_effect"
 ROUNDS=3
@@ -52,10 +58,12 @@ for i in $(seq 0 $((NUM_FAMILIES - 1))); do
     echo "--- Family: adv=${ADV} tgt=${TGT} ward=${WARD} ---"
 
     for profile in "${PROFILES[@]}"; do
+        profile_seed="${PROFILE_SEEDS[$profile]}"
         run_bg python main.py \
             --scenario ${SCENARIOS} \
-            --profile "${profile}" \
-            --adversary-data-access both \
+            --target-profiles yes \
+            --adversary-profile-access both \
+            --profile-seed "${profile_seed}" \
             --warden both \
             --warden-model "${WARD}" \
             --requester-type adversary \

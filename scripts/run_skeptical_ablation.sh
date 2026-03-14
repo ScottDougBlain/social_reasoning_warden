@@ -34,6 +34,12 @@ PROFILES=(
     idealistic
     time_pressured
 )
+declare -A PROFILE_SEEDS=(
+    [authority_deferential]=101
+    [compliant]=202
+    [idealistic]=303
+    [time_pressured]=404
+)
 
 # Same 11 scenarios used in cap_asym / dossier_effect studies
 SCENARIOS="ai_containment ai_override automation_decision product_launch coding_agent file_access file_access_password hiring model_release upselling vote"
@@ -107,10 +113,12 @@ for i in $(seq 0 $((NUM_FAMILIES - 1))); do
     echo "--- Family $((i+1)): adv=${ADV} tgt=${TGT} ward=${WARD} ---"
 
     for profile in "${PROFILES[@]}"; do
+        profile_seed="${PROFILE_SEEDS[$profile]}"
         # Condition 1: Baseline (no warden, no skepticism)
         run_or_print python main.py \
             --scenario ${SCENARIOS} \
-            --profile "${profile}" \
+            --target-profiles yes \
+            --profile-seed "${profile_seed}" \
             --warden without_warden \
             --target-skeptical off \
             --requester-type both \
@@ -124,7 +132,8 @@ for i in $(seq 0 $((NUM_FAMILIES - 1))); do
         # Condition 2: Skeptical target (no warden)
         run_or_print python main.py \
             --scenario ${SCENARIOS} \
-            --profile "${profile}" \
+            --target-profiles yes \
+            --profile-seed "${profile_seed}" \
             --warden without_warden \
             --target-skeptical on \
             --requester-type both \
@@ -138,7 +147,8 @@ for i in $(seq 0 $((NUM_FAMILIES - 1))); do
         # Condition 3: Warden (no skepticism)
         run_or_print python main.py \
             --scenario ${SCENARIOS} \
-            --profile "${profile}" \
+            --target-profiles yes \
+            --profile-seed "${profile_seed}" \
             --warden with_warden \
             --target-skeptical off \
             --requester-type both \

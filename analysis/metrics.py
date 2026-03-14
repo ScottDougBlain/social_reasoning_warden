@@ -306,7 +306,11 @@ def _condition_flags(log: dict) -> tuple[bool, bool, bool]:
         has_adversary_data = bool(profile.get("adversary_has_data"))
     else:
         profiles = log.get("profiles") or []
-        has_profile = any(p.get("name") for p in profiles if isinstance(p, dict))
+        has_profile = any(
+            p.get("target_has_profile")
+            for p in profiles
+            if isinstance(p, dict)
+        )
         has_adversary_data = bool(log.get("adversary_has_data"))
     return has_warden, has_profile, has_adversary_data
 
@@ -620,6 +624,8 @@ def plot_success_rates(logs: list[dict]) -> None:
 def _extract_profile_name(log: dict) -> str | None:
     """Extract profile display name from a log."""
     profile = log.get("profile") or {}
+    if profile and not profile.get("target_has_profile"):
+        return None
     name = profile.get("name")
     if name:
         return name

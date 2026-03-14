@@ -29,6 +29,12 @@ PROFILES=(
     idealistic
     time_pressured
 )
+declare -A PROFILE_SEEDS=(
+    [authority_deferential]=101
+    [compliant]=202
+    [idealistic]=303
+    [time_pressured]=404
+)
 
 SCENARIO="hiring"
 
@@ -94,10 +100,12 @@ for i in $(seq 0 $((NUM_FAMILIES - 1))); do
     echo "--- Family $((i+1)): adv=${ADV} tgt=${TGT} ward=${WARD} ---"
 
     for profile in "${PROFILES[@]}"; do
+        profile_seed="${PROFILE_SEEDS[$profile]}"
         # Both warden conditions, both requester types
         run_or_print python main.py \
             --scenario ${SCENARIO} \
-            --profile "${profile}" \
+            --target-profiles yes \
+            --profile-seed "${profile_seed}" \
             --warden both \
             --requester-type both \
             --requester-model "${ADV}" \

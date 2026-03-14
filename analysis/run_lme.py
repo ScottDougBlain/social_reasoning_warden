@@ -123,7 +123,7 @@ def logs_to_dataframe(logs: list[dict]) -> pd.DataFrame:
                 "requester_type": requester_type,
                 "has_warden": int(_has_warden(log)),
                 "profile_name": profile.get("name") or "none",
-                "has_profile": int(bool(profile.get("name"))),
+                "has_profile": int(bool(profile.get("target_has_profile"))),
                 "adversary_has_data": int(bool(profile.get("adversary_has_data"))),
                 "warden_has_intel": int(bool(profile.get("warden_has_intel"))),
                 "dossier_variant": profile.get("dossier_variant"),

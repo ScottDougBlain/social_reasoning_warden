@@ -30,6 +30,14 @@ PROFILES=(
     compliant
     time_pressured
 )
+declare -A PROFILE_SEEDS=(
+    [authority_deferential]=101
+    [idealistic]=202
+    [lonely_isolated]=303
+    [overconfident]=404
+    [compliant]=505
+    [time_pressured]=606
+)
 
 # Scenarios already used for profiled adversary runs (good coverage)
 SCENARIOS="ai_containment hiring vote automation_decision upselling"
@@ -73,10 +81,12 @@ echo
 
 for profile in "${PROFILES[@]}"; do
     echo "--- Profile: ${profile} ---"
+    profile_seed="${PROFILE_SEEDS[$profile]}"
     run_or_print python main.py \
         --scenario ${SCENARIOS} \
-        --profile "${profile}" \
-        --adversary-data-access no_access \
+        --target-profiles yes \
+        --adversary-profile-access no \
+        --profile-seed "${profile_seed}" \
         --warden both \
         --warden-model "${WARDEN_MODEL}" \
         --requester-type adversary \

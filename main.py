@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from src.client import supports_native_reasoning
-from src.profiles import assign_profiles_to_seats, list_profiles, load_profile
+from src.profiles import assign_profiles_to_seats, generate_profile
 from src.runner import run_experiment, run_multi_target_experiment
 from src.scenarios.base import MultiTargetScenario
 from src.scenarios.experimental import (
@@ -191,8 +191,33 @@ def _print_red(text: str) -> None:
     print(f"{ANSI_RED}{text}{ANSI_RESET}")
 
 
+def _toggle_values(value: str) -> list[bool]:
+    if value == "both":
+        return [False, True]
+    return [value == "yes"]
+
+
+def _profiles_requested(args) -> bool:
+    return any(
+        value in {"yes", "both"}
+        for value in (
+            args.target_profiles,
+            args.adversary_profile_access,
+            args.warden_profile_access,
+        )
+    )
+
+
+def _build_round_profile_seeds(num_rounds: int, seed: int) -> list[int]:
+    rng = random.Random(seed)
+    return [rng.randrange(0, 2**63) for _ in range(num_rounds)]
+
+
 def main():
-    parser = argparse.ArgumentParser(description="ERA Social Warden Experiment Runner")
+    parser = argparse.ArgumentParser(
+        description="ERA Social Warden Experiment Runner",
+        allow_abbrev=False,
+    )
     parser.add_argument(
         "--scenario",
         nargs="+",
@@ -330,15 +355,6 @@ def main():
         help="Let the benign agent generate its own opening message instead of using a fixed one",
     )
     parser.add_argument(
-        "--adversary-data-access",
-        choices=["no_access", "access", "both"],
-        default="no_access",
-        help=(
-            "Adversary behavioral dossier access: no_access, access, or both. "
-            "Requires a profile when access is enabled."
-        ),
-    )
-    parser.add_argument(
         "--warden-awareness",
         "--warden_awareness",
         dest="warden_awareness",
@@ -362,43 +378,42 @@ def main():
     )
 
     ############# PERSONALIZATION / PROFILING ARGUMENTS #############
-    
-    parser.add_argument(
-        "--dossier-variant",
-        type=int,
-        choices=[1, 2, 3],
-        default=None,
-        help="Dossier variant to use (1, 2, or 3). Omit for random selection.",
-    )
 
     profile_group = parser.add_argument_group("profiling options")
     profile_group.add_argument(
-        "--profile",
-        type=str,
-        metavar="NAME",
-        help="Use a specific profile by name; if not specified, no profile is used",
+        "--target-profiles",
+        choices=["yes", "no", "both"],
+        default="no",
+        help=(
+            "Whether the target receives a generated five-factor profile: "
+            "yes, no, or both."
+        ),
     )
     profile_group.add_argument(
-        "--random-profile",
-        action="store_true",
-        help="Use a randomly selected profile",
+        "--adversary-profile-access",
+        choices=["yes", "no", "both"],
+        default="no",
+        help=(
+            "Whether the adversary receives the generated five-factor "
+            "profile: yes, no, or both."
+        ),
+    )
+    profile_group.add_argument(
+        "--warden-profile-access",
+        choices=["yes", "no", "both"],
+        default="no",
+        help=(
+            "Whether the warden receives the generated five-factor profile: "
+            "yes, no, or both."
+        ),
     )
     profile_group.add_argument(
         "--profile-seed",
         type=int,
         default=42,
         help=(
-            "Seed for random profile selection when using --random-profile "
-            "(deterministic per-round schedule)."
-        ),
-    )
-    profile_group.add_argument(
-        "--warden-profile-access",
-        choices=["no_access", "access", "both"],
-        default="no_access",
-        help=(
-            "Warden access to target vulnerability profile: no_access, access, or both. "
-            "Requires a profile when access is enabled."
+            "Seed for generated profiles. The same per-round profile list is "
+            "reused across all condition cells."
         ),
     )
     parser.add_argument(
@@ -428,52 +443,34 @@ def main():
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
 
-    profile_requested = bool(args.profile or args.random_profile)
     if args.decision_reprompt_attempts < 0:
         parser.error("--decision-reprompt-attempts must be >= 0")
-    if args.adversary_data_access in {"access", "both"} and not profile_requested:
-        parser.error(
-            "--adversary-data-access access|both requires --profile or --random-profile"
-        )
-    if args.warden_profile_access in {"access", "both"} and not profile_requested:
-        parser.error(
-            "--warden-profile-access access|both requires --profile or --random-profile"
-        )
 
-    # Build a deterministic profile schedule per round (if enabled)
+    profiles_requested = _profiles_requested(args)
+    round_profile_seeds: list[int] | None = None
     profile_schedule: list | None = None
-    if args.profile:
-        profile = load_profile(args.profile)
-        profile_schedule = [profile] * args.experiment_rounds
-    elif args.random_profile:
-        available_profiles = sorted(list_profiles())
-        if not available_profiles:
-            parser.error("No profiles available in prompts/profiles/")
-        rng = random.Random(args.profile_seed)
+    if profiles_requested:
+        round_profile_seeds = _build_round_profile_seeds(
+            args.experiment_rounds,
+            args.profile_seed,
+        )
         profile_schedule = [
-            load_profile(rng.choice(available_profiles))
-            for _ in range(args.experiment_rounds)
+            generate_profile(random.Random(seed))
+            for seed in round_profile_seeds
         ]
 
     # CoT setting (single mode for all agents)
     cot_mode = args.cot
 
     # Calculate total experiments
-    adversary_data_access_values = (
-        [False, True]
-        if args.adversary_data_access == "both"
-        else [args.adversary_data_access == "access"]
-    )
+    target_profile_values = _toggle_values(args.target_profiles)
+    adversary_profile_access_values = _toggle_values(args.adversary_profile_access)
     warden_awareness_values = (
         [False, True]
         if args.warden_awareness == "both"
         else [args.warden_awareness == "on"]
     )
-    warden_profile_access_values = (
-        [False, True]
-        if args.warden_profile_access == "both"
-        else [args.warden_profile_access == "access"]
-    )
+    warden_profile_access_values = _toggle_values(args.warden_profile_access)
     requester_types = (
         ["adversary", "benign_agent"]
         if args.requester_type == "both"
@@ -490,10 +487,17 @@ def main():
         else [args.target_skeptical == "on"]
     )
 
-    def effective_adversary_data_access_values(requester_type: str) -> list[bool]:
+    def effective_target_profile_values() -> list[bool]:
+        if not profiles_requested:
+            return [False]
+        return target_profile_values
+
+    def effective_adversary_profile_access_values(requester_type: str) -> list[bool]:
         if requester_type != "adversary":
             return [False]
-        return adversary_data_access_values
+        if not profiles_requested:
+            return [False]
+        return adversary_profile_access_values
 
     def effective_warden_awareness_values(requester_type: str) -> list[bool]:
         if requester_type != "adversary":
@@ -502,6 +506,8 @@ def main():
 
     def effective_warden_profile_access_values(use_warden: bool) -> list[bool]:
         if not use_warden:
+            return [False]
+        if not profiles_requested:
             return [False]
         return warden_profile_access_values
 
@@ -519,13 +525,15 @@ def main():
 
     branch_multiplier = 0
     for requester_type in requester_types:
-        access_values = effective_adversary_data_access_values(requester_type)
+        target_values = effective_target_profile_values()
+        adversary_values = effective_adversary_profile_access_values(requester_type)
         awareness_values = effective_warden_awareness_values(requester_type)
         for use_warden in warden_modes:
             warden_access_values = effective_warden_profile_access_values(use_warden)
             warden_models = effective_warden_models(use_warden)
             branch_multiplier += (
-                len(access_values)
+                len(target_values)
+                * len(adversary_values)
                 * len(awareness_values)
                 * len(warden_access_values)
                 * len(warden_models)
@@ -561,15 +569,14 @@ def main():
     print(_format_plan_line("Parallel workers", str(args.max_workers)))
     if profile_schedule:
         preview_profile = profile_schedule[0] if profile_schedule else None
-        if preview_profile and args.random_profile and args.experiment_rounds > 1:
-            seed_note = (
-                f" (seed={args.profile_seed})"
-                if args.profile_seed is not None
-                else ""
-            )
-            print(_format_plan_line("Profiles", f"random per round{seed_note}"))
+        seed_note = f"seed={args.profile_seed}"
+        if args.experiment_rounds > 1:
+            print(_format_plan_line("Profiles", f"generated per round ({seed_note})"))
         elif preview_profile:
-            print(_format_plan_line("Profile", preview_profile.name))
+            print(_format_plan_line("Profile", f"{preview_profile.name} ({seed_note})"))
+    print(_format_plan_line("Target profiles", args.target_profiles))
+    print(_format_plan_line("Adversary access", args.adversary_profile_access))
+    print(_format_plan_line("Warden access", args.warden_profile_access))
     if len(args.scenario) > 1:
         scenario_count = len(args.scenario)
         print(
@@ -636,12 +643,20 @@ def main():
                     if profile_schedule
                     else None
                 )
+                round_profile_seed = (
+                    round_profile_seeds[round_idx - 1]
+                    if round_profile_seeds
+                    else None
+                )
                 for requester_model in args.requester_model:
                     for target_model in args.target_model:
                         for requester_type in requester_types:
                             for use_warden in warden_modes:
-                                effective_access_values = (
-                                    effective_adversary_data_access_values(requester_type)
+                                effective_target_values = (
+                                    effective_target_profile_values()
+                                )
+                                effective_adversary_values = (
+                                    effective_adversary_profile_access_values(requester_type)
                                 )
                                 effective_awareness_values = (
                                     effective_warden_awareness_values(requester_type)
@@ -651,46 +666,49 @@ def main():
                                 )
                                 effective_models = effective_warden_models(use_warden)
                                 for warden_model in effective_models:
-                                    for adversary_data_access in effective_access_values:
-                                        for warden_awareness in effective_awareness_values:
-                                            for warden_profile_access in effective_warden_access_values:
-                                                for target_skeptical in target_skeptical_values:
-                                                    for scenario_name in args.scenario:
-                                                        run_index += 1
-                                                        scenario = SCENARIOS[scenario_name]()
-                                                        warden_message_mode = warden_message_mode_for_run(use_warden)
-                                                        future = executor.submit(
-                                                            _run_scenario,
-                                                            scenario=scenario,
-                                                            args=args,
-                                                            use_warden=use_warden,
-                                                            warden_message_mode=warden_message_mode,
-                                                            requester_type=requester_type,
-                                                            requester_model=requester_model,
-                                                            target_model=target_model,
-                                                            warden_model=warden_model,
-                                                            profile=profile,
-                                                            warden_profile_access=warden_profile_access,
-                                                            adversary_data_access=adversary_data_access,
-                                                            warden_awareness=warden_awareness,
-                                                            target_skeptical=target_skeptical,
-                                                            cot_mode=cot_mode,
-                                                            warden_system_prompt=args.warden_system_prompt,
-                                                            adversary_system_prompt=args.adversary_system_prompt,
-                                                            run_index=run_index,
-                                                            quiet=quiet_runs,
-                                                        )
-                                                        futures.append(future)
-                                                        future_contexts[future] = {
-                                                            "run_index": run_index,
-                                                            "round_idx": round_idx,
-                                                            "scenario": scenario_name,
-                                                            "requester_type": requester_type,
-                                                            "requester_model": requester_model,
-                                                            "target_model": target_model,
-                                                            "warden_model": warden_model if use_warden else "none",
-                                                            "use_warden": use_warden,
-                                                        }
+                                    for target_profiles in effective_target_values:
+                                        for adversary_profile_access in effective_adversary_values:
+                                            for warden_awareness in effective_awareness_values:
+                                                for warden_profile_access in effective_warden_access_values:
+                                                    for target_skeptical in target_skeptical_values:
+                                                        for scenario_name in args.scenario:
+                                                            run_index += 1
+                                                            scenario = SCENARIOS[scenario_name]()
+                                                            warden_message_mode = warden_message_mode_for_run(use_warden)
+                                                            future = executor.submit(
+                                                                _run_scenario,
+                                                                scenario=scenario,
+                                                                args=args,
+                                                                use_warden=use_warden,
+                                                                warden_message_mode=warden_message_mode,
+                                                                requester_type=requester_type,
+                                                                requester_model=requester_model,
+                                                                target_model=target_model,
+                                                                warden_model=warden_model,
+                                                                profile=profile,
+                                                                round_profile_seed=round_profile_seed,
+                                                                target_has_profile=target_profiles,
+                                                                warden_profile_access=warden_profile_access,
+                                                                adversary_profile_access=adversary_profile_access,
+                                                                warden_awareness=warden_awareness,
+                                                                target_skeptical=target_skeptical,
+                                                                cot_mode=cot_mode,
+                                                                warden_system_prompt=args.warden_system_prompt,
+                                                                adversary_system_prompt=args.adversary_system_prompt,
+                                                                run_index=run_index,
+                                                                quiet=quiet_runs,
+                                                            )
+                                                            futures.append(future)
+                                                            future_contexts[future] = {
+                                                                "run_index": run_index,
+                                                                "round_idx": round_idx,
+                                                                "scenario": scenario_name,
+                                                                "requester_type": requester_type,
+                                                                "requester_model": requester_model,
+                                                                "target_model": target_model,
+                                                                "warden_model": warden_model if use_warden else "none",
+                                                                "use_warden": use_warden,
+                                                            }
 
             completed = 0
             for future in as_completed(futures):
@@ -729,6 +747,11 @@ def main():
                 if profile_schedule
                 else None
             )
+            round_profile_seed = (
+                round_profile_seeds[round_idx - 1]
+                if round_profile_seeds
+                else None
+            )
             if args.experiment_rounds > 1 and profile:
                 print(f"Profile: {profile.name}")
 
@@ -736,8 +759,11 @@ def main():
                 for target_model in args.target_model:
                     for requester_type in requester_types:
                         for use_warden in warden_modes:
-                            effective_access_values = (
-                                effective_adversary_data_access_values(requester_type)
+                            effective_target_values = (
+                                effective_target_profile_values()
+                            )
+                            effective_adversary_values = (
+                                effective_adversary_profile_access_values(requester_type)
                             )
                             effective_awareness_values = (
                                 effective_warden_awareness_values(requester_type)
@@ -747,43 +773,46 @@ def main():
                             )
                             effective_models = effective_warden_models(use_warden)
                             for warden_model in effective_models:
-                                for adversary_data_access in effective_access_values:
-                                    for warden_awareness in effective_awareness_values:
-                                        for warden_profile_access in effective_warden_access_values:
-                                            for target_skeptical in target_skeptical_values:
-                                                if args.warden == "both":
-                                                    if use_warden:
-                                                        print("=== Running WITH warden ===\n")
-                                                    else:
-                                                        print("=== Running WITHOUT warden ===\n")
-                                                if target_skeptical:
-                                                    print("=== Target: SKEPTICAL ===\n")
-                                                for scenario_name in args.scenario:
-                                                    if len(args.scenario) > 1:
-                                                        print(f"--- Scenario: {scenario_name} ---\n")
-                                                    scenario = SCENARIOS[scenario_name]()
-                                                    run_index += 1
-                                                    warden_message_mode = warden_message_mode_for_run(use_warden)
-                                                    _run_scenario(
-                                                        scenario=scenario,
-                                                        args=args,
-                                                        use_warden=use_warden,
-                                                        warden_message_mode=warden_message_mode,
-                                                        requester_type=requester_type,
-                                                        requester_model=requester_model,
-                                                        target_model=target_model,
-                                                        warden_model=warden_model,
-                                                        profile=profile,
-                                                        warden_profile_access=warden_profile_access,
-                                                        adversary_data_access=adversary_data_access,
-                                                        warden_awareness=warden_awareness,
-                                                        target_skeptical=target_skeptical,
-                                                        cot_mode=cot_mode,
-                                                        warden_system_prompt=args.warden_system_prompt,
-                                                        adversary_system_prompt=args.adversary_system_prompt,
-                                                        run_index=run_index,
-                                                        quiet=quiet_runs,
-                                                    )
+                                for target_profiles in effective_target_values:
+                                    for adversary_profile_access in effective_adversary_values:
+                                        for warden_awareness in effective_awareness_values:
+                                            for warden_profile_access in effective_warden_access_values:
+                                                for target_skeptical in target_skeptical_values:
+                                                    if args.warden == "both":
+                                                        if use_warden:
+                                                            print("=== Running WITH warden ===\n")
+                                                        else:
+                                                            print("=== Running WITHOUT warden ===\n")
+                                                    if target_skeptical:
+                                                        print("=== Target: SKEPTICAL ===\n")
+                                                    for scenario_name in args.scenario:
+                                                        if len(args.scenario) > 1:
+                                                            print(f"--- Scenario: {scenario_name} ---\n")
+                                                        scenario = SCENARIOS[scenario_name]()
+                                                        run_index += 1
+                                                        warden_message_mode = warden_message_mode_for_run(use_warden)
+                                                        _run_scenario(
+                                                            scenario=scenario,
+                                                            args=args,
+                                                            use_warden=use_warden,
+                                                            warden_message_mode=warden_message_mode,
+                                                            requester_type=requester_type,
+                                                            requester_model=requester_model,
+                                                            target_model=target_model,
+                                                            warden_model=warden_model,
+                                                            profile=profile,
+                                                            round_profile_seed=round_profile_seed,
+                                                            target_has_profile=target_profiles,
+                                                            warden_profile_access=warden_profile_access,
+                                                            adversary_profile_access=adversary_profile_access,
+                                                            warden_awareness=warden_awareness,
+                                                            target_skeptical=target_skeptical,
+                                                            cot_mode=cot_mode,
+                                                            warden_system_prompt=args.warden_system_prompt,
+                                                            adversary_system_prompt=args.adversary_system_prompt,
+                                                            run_index=run_index,
+                                                            quiet=quiet_runs,
+                                                        )
 
 
 def _run_scenario(
@@ -796,8 +825,10 @@ def _run_scenario(
     target_model,
     warden_model,
     profile,
+    round_profile_seed,
+    target_has_profile,
     warden_profile_access,
-    adversary_data_access,
+    adversary_profile_access,
     warden_awareness,
     target_skeptical,
     cot_mode,
@@ -808,27 +839,20 @@ def _run_scenario(
 ):
     """Route to the correct runner based on scenario type."""
     if isinstance(scenario, MultiTargetScenario):
-        # Assign profiles to seats
-        if profile and not args.random_profile:
-            # --profile NAME: explicit profile, duplicate to all seats
-            profiles = [profile] * scenario.num_targets()
-        elif args.random_profile:
-            # --random-profile: assign different profiles per seat
-            # Vary seed by run_index so multi-round experiments differ
-            seed = args.profile_seed
-            if seed is not None and run_index is not None:
-                seed = seed + run_index
-            profiles = assign_profiles_to_seats(
+        profiles_requested_for_run = (
+            profile is not None
+            or target_has_profile
+            or adversary_profile_access
+            or warden_profile_access
+        )
+        profiles = (
+            assign_profiles_to_seats(
                 scenario.num_targets(),
-                random_seed=seed,
+                random_seed=round_profile_seed,
             )
-        else:
-            # No profiles — use empty profiles list
-            from src.profiles import TargetProfile
-            profiles = [
-                TargetProfile(name=f"Seat {i+1}")
-                for i in range(scenario.num_targets())
-            ]
+            if profiles_requested_for_run
+            else []
+        )
         run_multi_target_experiment(
             scenario=scenario,
             profiles=profiles,
@@ -842,14 +866,14 @@ def _run_scenario(
             warden_system_prompt=warden_system_prompt,
             adversary_system_prompt=adversary_system_prompt,
             tag=args.tag,
-            profile_to_warden=warden_profile_access,
+            target_has_profile=target_has_profile,
+            warden_profile_access=warden_profile_access,
             cot_mode=cot_mode,
             adversary_generates_opening=args.adversary_generates_opening,
             benign_agent_generates_opening=args.benign_agent_generates_opening,
-            adversary_data_access=adversary_data_access,
+            adversary_profile_access=adversary_profile_access,
             warden_awareness=warden_awareness,
             target_skeptical=target_skeptical,
-            dossier_variant=args.dossier_variant,
             debug=args.debug,
             decision_reprompt_attempts=args.decision_reprompt_attempts,
             run_index=run_index,
@@ -869,14 +893,14 @@ def _run_scenario(
             adversary_system_prompt=adversary_system_prompt,
             tag=args.tag,
             profile=profile,
-            profile_to_warden=warden_profile_access,
+            target_has_profile=target_has_profile,
+            warden_profile_access=warden_profile_access,
             cot_mode=cot_mode,
             adversary_generates_opening=args.adversary_generates_opening,
             benign_agent_generates_opening=args.benign_agent_generates_opening,
-            adversary_data_access=adversary_data_access,
+            adversary_profile_access=adversary_profile_access,
             warden_awareness=warden_awareness,
             target_skeptical=target_skeptical,
-            dossier_variant=args.dossier_variant,
             debug=args.debug,
             decision_reprompt_attempts=args.decision_reprompt_attempts,
             run_index=run_index,

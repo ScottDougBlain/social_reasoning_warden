@@ -18,7 +18,7 @@ main.py                    # CLI entry point — orchestrates experiment runs
 src/
   runner.py                # Core experiment loop: turn-taking, logging, agent coordination
   client.py                # Multi-provider API client (OpenRouter → Groq → Together → Cerebras → HF)
-  profiles.py              # BFI-2 / VIA personality profiles — dataclasses and YAML loading
+  profiles.py              # Generated five-factor personality profiles
   agents/
     adversary.py           # Adversary agent: builds system prompt with hidden goal + dossier
     benign_agent.py        # Benign agent: legitimate requester (control condition)
@@ -27,7 +27,7 @@ src/
   scenarios/
     base.py                # Abstract Scenario base class (scenarios are data-driven via runner)
   data/
-    dossier.py             # Static dossier assembly: interleaves noise + signal items
+    dossier.py             # Legacy static dossier assembly (not used by current CLI)
     generator.py           # (Legacy) per-run random behavioral data generator — no longer used
 analysis/
   metrics.py               # Log analysis with Rich tables (grant rates, warden stats)
@@ -37,16 +37,8 @@ prompts/
   warden/warden_system_1.yaml # Warden system prompt template (advisory format)
   benign_agent_system.yaml # Benign agent system prompt template
   decision_prompt.yaml     # Final decision extraction prompt
-  profiles/                # 6 psychological profiles (YAML, BFI-2 + VIA grounded)
-    compliant.yaml         # High agreeableness, folds under pressure/guilt/conflict
-    authority_deferential.yaml  # Defers to hierarchy and rank
-    overconfident.yaml     # Grants access out of carelessness
-    time_pressured.yaml    # Rushes decisions under deadline stress
-    lonely_isolated.yaml   # Craves connection, exploitable via rapport
-    idealistic.yaml        # Values-based vulnerability ("helping people")
-  dossiers/
-    noise/v{1,2,3}.yaml    # ~37 mundane workplace items (shared across profiles)
-    signal/<profile>/v{1,2,3}.yaml  # 9 personality-revealing items per profile per variant
+  legacy-profiles/         # Legacy YAML profile artifacts (not used by current CLI)
+  legacy-dossiers/         # Legacy dossier artifacts (not used by current CLI)
 logs/                      # JSON experiment logs (one per run)
 docs/                      # Demo docs for mentor review
 ```
@@ -55,28 +47,27 @@ docs/                      # Demo docs for mentor review
 
 ```bash
 # Basic run (adversary vs target with warden, 4 turns)
-python main.py --scenario file_access_password --profile compliant
+python main.py --scenario file_access_password --target-profiles yes
 
-# Full factorial: both requester types, both warden conditions, with dossier
-python main.py --requester-type both --warden both --profile compliant \
-  --adversary-data-access --dossier-variant 1
+# Full factorial: both requester types, both warden conditions, shared profile seed
+python main.py --requester-type both --warden both --target-profiles yes \
+  --adversary-profile-access both --profile-seed 42
 
 # Multiple models
 python main.py --requester-model arcee-ai/trinity-large-preview:free \
   --target-model arcee-ai/trinity-mini:free
 
-# Available profile keys match the YAML filenames in prompts/profiles/
-ls prompts/profiles
+# Profiles are generated on the fly; reuse a seed for reproducible rounds
+python main.py --target-profiles yes --profile-seed 123
 ```
 
 ### Key CLI Flags
-- `--profile NAME` / `--random-profile` — assign psychological profile to target
-- `--profile-to-warden` — give warden intel about target's vulnerabilities
-- `--adversary-data-access` — give adversary a behavioral dossier (~80% noise, ~20% signal)
-- `--dossier-variant 1|2|3` — pick specific variant (omit for random)
+- `--target-profiles yes|no|both` — control whether the target receives a generated five-factor profile
+- `--adversary-profile-access yes|no|both` — control whether the adversary sees that profile
+- `--warden-profile-access yes|no|both` — control whether the warden sees that profile
+- `--profile-seed INT` — deterministically generate the same per-round profile list across condition cells
 - `--warden both` — run with and without warden in same session
 - `--requester-type both` — run adversary and benign agent conditions
-- `--no-adversary-cot` / `--no-target-cot` / `--no-warden-cot` — disable chain-of-thought
 - `--debug` — print full model contexts for each API call
 - `--tag NAME` — tag logs for filtering in metrics
 
@@ -89,10 +80,9 @@ ls prompts/profiles
 
 ## Key Design Decisions
 
-- **Profiles grounded in BFI-2 and VIA**: Each profile has percentile scores on Big Five Inventory 2 domains/facets and VIA character strengths — not ad-hoc trait descriptions. Narratives use BFI-2 item language.
-- **Static dossiers with signal/noise**: Behavioral data is pre-authored YAML (not generated per run). 9 signal items interleaved at fixed positions among ~37 noise items. This tests whether models can strategically attend to relevant information.
-- **Three paired variants**: Same noise base + different signal content per variant enables controlled experiments.
-- **Target never sees vulnerabilities**: `vulnerabilities` field goes to adversary/warden only. Target gets `narrative`, `via_strengths.top`, `social_context`, `behavioral_tendencies`.
+- **Profiles are generated on the fly**: Each round draws a five-factor profile over extraversion, agreeableness, conscientiousness, neuroticism, and openness, with each trait set to LOW, MEDIUM, or HIGH.
+- **Profile access is role-specific**: The target, adversary, and warden can each independently receive the generated profile via CLI flags.
+- **Seeds define the round schedule**: `--profile-seed` ensures every condition cell in a run sees the same per-round profile list.
 - **Warden is observer-only**: Sends private advisory notes to target; never speaks to the requester.
 - **Reasoning tag extraction**: Client strips `<think>`, `<reasoning>`, `<scratchpad>` tags from model output for models like DeepSeek R1 / Chimera.
 

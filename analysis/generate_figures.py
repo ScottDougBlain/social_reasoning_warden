@@ -187,6 +187,8 @@ def fig_scenario_profile_heatmap(logs: list[dict]) -> None:
     def extract_profile(log: dict) -> str | None:
         profile = log.get("profile") or {}
         if isinstance(profile, dict):
+            if not profile.get("target_has_profile"):
+                return None
             return profile.get("name")
         return None
 

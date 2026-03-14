@@ -173,7 +173,7 @@ Adversary success varies ~6× across scenarios (12.3% for `automation_decision` 
 ├── src/
 │   ├── runner.py                # Experiment orchestration and turn-taking
 │   ├── client.py                # Multi-provider LLM API client
-│   ├── profiles.py              # BFI-2 / VIA profile dataclasses
+│   ├── profiles.py              # Generated five-factor profile utilities
 │   ├── agents/
 │   │   ├── adversary.py         # Adversary agent (hidden goal + dossier)
 │   │   ├── benign_agent.py      # Benign control agent
@@ -227,20 +227,21 @@ OPENROUTER_API_KEY=sk-or-...
 
 ```bash
 # Basic adversary vs target with warden
-python main.py --scenario file_access_password --profile compliant
+python main.py --scenario file_access_password --target-profiles yes
 
 # Full factorial: both requester types × warden conditions
-python main.py --requester-type both --warden both --profile compliant
+python main.py --requester-type both --warden both --target-profiles yes
 
-# With behavioral dossier
-python main.py --adversary-data-access access --dossier-variant 1 --profile idealistic
+# Share the same generated profile with target, adversary, and warden
+python main.py --target-profiles yes --adversary-profile-access yes \
+  --warden-profile-access yes --profile-seed 42
 
 # Capability asymmetry: specify warden tier
 python main.py --warden-model meta-llama/llama-3.3-70b-instruct:free \
   --target-model google/gemma-3-27b-it:free
 
-# Available profile keys match the YAML filenames in prompts/profiles/
-ls prompts/profiles
+# Profiles are generated on the fly; reuse a seed for reproducible rounds
+python main.py --target-profiles yes --profile-seed 123
 
 # Analyze results
 python -m analysis.metrics --tag my_experiment
