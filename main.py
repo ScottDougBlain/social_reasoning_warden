@@ -11,20 +11,15 @@ from src.client import supports_native_reasoning
 from src.profiles import assign_profiles_to_seats, list_profiles, load_profile
 from src.runner import run_experiment, run_multi_target_experiment
 from src.scenarios.base import MultiTargetScenario
-from src.scenarios.train import (
+from src.scenarios.experimental import (
     AIContainmentBoardScenario,
-    AIContainmentScenario,
     AIMoratoriumScenario,
-    AIOverrideScenario,
     AIOversightScenario,
     AIRaceScenario,
     AITreatyScenario,
-    AutomationDecisionScenario,
     AutonomousWeaponsScenario,
     BiasInDeploymentScenario,
     BoardAcquisitionScenario,
-    ProductLaunchScenario,
-    CodingAgentScenario,
     CompartmentalizedReviewScenario,
     ConcentrationOfPowerScenario,
     DeceptiveAlignmentScenario,
@@ -32,35 +27,51 @@ from src.scenarios.train import (
     DisinformationScenario,
     DualUseBiosecurityScenario,
     EmergencyShutdownScenario,
-    FileAccessPasswordScenario,
-    FileAccessScenario,
-    HiringScenario,
     KillSwitchScenario,
     MedicalAIScenario,
-    ModelReleaseScenario,
     OpenWeightsScenario,
     RegulatoryCaptureScenario,
     SafetyBudgetScenario,
     SafetyCoalitionScenario,
     SurveillanceScenario,
+)
+from src.scenarios.test import (
+    AIContainmentScenario,
+    AIOverrideScenario,
+    AutomationDecisionScenario,
+    CodingAgentScenario,
+    FileAccessPasswordScenario,
+    FileAccessScenario,
+    HiringScenario,
+    ModelReleaseScenario,
+    ProductLaunchScenario,
     UpsellingScenario,
     VoteScenario,
 )
 
-TRAIN_SCENARIOS = {
+TRAIN_SCENARIOS = {}
+TEST_SCENARIOS = {
     "ai_containment": AIContainmentScenario,
+    "ai_override": AIOverrideScenario,
+    "automation_decision": AutomationDecisionScenario,
+    "coding_agent": CodingAgentScenario,
+    "file_access": FileAccessScenario,
+    "file_access_password": FileAccessPasswordScenario,
+    "hiring": HiringScenario,
+    "model_release": ModelReleaseScenario,
+    "product_launch": ProductLaunchScenario,
+    "upselling": UpsellingScenario,
+    "vote": VoteScenario,
+}
+EXPERIMENTAL_SCENARIOS = {
     "ai_containment_board_mas": AIContainmentBoardScenario,
     "ai_moratorium_mas": AIMoratoriumScenario,
     "ai_race_mas": AIRaceScenario,
     "ai_treaty_mas": AITreatyScenario,
     "ai_oversight_mas": AIOversightScenario,
-    "ai_override": AIOverrideScenario,
-    "automation_decision": AutomationDecisionScenario,
     "autonomous_weapons_mas": AutonomousWeaponsScenario,
     "bias_in_deployment_mas": BiasInDeploymentScenario,
     "board_acquisition_mas": BoardAcquisitionScenario,
-    "product_launch": ProductLaunchScenario,
-    "coding_agent": CodingAgentScenario,
     "compartmentalized_review_mas": CompartmentalizedReviewScenario,
     "concentration_of_power_mas": ConcentrationOfPowerScenario,
     "deceptive_alignment_mas": DeceptiveAlignmentScenario,
@@ -68,23 +79,16 @@ TRAIN_SCENARIOS = {
     "disinformation_mas": DisinformationScenario,
     "dual_use_biosecurity_mas": DualUseBiosecurityScenario,
     "emergency_shutdown_mas": EmergencyShutdownScenario,
-    "file_access": FileAccessScenario,
-    "file_access_password": FileAccessPasswordScenario,
-    "hiring": HiringScenario,
     "kill_switch_mas": KillSwitchScenario,
     "medical_ai_mas": MedicalAIScenario,
-    "model_release": ModelReleaseScenario,
     "open_weights_mas": OpenWeightsScenario,
     "regulatory_capture_mas": RegulatoryCaptureScenario,
     "safety_budget_mas": SafetyBudgetScenario,
     "safety_coalition_mas": SafetyCoalitionScenario,
     "surveillance_mas": SurveillanceScenario,
-    "upselling": UpsellingScenario,
-    "vote": VoteScenario,
 }
-TEST_SCENARIOS = {}
-SCENARIOS = {**TRAIN_SCENARIOS, **TEST_SCENARIOS}
-SCENARIO_GROUP_SELECTORS = ("all_train", "all_test")
+SCENARIOS = {**TRAIN_SCENARIOS, **TEST_SCENARIOS, **EXPERIMENTAL_SCENARIOS}
+SCENARIO_GROUP_SELECTORS = ("all_train", "all_test", "all_experimental")
 WARDEN_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "warden"
 DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system_1.yaml"
 ADVERSARY_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "adversary"
@@ -117,6 +121,9 @@ def _expand_scenario_selection(selected: list[str]) -> list[str]:
             continue
         if scenario_name == "all_test":
             expanded.extend(sorted(TEST_SCENARIOS.keys()))
+            continue
+        if scenario_name == "all_experimental":
+            expanded.extend(sorted(EXPERIMENTAL_SCENARIOS.keys()))
             continue
         expanded.append(scenario_name)
 
@@ -193,7 +200,7 @@ def main():
         default=["file_access_password"],
         help=(
             "Scenario(s) to run (default: file_access_password). Space-separated list. "
-            "Use all_train or all_test to run full train/test sets."
+            "Use all_train, all_test, or all_experimental to run full scenario sets."
         ),
     )
     parser.add_argument(
@@ -420,8 +427,7 @@ def main():
     args.scenario = _expand_scenario_selection(args.scenario)
     if not args.scenario:
         parser.error(
-            "--scenario selection expanded to zero scenarios "
-            "(e.g. all_test selected but no test scenarios are registered)."
+            "--scenario selection expanded to zero scenarios."
         )
 
     # Parse model lists
