@@ -65,8 +65,8 @@ python main.py --requester-type both --warden both --profile compliant \
 python main.py --requester-model arcee-ai/trinity-large-preview:free \
   --target-model arcee-ai/trinity-mini:free
 
-# List profiles
-python main.py --list-profiles
+# Available profile keys match the YAML filenames in prompts/profiles/
+ls prompts/profiles
 ```
 
 ### Key CLI Flags

@@ -360,6 +360,9 @@ def main():
             "run skeptical and non-skeptical conditions."
         ),
     )
+
+    ############# PERSONALIZATION / PROFILING ARGUMENTS #############
+    
     parser.add_argument(
         "--dossier-variant",
         type=int,
@@ -368,13 +371,12 @@ def main():
         help="Dossier variant to use (1, 2, or 3). Omit for random selection.",
     )
 
-    # Profile arguments
     profile_group = parser.add_argument_group("profiling options")
     profile_group.add_argument(
         "--profile",
         type=str,
         metavar="NAME",
-        help="Use a specific profile by name (see --list-profiles); if not specified, no profile is used",
+        help="Use a specific profile by name; if not specified, no profile is used",
     )
     profile_group.add_argument(
         "--random-profile",
@@ -399,12 +401,6 @@ def main():
             "Requires a profile when access is enabled."
         ),
     )
-    profile_group.add_argument(
-        "--list-profiles",
-        action="store_true",
-        help="List available profiles and exit",
-    )
-
     parser.add_argument(
         "-y", "--yes",
         action="store_true",
@@ -412,17 +408,6 @@ def main():
     )
 
     args = parser.parse_args()
-
-    # Handle --list-profiles
-    if args.list_profiles:
-        profiles = list_profiles()
-        if profiles:
-            print("Available profiles:")
-            for name in sorted(profiles):
-                print(f"  - {name}")
-        else:
-            print("No profiles found in prompts/profiles/")
-        return
 
     args.scenario = _expand_scenario_selection(args.scenario)
     if not args.scenario:

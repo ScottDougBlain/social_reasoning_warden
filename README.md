@@ -239,8 +239,8 @@ python main.py --adversary-data-access access --dossier-variant 1 --profile idea
 python main.py --warden-model meta-llama/llama-3.3-70b-instruct:free \
   --target-model google/gemma-3-27b-it:free
 
-# List available profiles
-python main.py --list-profiles
+# Available profile keys match the YAML filenames in prompts/profiles/
+ls prompts/profiles
 
 # Analyze results
 python -m analysis.metrics --tag my_experiment
