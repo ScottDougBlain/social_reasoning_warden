@@ -374,10 +374,10 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path, use_raw: bool =
     ax.set_xlabel("Warden Capability Tier")
     ax.set_ylabel("Adversary Success Rate (%)")
     ax.set_title(f"Warden Capability Asymmetry\n({ci_label}, OR any-warden vs. none = {or_overall:.3f})")
-    ax.set_ylim(0, 65)
+    ax.set_ylim(0, 80)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
-        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
+        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=8)
 
     sns.despine()
     fig.tight_layout()
@@ -789,8 +789,10 @@ def fig_profile_vulnerability(data: list[dict], output_dir: Path, use_raw: bool 
                edgecolor="black", linewidth=0.5)
 
         for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
-            ax.text(x[i] + offset, h + 2, f"{r:.1f}%\nn={n}",
-                    ha="center", fontsize=8)
+            ax.text(x[i] + offset, h + 2.5, f"{r:.1f}%",
+                    ha="center", fontsize=8, fontweight="bold")
+            ax.text(x[i] + offset, h + 7, f"n={n}",
+                    ha="center", fontsize=7, color="0.35")
 
     ax.set_xticks(x)
     ax.set_xticklabels(profile_order, fontsize=9)
@@ -798,7 +800,7 @@ def fig_profile_vulnerability(data: list[dict], output_dir: Path, use_raw: bool 
     ax.set_ylabel("Adversary Success Rate (%)")
     ax.set_title(f"Profile Vulnerability × Warden ({ci_label})\n"
                  "(pooled across studies, adversary only)")
-    ax.set_ylim(0, 80)
+    ax.set_ylim(0, 90)
     ax.legend(loc="upper right", framealpha=0.9)
 
     sns.despine()
@@ -892,7 +894,152 @@ def fig_model_roles(data: list[dict], output_dir: Path, use_raw: bool = False):
     _save_fig(fig, output_dir, "fig9_model_roles")
 
 
-# ── Figure 10: Scenario × Profile Heatmap ────────────────────────────────
+# ── Figure 10: Warden Intelligence Scatter ────────────────────────────────
+
+# Map short warden model names to AI Intelligence Index scores.
+# Sourced from Lennart's MODEL_TO_AI_INDEX (metrics.py) and extended for
+# additional models using approximate capability rankings.
+_WARDEN_AI_INDEX = {
+    # Gemma family (small → large)
+    "gemma-3-4b-it": 6,
+    "gemma-3-12b-it": 9,
+    "gemma-3-27b-it": 10,
+    # Gemini family
+    "gemini-2.5-flash-lite": 22,
+    "gemini-2.5-flash": 35,
+    "gemini-3-flash-preview": 40,
+    # Llama family
+    "llama-3.1-70b-instruct": 12,
+    "llama-4-scout": 14,
+    "llama-4-maverick": 18,
+    # Mistral family
+    "mistral-small-3.1-24b-instruct": 14,
+    "mistral-medium-3.1": 20,
+    "mistral-large-2512": 28,
+    # Claude family
+    "claude-haiku-4-5": 30,
+    "claude-haiku-4.5": 30,
+    "claude-sonnet-4": 50,
+    # OpenAI
+    "gpt-4o": 45,
+}
+
+
+def fig_warden_intelligence(data: list[dict], output_dir: Path, use_raw: bool = False):
+    """Scatter: warden score vs AI intelligence index.
+
+    For models with both adversary and benign data, the score is the combined
+    metric ((1 − adversary SR) + benign SR) / 2.  For models with adversary
+    data only, the score is simply (1 − adversary SR).  Both are marked with
+    different markers so the reader can distinguish.
+    """
+    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
+    warden_data = [d for d in data if d["tag"] in main_tags and d["has_warden"]
+                   and d["warden_model"] in _WARDEN_AI_INDEX]
+    if not warden_data:
+        print("  [skip] No warden data with AI index scores")
+        return
+
+    # Try emmeans for adversary SR by warden model
+    em = None if use_raw else _load_emmeans("fig9_model_roles")
+    em_warden = {}
+    if em:
+        for e in em:
+            if e["role"] == "warden":
+                short = e["model"].split("/")[-1].split(":")[0]
+                em_warden[short] = e
+
+    # Aggregate by warden model
+    by_warden: dict[str, dict] = {}
+    for d in warden_data:
+        wm = d["warden_model"]
+        if wm not in by_warden:
+            by_warden[wm] = {"adv": [], "ben": []}
+        if d["requester_type"] == "adversary":
+            by_warden[wm]["adv"].append(d)
+        elif d["requester_type"] == "benign_agent":
+            by_warden[wm]["ben"].append(d)
+
+    points = []
+    for wm, groups in by_warden.items():
+        if not groups["adv"]:
+            continue
+        ai_idx = _WARDEN_AI_INDEX[wm]
+
+        # Adversary SR (use emmeans if available)
+        e = em_warden.get(wm)
+        if e:
+            adv_sr = e["prob"]
+        else:
+            adv_sr = sum(1 for d in groups["adv"]
+                         if d["decision"] == "requester_success") / len(groups["adv"])
+
+        has_ben = len(groups["ben"]) >= 5
+        if has_ben:
+            ben_sr = sum(1 for d in groups["ben"]
+                         if d["decision"] == "requester_success") / len(groups["ben"])
+            score = ((1 - adv_sr) + ben_sr) / 2
+        else:
+            ben_sr = None
+            score = 1 - adv_sr
+
+        n_total = len(groups["adv"]) + len(groups["ben"])
+        points.append((wm, ai_idx, score, adv_sr, ben_sr, n_total, has_ben))
+
+    if not points:
+        print("  [skip] No warden models with adversary data")
+        return
+
+    ci_label = "GLME-adjusted adversary SR" if em_warden else "raw"
+
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+
+    # Split into combined-score vs adversary-only for different markers
+    pts_combined = [p for p in points if p[6]]
+    pts_adv_only = [p for p in points if not p[6]]
+
+    if pts_combined:
+        ax.scatter([p[1] for p in pts_combined],
+                   [p[2] * 100 for p in pts_combined],
+                   s=90, color=PALETTE[0], edgecolors="white", linewidth=0.8,
+                   zorder=3, label="Combined score")
+    if pts_adv_only:
+        ax.scatter([p[1] for p in pts_adv_only],
+                   [p[2] * 100 for p in pts_adv_only],
+                   s=70, color=PALETTE[1], edgecolors="white", linewidth=0.8,
+                   marker="D", zorder=3, label="Adversary suppression only")
+
+    # Label each point with adjustable text to reduce overlap
+    all_pts = sorted(points, key=lambda p: (p[1], -p[2]))
+    for i, (label, x, y_raw, *_rest) in enumerate(all_pts):
+        y = y_raw * 100
+        offset = 8 if i % 2 == 0 else -10
+        va = "bottom" if i % 2 == 0 else "top"
+        ax.annotate(label, (x, y), textcoords="offset points",
+                    xytext=(5, offset), ha="left", va=va,
+                    fontsize=7.5, color="0.3")
+
+    xs = [p[1] for p in points]
+    ys = [p[2] * 100 for p in points]
+    y_min = max(0, min(ys) - 5)
+    ax.set_ylim(y_min, 100)
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.set_xlabel("Model Intelligence Index Score")
+    ax.set_ylabel("Warden Score (%)")
+    ax.set_title(f"Warden Effectiveness vs. Model Intelligence ({ci_label})")
+
+    ax.set_xticks(sorted(set(xs)))
+    x_span = max(xs) - min(xs)
+    x_pad = max(2, x_span * 0.10)
+    ax.set_xlim(min(xs) - x_pad, max(xs) + x_pad * 1.5)
+
+    ax.legend(loc="lower right", fontsize=8, framealpha=0.9)
+    sns.despine()
+    fig.tight_layout()
+    _save_fig(fig, output_dir, "fig10_warden_intelligence")
+
+
+# ── (Legacy) Figure 10: Scenario × Profile Heatmap ───────────────────────
 
 
 def fig_scenario_profile_heatmap(data: list[dict], output_dir: Path, use_raw: bool = False):
@@ -1019,7 +1166,7 @@ def main():
     fig_warden_fp(data, output_dir)
     fig_profile_vulnerability(data, output_dir, use_raw=use_raw)
     fig_model_roles(data, output_dir, use_raw=use_raw)
-    fig_scenario_profile_heatmap(data, output_dir, use_raw=use_raw)
+    fig_warden_intelligence(data, output_dir, use_raw=use_raw)
 
     print(f"\nAll figures saved to {output_dir}/")
 

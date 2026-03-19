@@ -86,10 +86,10 @@ ax_title.text(0.5, 0.10,
 # BODY — 6 rows x 2 columns with custom heights
 # ==========================================
 body = gridspec.GridSpecFromSubplotSpec(
-    7, 2,
+    6, 2,
     subplot_spec=outer[2],
-    height_ratios=[1.0, 1.05, 0.85, 0.85, 0.85, 1.05, 0.92],
-    hspace=0.12, wspace=0.04
+    height_ratios=[1.0, 1.05, 0.88, 0.88, 1.0, 1.05],
+    hspace=0.13, wspace=0.04
 )
 
 
@@ -216,45 +216,33 @@ make_figure_ax(body[3, 1],
                os.path.join(FIG_DIR, "fig4_skeptical_ablation.png"),
                "Fig 4.  Prompt-based skepticism: comparable suppression, 3\u00d7 lower FP cost")
 
-# ---------- Row 4: Model Roles + Scenario×Profile Heatmap ----------
+# ---------- Row 4: Profile vulnerability + Warden Intelligence ----------
 make_figure_ax(body[4, 0],
-               os.path.join(FIG_DIR, "fig9_model_roles.png"),
-               "Fig 6.  Adversary success varies by model role (requester, target, warden)")
-
-make_figure_ax(body[4, 1],
-               os.path.join(FIG_DIR, "fig10_scenario_profile_heatmap.png"),
-               "Fig 7.  Scenario × profile interaction reveals heterogeneous vulnerability")
-
-# ---------- Row 5: Profile vulnerability + Key Findings ----------
-make_figure_ax(body[5, 0],
-               os.path.join(FIG_DIR, "fig_profile_vulnerability.png"),
+               os.path.join(FIG_DIR, "fig8_profile_vulnerability.png"),
                "Fig 5.  Warden benefit greatest for most vulnerable profiles")
 
-make_text_ax(body[5, 1], "Key Findings", (
+make_figure_ax(body[4, 1],
+               os.path.join(FIG_DIR, "fig10_warden_intelligence.png"),
+               "Fig 6.  Warden effectiveness scales with model intelligence")
+
+# ---------- Row 5: Key Findings + Conclusions/Next Steps ----------
+make_text_ax(body[5, 0], "Key Findings & Conclusions", (
     "1.  Adversarial LLMs succeed ~52% undefended;\n"
-    "    6\u00d7 variation across scenarios (12\u201376%)\n\n"
+    "    6\u00d7 variation across scenarios (12\u201376%)\n"
     "2.  Warden reduces adversary SR to ~10%\n"
-    "    (OR = 0.053, p < .001), robust across conditions\n\n"
+    "    (OR = 0.053, p < .001), robust across conditions\n"
     "3.  Dossiers don\u2019t help adversaries (yet) \u2014 models\n"
-    "    can\u2019t spontaneously leverage personal info\n\n"
-    "4.  Even a weak warden cuts success by 62%\n\n"
+    "    can\u2019t spontaneously leverage personal info\n"
+    "4.  Even a weak warden cuts success by 62%\n"
     "5.  Prompt skepticism matches warden effectiveness\n"
-    "    with 3\u00d7 lower false-positive cost"
-), accent=TEAL_DIM, body_fontsize=14)
+    "    with 3\u00d7 lower false-positive cost\n\n"
+    "\u2022  Social reasoning poses a concrete dual-use risk\n"
+    "\u2022  Warden provides scalable oversight, even when weaker\n"
+    "\u2022  Precision\u2013recall tradeoff between prompt-based and\n"
+    "   agent-based defense has practical implications"
+), accent=TEAL_DIM, body_fontsize=12)
 
-# ---------- Row 6: Conclusions + Next Steps ----------
-make_text_ax(body[6, 0], "Conclusions", (
-    "\u2022  Social reasoning poses a concrete dual-use\n"
-    "   risk in LLM-mediated interactions\n\n"
-    "\u2022  A warden agent provides effective, scalable\n"
-    "   oversight even when weaker than the adversary\n\n"
-    "\u2022  Precision\u2013recall tradeoff between prompt-based\n"
-    "   and agent-based defense has practical implications\n\n"
-    "\u2022  Current models cannot exploit personal info in\n"
-    "   multi-turn manipulation \u2014 but frontier models may"
-), body_fontsize=15)
-
-make_text_ax(body[6, 1], "Next Steps", (
+make_text_ax(body[5, 1], "Next Steps", (
     "\u25B6  Frontier model runs (Claude, GPT-4o, Gemini Pro)\n"
     "   Do stronger adversaries overcome the warden?\n\n"
     "\u25B6  Human\u2013AI interaction study (pilot in progress)\n"
@@ -263,7 +251,7 @@ make_text_ax(body[6, 1], "Next Steps", (
     "   Classify persuasion tactics used by adversaries\n\n"
     "\u25B6  Release COAX-Bench evaluation framework\n"
     "   11 scenarios, profiles, modular warden integration"
-), accent=ORANGE, body_fontsize=15)
+), accent=ORANGE, body_fontsize=14)
 
 # ==========================================
 # FOOTER
