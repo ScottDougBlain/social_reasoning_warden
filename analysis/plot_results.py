@@ -7,9 +7,13 @@ Generates key result plots from the three main studies:
   - cap_asym: warden capability tier
   - skeptical_ablation: baseline vs skeptical vs warden × requester type
 
+When emmeans JSON files exist (from extract_emmeans.py), figures use GLME-adjusted
+estimated marginal means with asymptotic CIs. Otherwise falls back to raw Wilson CIs.
+
 Usage:
     python analysis/plot_results.py
     python analysis/plot_results.py --output-dir results/figures
+    python analysis/plot_results.py --raw   # force raw rates even if emmeans exist
 """
 
 from __future__ import annotations
@@ -37,8 +41,31 @@ PALETTE = sns.color_palette("colorblind")
 FIG_DPI = 200
 BAR_WIDTH = 0.35
 
+
+def _save_fig(fig: plt.Figure, output_dir: Path, name: str) -> None:
+    """Save figure as both PDF and PNG."""
+    fig.savefig(output_dir / f"{name}.pdf", dpi=FIG_DPI, bbox_inches="tight")
+    fig.savefig(output_dir / f"{name}.png", dpi=FIG_DPI, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  [saved] {name}.pdf + .png")
+
 # Backward compat: old logs used "chicken" before the rename to "product_launch"
 _SCENARIO_ALIASES = {"chicken": "product_launch"}
+
+# ── Emmeans loading ──────────────────────────────────────────────────────
+
+EMMEANS_DIR = Path(__file__).resolve().parents[1] / "results" / "emmeans"
+
+
+def _load_emmeans(name: str) -> list[dict] | None:
+    """Load emmeans JSON if it exists, else return None."""
+    path = EMMEANS_DIR / f"{name}.json"
+    if not path.exists():
+        return None
+    with open(path) as f:
+        data = json.load(f)
+    print(f"  [emmeans] loaded {path.name} ({len(data)} cells)")
+    return data
 
 
 def _wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -122,6 +149,9 @@ def _load_and_flatten(tags: list[str] | None = None) -> list[dict]:
         else:
             tier = "mid"
 
+        target_model = (models.get("target") or "unknown").split("/")[-1].split(":")[0]
+        warden_model = (warden or "none").split("/")[-1].split(":")[0] if warden else "none"
+
         rows.append({
             "decision": decision,
             "requester_type": rt,
@@ -133,6 +163,8 @@ def _load_and_flatten(tags: list[str] | None = None) -> list[dict]:
             "profile": profile.get("name") or "none",
             "model_family": family,
             "req_model": req_short,
+            "target_model": target_model,
+            "warden_model": warden_model,
             "tag": log.get("tag") or "",
         })
     return rows
@@ -141,7 +173,7 @@ def _load_and_flatten(tags: list[str] | None = None) -> list[dict]:
 # ── Figure 1: Warden Effect (dossier_effect study) ──────────────────────
 
 
-def fig_warden_effect(data: list[dict], output_dir: Path):
+def fig_warden_effect(data: list[dict], output_dir: Path, use_raw: bool = False):
     """Bar chart: adversary SR with vs without warden, from dossier_effect."""
     adv = [d for d in data if d["tag"] == "dossier_effect" and d["requester_type"] == "adversary"]
     if not adv:
@@ -150,18 +182,33 @@ def fig_warden_effect(data: list[dict], output_dir: Path):
 
     with_w = [d for d in adv if d["has_warden"]]
     without_w = [d for d in adv if not d["has_warden"]]
+    n_nw = len(without_w)
+    n_w = len(with_w)
 
-    r_w, lo_w, hi_w, n_w = _rate_and_ci(with_w)
-    r_nw, lo_nw, hi_nw, n_nw = _rate_and_ci(without_w)
+    # Try emmeans
+    em = None if use_raw else _load_emmeans("fig1_warden_effect")
+
+    if em:
+        em_by_w = {int(e["has_warden"]): e for e in em}
+        r_nw = em_by_w[0]["prob"]
+        lo_nw = em_by_w[0]["asymp.LCL"]
+        hi_nw = em_by_w[0]["asymp.UCL"]
+        r_w = em_by_w[1]["prob"]
+        lo_w = em_by_w[1]["asymp.LCL"]
+        hi_w = em_by_w[1]["asymp.UCL"]
+        ci_label = "GLME-adjusted"
+    else:
+        r_nw, lo_nw, hi_nw, _ = _rate_and_ci(without_w)
+        r_w, lo_w, hi_w, _ = _rate_and_ci(with_w)
+        ci_label = "raw"
 
     fig, ax = plt.subplots(figsize=(5, 5))
-    bars = ax.bar(
+
+    # Asymmetric error bars
+    ax.bar(
         [0, 1], [r_nw * 100, r_w * 100],
-        yerr=[(r_nw - lo_nw) * 100, (r_w - lo_w) * 100],
-        error_kw=dict(capsize=6, capthick=1.5, elinewidth=1.5),
         color=[PALETTE[0], PALETTE[1]], width=0.55, edgecolor="black", linewidth=0.5,
     )
-    # Asymmetric error bars
     ax.errorbar(
         [0, 1], [r_nw * 100, r_w * 100],
         yerr=[[(r_nw - lo_nw) * 100, (r_w - lo_w) * 100],
@@ -174,7 +221,7 @@ def fig_warden_effect(data: list[dict], output_dir: Path):
     ax.set_xticks([0, 1])
     ax.set_xticklabels(["No Warden", "With Warden"])
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title(f"Warden Effect on Adversary Success\n(raw OR = {or_val:.3f})")
+    ax.set_title(f"Warden Effect on Adversary Success\n({ci_label}, OR = {or_val:.3f})")
     ax.set_ylim(0, 70)
 
     for i, (r, hi, n) in enumerate([(r_nw, hi_nw, n_nw), (r_w, hi_w, n_w)]):
@@ -182,15 +229,13 @@ def fig_warden_effect(data: list[dict], output_dir: Path):
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig1_warden_effect.pdf", dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig1_warden_effect.pdf")
+    _save_fig(fig, output_dir, "fig1_warden_effect")
 
 
 # ── Figure 2: Dossier Effect (2×2 interaction) ──────────────────────────
 
 
-def fig_dossier_effect(data: list[dict], output_dir: Path):
+def fig_dossier_effect(data: list[dict], output_dir: Path, use_raw: bool = False):
     """Grouped bar: dossier × warden interaction, adversary only."""
     adv = [d for d in data if d["tag"] == "dossier_effect" and d["requester_type"] == "adversary"]
     if not adv:
@@ -204,15 +249,38 @@ def fig_dossier_effect(data: list[dict], output_dir: Path):
         ("Dossier\nWith Warden", lambda d: d["has_dossier"] and d["has_warden"]),
     ]
 
+    # Map emmeans cells to condition order: (dossier, warden) -> index
+    em_key_order = [(0, 0), (1, 0), (0, 1), (1, 1)]
+
+    em = None if use_raw else _load_emmeans("fig2_dossier_interaction")
+
     rates, los, his, hi_abs, ns = [], [], [], [], []
-    for label, filt in conditions:
-        subset = [d for d in adv if filt(d)]
-        r, lo, hi, n = _rate_and_ci(subset)
-        rates.append(r * 100)
-        los.append((r - lo) * 100)
-        his.append((hi - r) * 100)
-        hi_abs.append(hi * 100)
-        ns.append(n)
+    if em:
+        em_lookup = {(int(e["has_dossier"]), int(e["has_warden"])): e for e in em}
+        for i, (label, filt) in enumerate(conditions):
+            subset = [d for d in adv if filt(d)]
+            dk, wk = em_key_order[i]
+            e = em_lookup.get((dk, wk))
+            if e:
+                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+            else:
+                r, lo, hi, _ = _rate_and_ci(subset)
+            rates.append(r * 100)
+            los.append((r - lo) * 100)
+            his.append((hi - r) * 100)
+            hi_abs.append(hi * 100)
+            ns.append(len(subset))
+        ci_label = "GLME-adjusted"
+    else:
+        for label, filt in conditions:
+            subset = [d for d in adv if filt(d)]
+            r, lo, hi, n = _rate_and_ci(subset)
+            rates.append(r * 100)
+            los.append((r - lo) * 100)
+            his.append((hi - r) * 100)
+            hi_abs.append(hi * 100)
+            ns.append(n)
+        ci_label = "raw"
 
     fig, ax = plt.subplots(figsize=(7, 5))
     colors = [PALETTE[0], PALETTE[0], PALETTE[1], PALETTE[1]]
@@ -225,7 +293,7 @@ def fig_dossier_effect(data: list[dict], output_dir: Path):
     for bar, hatch in zip(bars, hatches):
         bar.set_hatch(hatch)
 
-    # Compute raw ORs
+    # Compute raw ORs (always from data, for reference)
     dossier_yes = [d for d in adv if d["has_dossier"]]
     dossier_no = [d for d in adv if not d["has_dossier"]]
     or_dossier = _raw_odds_ratio(dossier_yes, dossier_no)
@@ -236,7 +304,7 @@ def fig_dossier_effect(data: list[dict], output_dir: Path):
     ax.set_xticks(x)
     ax.set_xticklabels([c[0] for c in conditions], fontsize=9)
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title(f"Dossier × Warden Interaction\n(raw OR: dossier = {or_dossier:.2f}, warden = {or_warden:.3f})")
+    ax.set_title(f"Dossier × Warden Interaction\n({ci_label} OR: dossier = {or_dossier:.2f}, warden = {or_warden:.3f})")
     ax.set_ylim(0, 70)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
@@ -244,15 +312,13 @@ def fig_dossier_effect(data: list[dict], output_dir: Path):
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig2_dossier_interaction.pdf", dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig2_dossier_interaction.pdf")
+    _save_fig(fig, output_dir, "fig2_dossier_interaction")
 
 
 # ── Figure 3: Capability Asymmetry (warden tier) ────────────────────────
 
 
-def fig_capability_asymmetry(data: list[dict], output_dir: Path):
+def fig_capability_asymmetry(data: list[dict], output_dir: Path, use_raw: bool = False):
     """Bar chart: adversary SR by warden tier (none/weak/mid/strong)."""
     adv = [d for d in data if d["tag"] == "cap_asym" and d["requester_type"] == "adversary"]
     if not adv:
@@ -262,15 +328,34 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path):
     tiers = ["none", "weak", "mid", "strong"]
     tier_labels = ["None", "Weak\n(= target)", "Mid", "Strong\n(= adversary)"]
 
+    em = None if use_raw else _load_emmeans("fig3_capability_asymmetry")
+
     rates, los, his, hi_abs, ns = [], [], [], [], []
-    for tier in tiers:
-        subset = [d for d in adv if d["warden_tier"] == tier]
-        r, lo, hi, n = _rate_and_ci(subset)
-        rates.append(r * 100)
-        los.append((r - lo) * 100)
-        his.append((hi - r) * 100)
-        hi_abs.append(hi * 100)
-        ns.append(n)
+    if em:
+        em_lookup = {e["warden_tier"]: e for e in em}
+        for tier in tiers:
+            subset = [d for d in adv if d["warden_tier"] == tier]
+            e = em_lookup.get(tier)
+            if e:
+                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+            else:
+                r, lo, hi, _ = _rate_and_ci(subset)
+            rates.append(r * 100)
+            los.append((r - lo) * 100)
+            his.append((hi - r) * 100)
+            hi_abs.append(hi * 100)
+            ns.append(len(subset))
+        ci_label = "GLME-adjusted"
+    else:
+        for tier in tiers:
+            subset = [d for d in adv if d["warden_tier"] == tier]
+            r, lo, hi, n = _rate_and_ci(subset)
+            rates.append(r * 100)
+            los.append((r - lo) * 100)
+            his.append((hi - r) * 100)
+            hi_abs.append(hi * 100)
+            ns.append(n)
+        ci_label = "raw"
 
     fig, ax = plt.subplots(figsize=(6, 5))
     x = np.arange(4)
@@ -288,7 +373,7 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path):
     ax.set_xticklabels(tier_labels, fontsize=9)
     ax.set_xlabel("Warden Capability Tier")
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title(f"Warden Capability Asymmetry\n(raw OR any-warden vs. none = {or_overall:.3f})")
+    ax.set_title(f"Warden Capability Asymmetry\n({ci_label}, OR any-warden vs. none = {or_overall:.3f})")
     ax.set_ylim(0, 65)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
@@ -296,15 +381,13 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path):
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig3_capability_asymmetry.pdf", dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig3_capability_asymmetry.pdf")
+    _save_fig(fig, output_dir, "fig3_capability_asymmetry")
 
 
 # ── Figure 4: Skeptical Ablation (3 conditions × 2 requester types) ─────
 
 
-def fig_skeptical_ablation(data: list[dict], output_dir: Path):
+def fig_skeptical_ablation(data: list[dict], output_dir: Path, use_raw: bool = False):
     """Grouped bar: defense condition × requester type."""
     skep = [d for d in data if d["tag"] == "skeptical_ablation"]
     if not skep:
@@ -324,9 +407,17 @@ def fig_skeptical_ablation(data: list[dict], output_dir: Path):
     conditions = ["baseline", "skeptical", "warden"]
     cond_labels = ["Baseline\n(no defense)", "Skeptical\n(prompt)", "Warden\n(agent)"]
 
+    em = None if use_raw else _load_emmeans("fig4_skeptical_ablation")
+    em_lookup = {}
+    if em:
+        for e in em:
+            em_lookup[(e["defense"], e["requester_type"])] = e
+
     fig, ax = plt.subplots(figsize=(7, 5.5))
     x = np.arange(len(conditions))
     width = 0.32
+
+    ci_label = "GLME-adjusted" if em else "raw"
 
     for j, (rt, rt_label, color) in enumerate([
         ("adversary", "Adversary", PALETTE[3]),
@@ -335,7 +426,12 @@ def fig_skeptical_ablation(data: list[dict], output_dir: Path):
         rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
         for cond in conditions:
             subset = [d for d in skep if d["requester_type"] == rt and _cond(d) == cond]
-            r, lo, hi, n = _rate_and_ci(subset)
+            e = em_lookup.get((cond, rt))
+            if e:
+                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+                n = len(subset)
+            else:
+                r, lo, hi, n = _rate_and_ci(subset)
             rates.append(r * 100)
             err_lo.append((r - lo) * 100)
             err_hi.append((hi - r) * 100)
@@ -354,21 +450,20 @@ def fig_skeptical_ablation(data: list[dict], output_dir: Path):
     ax.set_xticks(x)
     ax.set_xticklabels(cond_labels, fontsize=9)
     ax.set_ylabel("Success Rate (%)")
-    ax.set_title("Defense Mechanism Comparison\n(Adversary suppression vs. benign false positive cost)")
+    ax.set_title(f"Defense Mechanism Comparison ({ci_label})\n"
+                 "(Adversary suppression vs. benign false positive cost)")
     ax.set_ylim(0, 110)
     ax.legend(loc="upper right", framealpha=0.9)
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig4_skeptical_ablation.pdf", dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig4_skeptical_ablation.pdf")
+    _save_fig(fig, output_dir, "fig4_skeptical_ablation")
 
 
 # ── Figure 5: Adversary SR by Model Family ───────────────────────────────
 
 
-def fig_model_family(data: list[dict], output_dir: Path):
+def fig_model_family(data: list[dict], output_dir: Path, use_raw: bool = False):
     """Bar chart: adversary SR by model family (pooled across main studies)."""
     main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     adv = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "adversary"
@@ -381,18 +476,27 @@ def fig_model_family(data: list[dict], output_dir: Path):
     for d in adv:
         families[d["model_family"]].append(d)
 
-    # Sort by success rate
+    em = None if use_raw else _load_emmeans("fig5_model_family")
+    em_lookup = {e["model_family"]: e for e in em} if em else {}
+
+    # Sort by success rate (use emmeans rate if available)
     family_data = []
     for fam, items in families.items():
         if len(items) < 10:
             continue
-        r, lo, hi, n = _rate_and_ci(items)
-        family_data.append((fam, r, lo, hi, n))
+        e = em_lookup.get(fam)
+        if e:
+            r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+        else:
+            r, lo, hi, _ = _rate_and_ci(items)
+        family_data.append((fam, r, lo, hi, len(items)))
     family_data.sort(key=lambda x: -x[1])
 
     if not family_data:
         print("  [skip] Not enough data for model family plot")
         return
+
+    ci_label = "GLME-adjusted" if em else "raw"
 
     fig, ax = plt.subplots(figsize=(7, 5))
     fams = [f[0] for f in family_data]
@@ -411,7 +515,8 @@ def fig_model_family(data: list[dict], output_dir: Path):
     ax.set_xticklabels(fams, fontsize=10)
     ax.set_xlabel("Adversary Model Family")
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title("Adversary Effectiveness by Model Family\n(no warden, pooled across studies)")
+    ax.set_title(f"Adversary Effectiveness by Model Family ({ci_label})\n"
+                 "(no warden, pooled across studies)")
     ax.set_ylim(0, 80)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
@@ -419,9 +524,7 @@ def fig_model_family(data: list[dict], output_dir: Path):
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig5_model_family.pdf", dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig5_model_family.pdf")
+    _save_fig(fig, output_dir, "fig5_model_family")
 
 
 # ── Figure 6: Adversary SR by Scenario ───────────────────────────────────
@@ -476,9 +579,7 @@ def fig_scenario_variation(data: list[dict], output_dir: Path):
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig6_scenario_variation.pdf", dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig6_scenario_variation.pdf")
+    _save_fig(fig, output_dir, "fig6_scenario_variation")
 
 
 # ── Figure 7: Warden FP by Scenario ─────────────────────────────────────
@@ -531,21 +632,27 @@ def fig_warden_fp(data: list[dict], output_dir: Path):
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig7_warden_fp_by_scenario.pdf", dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig7_warden_fp_by_scenario.pdf")
+    _save_fig(fig, output_dir, "fig7_warden_fp_by_scenario")
 
 
 # ── Figure 0: Warden Effect — Adversary vs Benign (pooled) ────────────────
 
 
-def fig_warden_effect_both(data: list[dict], output_dir: Path):
+def fig_warden_effect_both(data: list[dict], output_dir: Path, use_raw: bool = False):
     """Grouped bar: warden effect on adversary AND benign agent success."""
     main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     main = [d for d in data if d["tag"] in main_tags]
     if not main:
         print("  [skip] No main study data for warden effect (both)")
         return
+
+    em = None if use_raw else _load_emmeans("fig0_warden_effect_both")
+    em_lookup = {}
+    if em:
+        for e in em:
+            em_lookup[(e["requester_type"], int(e["has_warden"]))] = e
+
+    ci_label = "GLME-adjusted" if em else "raw"
 
     fig, ax = plt.subplots(figsize=(6, 5.5))
     x = np.arange(2)  # No Warden, With Warden
@@ -559,7 +666,12 @@ def fig_warden_effect_both(data: list[dict], output_dir: Path):
         for has_w in [False, True]:
             subset = [d for d in main if d["requester_type"] == rt
                       and d["has_warden"] == has_w]
-            r, lo, hi, n = _rate_and_ci(subset)
+            e = em_lookup.get((rt, int(has_w)))
+            if e:
+                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+                n = len(subset)
+            else:
+                r, lo, hi, n = _rate_and_ci(subset)
             rates.append(r * 100)
             err_lo.append((r - lo) * 100)
             err_hi.append((hi - r) * 100)
@@ -585,23 +697,20 @@ def fig_warden_effect_both(data: list[dict], output_dir: Path):
     ax.set_xticks(x)
     ax.set_xticklabels(["No Warden", "With Warden"], fontsize=10)
     ax.set_ylabel("Success Rate (%)")
-    ax.set_title("Warden Effect: Adversary vs. Benign Agent\n"
-                 f"(adversary raw OR = {or_adv:.3f})")
+    ax.set_title(f"Warden Effect: Adversary vs. Benign Agent ({ci_label})\n"
+                 f"(adversary OR = {or_adv:.3f})")
     ax.set_ylim(0, 115)
     ax.legend(loc="upper right", framealpha=0.9)
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig0_warden_effect_both.pdf",
-                dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig0_warden_effect_both.pdf")
+    _save_fig(fig, output_dir, "fig0_warden_effect_both")
 
 
 # ── Figure 8: Profile Vulnerability × Warden ─────────────────────────────
 
 
-def fig_profile_vulnerability(data: list[dict], output_dir: Path):
+def fig_profile_vulnerability(data: list[dict], output_dir: Path, use_raw: bool = False):
     """Grouped bar: adversary SR by profile × warden condition."""
     main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     adv = [d for d in data if d["tag"] in main_tags
@@ -619,6 +728,13 @@ def fig_profile_vulnerability(data: list[dict], output_dir: Path):
         "Overwhelmed Time-Pressured": "Time\nPressured",
         "Overwhelmed Time-Pressured Worker": "Time\nPressured",
     }
+    # Reverse map: canonical display label -> possible emmeans profile_name values
+    profile_em_map = {
+        "Idealistic": ["Idealistic True Believer"],
+        "Compliant": ["Compliant Agreeable"],
+        "Authority\nDeferential": ["Authority-Deferential Follower", "Authority-Deferential Junior Employee"],
+        "Time\nPressured": ["Overwhelmed Time-Pressured", "Overwhelmed Time-Pressured Worker"],
+    }
     profile_order = ["Idealistic", "Compliant",
                      "Authority\nDeferential", "Time\nPressured"]
 
@@ -628,6 +744,14 @@ def fig_profile_vulnerability(data: list[dict], output_dir: Path):
         label = profile_map.get(d["profile"])
         if label:
             bucketed[(label, d["has_warden"])].append(d)
+
+    em = None if use_raw else _load_emmeans("fig8_profile_vulnerability")
+    em_lookup = {}
+    if em:
+        for e in em:
+            em_lookup[(e["profile_name"], int(e["has_warden"]))] = e
+
+    ci_label = "GLME-adjusted" if em else "raw"
 
     fig, ax = plt.subplots(figsize=(7, 5.5))
     x = np.arange(len(profile_order))
@@ -640,7 +764,18 @@ def fig_profile_vulnerability(data: list[dict], output_dir: Path):
         rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
         for prof in profile_order:
             subset = bucketed.get((prof, has_w), [])
-            r, lo, hi, n = _rate_and_ci(subset)
+            # Try to find emmeans match
+            e = None
+            if em_lookup:
+                for em_name in profile_em_map.get(prof, []):
+                    e = em_lookup.get((em_name, int(has_w)))
+                    if e:
+                        break
+            if e:
+                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+                n = len(subset)
+            else:
+                r, lo, hi, n = _rate_and_ci(subset)
             rates.append(r * 100)
             err_lo.append((r - lo) * 100)
             err_hi.append((hi - r) * 100)
@@ -661,17 +796,174 @@ def fig_profile_vulnerability(data: list[dict], output_dir: Path):
     ax.set_xticklabels(profile_order, fontsize=9)
     ax.set_xlabel("Target Vulnerability Profile")
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title("Profile Vulnerability × Warden\n"
+    ax.set_title(f"Profile Vulnerability × Warden ({ci_label})\n"
                  "(pooled across studies, adversary only)")
     ax.set_ylim(0, 80)
     ax.legend(loc="upper right", framealpha=0.9)
 
     sns.despine()
     fig.tight_layout()
-    fig.savefig(output_dir / "fig8_profile_vulnerability.pdf",
-                dpi=FIG_DPI, bbox_inches="tight")
-    plt.close(fig)
-    print("  [saved] fig8_profile_vulnerability.pdf")
+    _save_fig(fig, output_dir, "fig8_profile_vulnerability")
+
+
+# ── Figure 9: Success Rate by Model Role ─────────────────────────────────
+
+
+def fig_model_roles(data: list[dict], output_dir: Path, use_raw: bool = False):
+    """3-panel bar chart: adversary SR by requester model, target model, warden model."""
+    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
+    adv = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "adversary"]
+    if not adv:
+        print("  [skip] No adversary data for model roles plot")
+        return
+
+    em = None if use_raw else _load_emmeans("fig9_model_roles")
+    em_lookup = {}
+    if em:
+        for e in em:
+            em_lookup[(e["role"], e["model"])] = e
+
+    ci_label = "GLME-adjusted" if em else "raw"
+
+    # Role configs: (role_key, data_field, filter, panel_title)
+    role_configs = [
+        ("requester", "req_model", lambda d: not d["has_warden"],
+         "By Requester Model\n(no warden)"),
+        ("target", "target_model", lambda d: not d["has_warden"],
+         "By Target Model\n(no warden)"),
+        ("warden", "warden_model", lambda d: d["has_warden"],
+         "By Warden Model\n(warden present)"),
+    ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5.5))
+
+    for ax, (role, data_field, filt, title) in zip(axes, role_configs):
+        subset = [d for d in adv if filt(d)]
+
+        # Group by model
+        by_model = defaultdict(list)
+        for d in subset:
+            model_name = d.get(data_field, "unknown")
+            if model_name and model_name != "none":
+                by_model[model_name].append(d)
+
+        # Build bars
+        model_data = []
+        for model_name, items in by_model.items():
+            if len(items) < 5:
+                continue
+            e = em_lookup.get((role, model_name))
+            if e:
+                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+            else:
+                r, lo, hi, _ = _rate_and_ci(items)
+            model_data.append((model_name, r, lo, hi, len(items)))
+        model_data.sort(key=lambda x: -x[1])
+
+        if not model_data:
+            ax.set_visible(False)
+            continue
+
+        names = [m[0] for m in model_data]
+        rates = [m[1] * 100 for m in model_data]
+        err_lo = [(m[1] - m[2]) * 100 for m in model_data]
+        err_hi = [(m[3] - m[1]) * 100 for m in model_data]
+        hi_abs = [m[3] * 100 for m in model_data]
+        ns = [m[4] for m in model_data]
+
+        x = np.arange(len(names))
+        ax.bar(x, rates, yerr=[err_lo, err_hi],
+               error_kw=dict(capsize=4, capthick=1, elinewidth=1),
+               color=PALETTE[:len(names)], width=0.6,
+               edgecolor="black", linewidth=0.5)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(names, fontsize=7, rotation=30, ha="right")
+        ax.set_ylabel("Adversary Success Rate (%)")
+        ax.set_title(title, fontsize=10)
+        ax.set_ylim(0, min(max(hi_abs) + 20, 110))
+
+        for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
+            ax.text(i, h + 1.5, f"{r:.0f}%\nn={n}", ha="center", fontsize=7)
+
+    fig.suptitle(f"Adversary Success by Model Role ({ci_label})", fontsize=13, y=1.02)
+    sns.despine()
+    fig.tight_layout()
+    _save_fig(fig, output_dir, "fig9_model_roles")
+
+
+# ── Figure 10: Scenario × Profile Heatmap ────────────────────────────────
+
+
+def fig_scenario_profile_heatmap(data: list[dict], output_dir: Path, use_raw: bool = False):
+    """Heatmap of adversary SR by scenario × profile."""
+    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
+    adv = [d for d in data if d["tag"] in main_tags
+           and d["requester_type"] == "adversary"
+           and d["profile"] != "none"]
+    if not adv:
+        print("  [skip] No adversary data with profiles for heatmap")
+        return
+
+    em = None if use_raw else _load_emmeans("fig10_scenario_profile_heatmap")
+    em_lookup = {}
+    if em:
+        for e in em:
+            em_lookup[(e["scenario"], e["profile_name"])] = e
+
+    ci_label = "GLME-adjusted" if em else "raw"
+
+    # Collect unique scenarios and profiles
+    scenarios = sorted({d["scenario"] for d in adv})
+    profiles = sorted({d["profile"] for d in adv})
+
+    # Build rate matrix
+    z = np.full((len(scenarios), len(profiles)), np.nan)
+    annotations = [[None] * len(profiles) for _ in range(len(scenarios))]
+
+    for i, sc in enumerate(scenarios):
+        for j, prof in enumerate(profiles):
+            e = em_lookup.get((sc, prof))
+            subset = [d for d in adv if d["scenario"] == sc and d["profile"] == prof]
+            n = len(subset)
+            if e:
+                r = e["prob"]
+            elif n > 0:
+                r = sum(1 for d in subset if d["decision"] == "requester_success") / n
+            else:
+                r = np.nan
+            z[i, j] = r
+            if not np.isnan(r):
+                annotations[i][j] = f"{r:.0%}\nn={n}"
+            else:
+                annotations[i][j] = ""
+
+    fig, ax = plt.subplots(figsize=(max(7, len(profiles) * 1.4 + 2),
+                                     max(5, len(scenarios) * 0.7 + 2)))
+
+    im = ax.imshow(z, cmap="RdYlGn_r", vmin=0, vmax=1, aspect="auto")
+    cbar = fig.colorbar(im, ax=ax, shrink=0.8)
+    cbar.set_label("Adversary Success Rate")
+    cbar.ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1))
+
+    ax.set_xticks(np.arange(len(profiles)))
+    ax.set_yticks(np.arange(len(scenarios)))
+    ax.set_xticklabels(profiles, fontsize=8, rotation=35, ha="right")
+    ax.set_yticklabels(scenarios, fontsize=8)
+    ax.set_xlabel("Target Profile")
+    ax.set_ylabel("Scenario")
+    ax.set_title(f"Adversary Success: Scenario × Profile ({ci_label})")
+
+    # Add text annotations
+    for i in range(len(scenarios)):
+        for j in range(len(profiles)):
+            txt = annotations[i][j]
+            if txt:
+                ax.text(j, i, txt, ha="center", va="center", fontsize=7,
+                        color="white" if z[i, j] > 0.6 else "black")
+
+    fig.tight_layout()
+    _save_fig(fig, output_dir, "fig10_scenario_profile_heatmap")
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -683,12 +975,29 @@ def main():
         "--output-dir", type=str, default="results/figures",
         help="Directory for output PDFs.",
     )
+    parser.add_argument(
+        "--raw", action="store_true",
+        help="Force raw Wilson CIs even if emmeans JSON files exist.",
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Loading all experiment logs...")
+    if args.raw:
+        print("(--raw: using raw Wilson CIs, ignoring emmeans)")
+    else:
+        if EMMEANS_DIR.exists():
+            em_files = list(EMMEANS_DIR.glob("*.json"))
+            print(f"Found {len(em_files)} emmeans JSON files in {EMMEANS_DIR}/")
+            if not em_files:
+                print("  (no emmeans found — will use raw Wilson CIs)")
+                print("  Run `python analysis/extract_emmeans.py` to generate them.")
+        else:
+            print("No emmeans directory found — will use raw Wilson CIs.")
+            print("  Run `python analysis/extract_emmeans.py` to generate GLME-adjusted estimates.")
+
+    print("\nLoading all experiment logs...")
     data = _load_and_flatten()
     print(f"  {len(data)} valid observations loaded")
 
@@ -697,16 +1006,20 @@ def main():
     main_data = [d for d in data if d["tag"] in main_tags]
     print(f"  {len(main_data)} from main studies ({', '.join(main_tags)})")
 
+    use_raw = args.raw
+
     print("\nGenerating figures...")
-    fig_warden_effect_both(data, output_dir)
-    fig_warden_effect(data, output_dir)
-    fig_dossier_effect(data, output_dir)
-    fig_capability_asymmetry(data, output_dir)
-    fig_skeptical_ablation(data, output_dir)
-    fig_model_family(data, output_dir)
+    fig_warden_effect_both(data, output_dir, use_raw=use_raw)
+    fig_warden_effect(data, output_dir, use_raw=use_raw)
+    fig_dossier_effect(data, output_dir, use_raw=use_raw)
+    fig_capability_asymmetry(data, output_dir, use_raw=use_raw)
+    fig_skeptical_ablation(data, output_dir, use_raw=use_raw)
+    fig_model_family(data, output_dir, use_raw=use_raw)
     fig_scenario_variation(data, output_dir)
     fig_warden_fp(data, output_dir)
-    fig_profile_vulnerability(data, output_dir)
+    fig_profile_vulnerability(data, output_dir, use_raw=use_raw)
+    fig_model_roles(data, output_dir, use_raw=use_raw)
+    fig_scenario_profile_heatmap(data, output_dir, use_raw=use_raw)
 
     print(f"\nAll figures saved to {output_dir}/")
 

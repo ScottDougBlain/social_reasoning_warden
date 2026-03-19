@@ -1,0 +1,226 @@
+[
+  {
+    "role": "requester",
+    "model": "anthropic/claude-opus-4",
+    "prob": 0.373077744120666,
+    "asymp.LCL": 0.135895971522369,
+    "asymp.UCL": 0.692478473619539
+  },
+  {
+    "role": "requester",
+    "model": "anthropic/claude-opus-4-6",
+    "prob": 0.708319390672359,
+    "asymp.LCL": 0.466244160111133,
+    "asymp.UCL": 0.870985494337611
+  },
+  {
+    "role": "requester",
+    "model": "anthropic/claude-opus-4.5",
+    "prob": 0.117403775773739,
+    "asymp.LCL": 0.0368079279059246,
+    "asymp.UCL": 0.316488211004099
+  },
+  {
+    "role": "requester",
+    "model": "anthropic/claude-sonnet-4",
+    "prob": 0.79155282885402,
+    "asymp.LCL": 0.463220807767129,
+    "asymp.UCL": 0.943534598846229
+  },
+  {
+    "role": "requester",
+    "model": "google/gemini-3-flash-preview",
+    "prob": 0.796040675670522,
+    "asymp.LCL": 0.707181829972919,
+    "asymp.UCL": 0.86315240587134
+  },
+  {
+    "role": "requester",
+    "model": "google/gemma-3-27b-it",
+    "prob": 0.404023481356743,
+    "asymp.LCL": 0.290449681952241,
+    "asymp.UCL": 0.528903870408934
+  },
+  {
+    "role": "requester",
+    "model": "meta-llama/llama-4-maverick",
+    "prob": 0.383416830426483,
+    "asymp.LCL": 0.271594852280316,
+    "asymp.UCL": 0.509100242122279
+  },
+  {
+    "role": "requester",
+    "model": "mistralai/mistral-large-2512",
+    "prob": 0.368749500538929,
+    "asymp.LCL": 0.259377186511225,
+    "asymp.UCL": 0.493509793033707
+  },
+  {
+    "role": "requester",
+    "model": "openai/gpt-4o",
+    "prob": 0.385845662019774,
+    "asymp.LCL": 0.220576743606054,
+    "asymp.UCL": 0.582413977409433
+  },
+  {
+    "role": "target",
+    "model": "anthropic/claude-3.5-haiku",
+    "prob": 0.321764127151021,
+    "asymp.LCL": 0.156955074104543,
+    "asymp.UCL": 0.547285246690738
+  },
+  {
+    "role": "target",
+    "model": "anthropic/claude-sonnet-4",
+    "prob": 0.560372416771633,
+    "asymp.LCL": 0.212588986360767,
+    "asymp.UCL": 0.857507059982699
+  },
+  {
+    "role": "target",
+    "model": "google/gemini-2.5-flash-lite",
+    "prob": 0.799229711181296,
+    "asymp.LCL": 0.709824448172113,
+    "asymp.UCL": 0.866277945832784
+  },
+  {
+    "role": "target",
+    "model": "google/gemma-3-4b-it",
+    "prob": 0.409333183202452,
+    "asymp.LCL": 0.293435610508691,
+    "asymp.UCL": 0.536263917265357
+  },
+  {
+    "role": "target",
+    "model": "meta-llama/llama-3.1-70b-instruct",
+    "prob": 0.388621205230797,
+    "asymp.LCL": 0.274475377586911,
+    "asymp.UCL": 0.516446616690944
+  },
+  {
+    "role": "target",
+    "model": "mistralai/mistral-small-3.1-24b-instruct",
+    "prob": 0.373869008620033,
+    "asymp.LCL": 0.26217069453764,
+    "asymp.UCL": 0.500852121469844
+  },
+  {
+    "role": "target",
+    "model": "openai/gpt-4o-mini",
+    "prob": 0.370430027578971,
+    "asymp.LCL": 0.207954604380959,
+    "asymp.UCL": 0.568701196650339
+  },
+  {
+    "role": "warden",
+    "model": "anthropic/claude-haiku-4-5",
+    "prob": 0.0655536838724131,
+    "asymp.LCL": 0.0078487341523966,
+    "asymp.UCL": 0.383517135895391
+  },
+  {
+    "role": "warden",
+    "model": "anthropic/claude-sonnet-4",
+    "prob": 0.129837504840948,
+    "asymp.LCL": 0.044396620179951,
+    "asymp.UCL": 0.323964221105194
+  },
+  {
+    "role": "warden",
+    "model": "arcee-ai/trinity-large-preview:free",
+    "prob": 0.0912658309428234,
+    "asymp.LCL": 0.0094332753206393,
+    "asymp.UCL": 0.514366439613204
+  },
+  {
+    "role": "warden",
+    "model": "google/gemini-2.5-flash",
+    "prob": 0.0920649489287821,
+    "asymp.LCL": 0.0503266843966285,
+    "asymp.UCL": 0.162495749039207
+  },
+  {
+    "role": "warden",
+    "model": "google/gemini-2.5-flash-lite",
+    "prob": 0.195380301023183,
+    "asymp.LCL": 0.0968233666328317,
+    "asymp.UCL": 0.354844007979403
+  },
+  {
+    "role": "warden",
+    "model": "google/gemini-3-flash-preview",
+    "prob": 0.10302091751359,
+    "asymp.LCL": 0.0592516005668768,
+    "asymp.UCL": 0.173171043958483
+  },
+  {
+    "role": "warden",
+    "model": "google/gemma-3-12b-it",
+    "prob": 0.095156614893283,
+    "asymp.LCL": 0.0525062968766018,
+    "asymp.UCL": 0.166368210927166
+  },
+  {
+    "role": "warden",
+    "model": "google/gemma-3-27b-it",
+    "prob": 0.107894085088644,
+    "asymp.LCL": 0.04784015773802,
+    "asymp.UCL": 0.225481730847551
+  },
+  {
+    "role": "warden",
+    "model": "google/gemma-3-4b-it",
+    "prob": 0.130172379445672,
+    "asymp.LCL": 0.0599022731104949,
+    "asymp.UCL": 0.260070609941505
+  },
+  {
+    "role": "warden",
+    "model": "meta-llama/llama-3.1-70b-instruct",
+    "prob": 0.109579359933255,
+    "asymp.LCL": 0.0485740495012378,
+    "asymp.UCL": 0.22877918398172
+  },
+  {
+    "role": "warden",
+    "model": "meta-llama/llama-4-maverick",
+    "prob": 0.187804939167912,
+    "asymp.LCL": 0.0919967253304004,
+    "asymp.UCL": 0.345432302179888
+  },
+  {
+    "role": "warden",
+    "model": "meta-llama/llama-4-scout",
+    "prob": 0.0968046451793323,
+    "asymp.LCL": 0.0532425086955078,
+    "asymp.UCL": 0.169622940151446
+  },
+  {
+    "role": "warden",
+    "model": "mistralai/mistral-large-2512",
+    "prob": 0.023147243590436,
+    "asymp.LCL": 0.0063633884065281,
+    "asymp.UCL": 0.0806083547350257
+  },
+  {
+    "role": "warden",
+    "model": "mistralai/mistral-medium-3.1",
+    "prob": 0.0112564220618706,
+    "asymp.LCL": 0.0046626032815287,
+    "asymp.UCL": 0.0269229396148126
+  },
+  {
+    "role": "warden",
+    "model": "mistralai/mistral-small-3.1-24b-instruct",
+    "prob": 0.0972476631948243,
+    "asymp.LCL": 0.0422040543533349,
+    "asymp.UCL": 0.208456223369429
+  },
+  {
+    "role": "warden",
+    "model": "openai/gpt-4o",
+    "prob": 0.306931596183484,
+    "asymp.LCL": 0.155080695226152,
+    "asymp.UCL": 0.516565920800007
+  }
+]

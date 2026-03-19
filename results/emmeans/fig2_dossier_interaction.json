@@ -1,0 +1,30 @@
+[
+  {
+    "has_dossier": 0,
+    "has_warden": 0,
+    "prob": 0.276903271875344,
+    "asymp.LCL": 0.13319106337776,
+    "asymp.UCL": 0.488323225248265
+  },
+  {
+    "has_dossier": 1,
+    "has_warden": 0,
+    "prob": 0.422951322653226,
+    "asymp.LCL": 0.227117581128532,
+    "asymp.UCL": 0.646415503297148
+  },
+  {
+    "has_dossier": 0,
+    "has_warden": 1,
+    "prob": 0.044287212153521,
+    "asymp.LCL": 0.0156924210786099,
+    "asymp.UCL": 0.118703810244561
+  },
+  {
+    "has_dossier": 1,
+    "has_warden": 1,
+    "prob": 0.0400677182850852,
+    "asymp.LCL": 0.0139262288803291,
+    "asymp.UCL": 0.109815565857916
+  }
+]

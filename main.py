@@ -8,7 +8,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from src.client import supports_native_reasoning
-from src.profiles import assign_profiles_to_seats, generate_profile
+from src.profile_generator import (
+    PERSONALITY_CLUSTERS,
+    create_grid_profile_data,
+    list_clusters,
+    parse_grid_key,
+    sample_grid_profiles,
+)
+from src.profiles import GridProfile, assign_profiles_to_seats, generate_profile
 from src.runner import run_experiment, run_multi_target_experiment
 from src.scenarios.base import MultiTargetScenario
 from src.scenarios.experimental import (
@@ -416,6 +423,48 @@ def main():
             "reused across all condition cells."
         ),
     )
+
+    ############# GRID PROFILE ARGUMENTS #############
+
+    grid_group = parser.add_argument_group("grid profile options")
+    grid_group.add_argument(
+        "--grid-profile",
+        type=str,
+        default=None,
+        metavar="KEY",
+        help=(
+            "Use a CB5T grid profile specified by key, e.g. E5_A95_C50_N5_O50. "
+            "Each domain takes a value from {5, 50, 95}."
+        ),
+    )
+    grid_group.add_argument(
+        "--random-grid-profile",
+        action="store_true",
+        default=False,
+        help=(
+            "Sample a random grid profile per experiment round from the "
+            "3^5 = 243 grid (uses --profile-seed for reproducibility)."
+        ),
+    )
+    grid_group.add_argument(
+        "--grid-cluster",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help=(
+            "Use a named personality cluster (e.g. resilient, overcontrolled, "
+            "undercontrolled, high_stability, low_stability, high_plasticity, "
+            "low_plasticity, average). Use 'all' to run all clusters "
+            "(expands --experiment-rounds accordingly)."
+        ),
+    )
+    grid_group.add_argument(
+        "--list-grid-profiles",
+        action="store_true",
+        default=False,
+        help="List available grid clusters and grid format info, then exit.",
+    )
+
     parser.add_argument(
         "-y", "--yes",
         action="store_true",
@@ -424,10 +473,51 @@ def main():
 
     args = parser.parse_args()
 
+    # Handle --list-grid-profiles early exit
+    if args.list_grid_profiles:
+        print("\n=== Available Grid Clusters ===")
+        for cluster_name in list_clusters():
+            scores = PERSONALITY_CLUSTERS[cluster_name]
+            label = "  ".join(f"{k}={v}" for k, v in scores.items())
+            print(f"  {cluster_name:<20s} {label}")
+        print()
+        print("=== Grid Profile Format ===")
+        print("  Use --grid-profile KEY with a key like E5_A95_C50_N5_O50")
+        print("  Each domain (E, A, C, N, O) takes a value from {5, 50, 95}")
+        print(f"  Total grid size: 3^5 = 243 profiles")
+        print()
+        print("  Use --random-grid-profile to sample one per round")
+        print("  Use --grid-cluster NAME for a named cluster (or 'all')")
+        return
+
     args.scenario = _expand_scenario_selection(args.scenario)
     if not args.scenario:
         parser.error(
             "--scenario selection expanded to zero scenarios."
+        )
+
+    # Validate mutual exclusion: grid flags vs. existing profile flags
+    grid_flags_used = []
+    if args.grid_profile is not None:
+        grid_flags_used.append("--grid-profile")
+    if args.random_grid_profile:
+        grid_flags_used.append("--random-grid-profile")
+    if args.grid_cluster is not None:
+        grid_flags_used.append("--grid-cluster")
+
+    if len(grid_flags_used) > 1:
+        parser.error(
+            f"Cannot combine grid profile flags: {', '.join(grid_flags_used)}. "
+            "Use exactly one."
+        )
+
+    using_grid_profile = len(grid_flags_used) == 1
+
+    if using_grid_profile and _profiles_requested(args):
+        parser.error(
+            f"{grid_flags_used[0]} cannot be combined with "
+            "--target-profiles / --adversary-profile-access / --warden-profile-access. "
+            "Grid profiles replace the generated five-factor profiles."
         )
 
     # Parse model lists
@@ -458,6 +548,59 @@ def main():
             generate_profile(random.Random(seed))
             for seed in round_profile_seeds
         ]
+
+    # Grid profile schedule building
+    grid_profile_schedule: list[GridProfile] | None = None
+    if args.grid_profile is not None:
+        try:
+            scores = parse_grid_key(args.grid_profile)
+        except ValueError as exc:
+            parser.error(str(exc))
+        data = create_grid_profile_data(**scores)
+        grid_profile_schedule = [
+            GridProfile.from_data(data)
+            for _ in range(args.experiment_rounds)
+        ]
+    elif args.random_grid_profile:
+        grid_data_list = sample_grid_profiles(
+            args.experiment_rounds, seed=args.profile_seed,
+        )
+        grid_profile_schedule = [
+            GridProfile.from_data(d) for d in grid_data_list
+        ]
+    elif args.grid_cluster is not None:
+        if args.grid_cluster == "all":
+            # Expand experiment_rounds to cover all clusters
+            cluster_names = list_clusters()
+            grid_profile_schedule = []
+            for cname in cluster_names:
+                scores = PERSONALITY_CLUSTERS[cname]
+                data = create_grid_profile_data(**scores, cluster=cname)
+                gp = GridProfile.from_data(data)
+                for _ in range(args.experiment_rounds):
+                    grid_profile_schedule.append(gp)
+            # Override experiment_rounds to total number of grid entries
+            args.experiment_rounds = len(grid_profile_schedule)
+        else:
+            if args.grid_cluster not in PERSONALITY_CLUSTERS:
+                parser.error(
+                    f"Unknown cluster '{args.grid_cluster}'. "
+                    f"Available: {', '.join(list_clusters())}"
+                )
+            scores = PERSONALITY_CLUSTERS[args.grid_cluster]
+            data = create_grid_profile_data(**scores, cluster=args.grid_cluster)
+            gp = GridProfile.from_data(data)
+            grid_profile_schedule = [gp for _ in range(args.experiment_rounds)]
+
+    # When grid profiles are active, wire them into the profile_schedule
+    # so the existing runner loop picks them up.
+    if grid_profile_schedule is not None:
+        profile_schedule = grid_profile_schedule
+        # Force profile flags on so the runner actually uses them
+        args.target_profiles = "yes"
+        args.adversary_profile_access = "yes"
+        args.warden_profile_access = "yes"
+        profiles_requested = True
 
     # CoT setting (single mode for all agents)
     cot_mode = args.cot
@@ -567,7 +710,25 @@ def main():
     )
     print(_format_plan_line("Experiment rounds", str(args.experiment_rounds)))
     print(_format_plan_line("Parallel workers", str(args.max_workers)))
-    if profile_schedule:
+    if grid_profile_schedule is not None:
+        if args.grid_cluster == "all":
+            cluster_names = list_clusters()
+            print(_format_plan_line(
+                "Grid profiles",
+                f"all {len(cluster_names)} clusters x {args.experiment_rounds // len(cluster_names)} round(s)",
+            ))
+        elif args.grid_cluster is not None:
+            print(_format_plan_line("Grid cluster", args.grid_cluster))
+        elif args.grid_profile is not None:
+            print(_format_plan_line("Grid profile", args.grid_profile))
+        elif args.random_grid_profile:
+            print(_format_plan_line(
+                "Grid profiles",
+                f"random per round (seed={args.profile_seed})",
+            ))
+        preview_gp = grid_profile_schedule[0]
+        print(_format_plan_line("Profile preview", preview_gp.name))
+    elif profile_schedule:
         preview_profile = profile_schedule[0] if profile_schedule else None
         seed_note = f"seed={args.profile_seed}"
         if args.experiment_rounds > 1:

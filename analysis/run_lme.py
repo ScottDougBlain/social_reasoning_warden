@@ -7,6 +7,8 @@ Runs confirmatory GLME models using R's lme4 + lmerTest:
   Model 2: Dossier Impact — adversary_has_data × has_warden (adversary only)
   Model 3: Profile Vulnerability — profile_name × has_warden (adversary + profiled)
   Model 4: Capability Asymmetry — warden_tier (none/weak/mid/strong)
+  Model 5: CB5T Detection × Resistance × Warden (adversary + CB5T profiled)
+  Model 6: Profile Family × Warden (adversary + CB5T profiled)
 
 Outputs: results/lme_results.md (formatted summary)
 
@@ -136,6 +138,20 @@ def logs_to_dataframe(logs: list[dict]) -> pd.DataFrame:
                 "num_turns": log.get("num_turns", 0),
                 "success": int(decision == "requester_success"),
                 "tag": log.get("tag"),
+                # CB5T-derived properties
+                "detection_capacity": profile.get("detection_capacity") or "unknown",
+                "resistance_capacity": profile.get("resistance_capacity") or "unknown",
+                "profile_family": profile.get("profile_family") or "unknown",
+                "primary_attack_surface": profile.get("primary_attack_surface") or "unknown",
+                "warden_value": profile.get("warden_value") or "unknown",
+                # BFI-2 domain scores (grid profiles)
+                "E": profile.get("E"),
+                "A": profile.get("A"),
+                "C": profile.get("C"),
+                "N": profile.get("N"),
+                "O": profile.get("O"),
+                "cluster": profile.get("cluster") or "none",
+                "profile_type": profile.get("profile_type") or "none",
             }
         )
 
@@ -678,6 +694,245 @@ if (!is.null(m4)) {{
     return output
 
 
+def run_model_5(df: pd.DataFrame, output_lines: list) -> str | None:
+    """Model 5: Detection × Resistance × Warden interaction.
+
+    Tests the CB5T-derived capacity model: whether detection_capacity and
+    resistance_capacity interact with warden presence to predict success.
+    Subset: adversary runs with profiled targets that have CB5T data.
+    """
+    data = df[
+        (df["requester_type"] == "adversary")
+        & (df["has_profile"] == 1)
+        & (df["detection_capacity"] != "unknown")
+    ].copy()
+
+    if len(data) < 20:
+        msg = f"Model 5 skipped: only {len(data)} adversary+CB5T observations."
+        print(f"\n  {msg}")
+        output_lines.append(f"## Model 5: Detection × Resistance × Warden\n\n*{msg}*\n")
+        return None
+
+    n_obs = len(data)
+    n_scenarios = data["scenario"].nunique()
+
+    csv_path = "/tmp/lme_cb5t_m5.csv"
+    data.to_csv(csv_path, index=False)
+
+    r_script = f"""
+library(lme4)
+library(car)
+
+{GLMER_FIT_BLOCK}
+
+d <- read.csv("{csv_path}")
+d$detection_capacity <- factor(d$detection_capacity, levels=c("LOW", "MODERATE", "HIGH"))
+d$resistance_capacity <- factor(d$resistance_capacity, levels=c("LOW", "MODERATE", "HIGH"))
+d$has_warden <- factor(d$has_warden)
+d$scenario <- factor(d$scenario)
+d$target_model <- factor(d$target_model)
+
+cat("\\n--- Data Summary ---\\n")
+cat(sprintf("Observations: %d\\n", nrow(d)))
+cat("\\nDetection × Resistance counts:\\n")
+print(table(d$detection_capacity, d$resistance_capacity))
+cat("\\nSuccess by detection × resistance × warden:\\n")
+print(with(d, tapply(success, list(detection_capacity, resistance_capacity, has_warden), mean)))
+
+cat("\\n--- Fitting Model 5: Detection x Resistance x Warden ---\\n")
+m5 <- fit_glmer(
+    success ~ detection_capacity * resistance_capacity * has_warden
+        + (1|scenario) + (1|target_model),
+    data=d, label="Model 5"
+)
+
+if (!is.null(m5)) {{
+    cat("\\n--- Fixed Effects ---\\n")
+    print(summary(m5))
+
+    cat("\\n--- Type III Wald Chi-Square Tests ---\\n")
+    print(Anova(m5, type="III"))
+
+    cat("\\n--- Random Effects ---\\n")
+    print(VarCorr(m5))
+
+    cat("\\n--- Odds Ratios ---\\n")
+    fe <- fixef(m5)
+    ci <- tryCatch(
+        confint(m5, parm="beta_", method="Wald"),
+        error = function(e) {{
+            cat("  CI computation failed:", e$message, "\\n")
+            NULL
+        }}
+    )
+    if (!is.null(ci)) {{
+        or_table <- data.frame(
+            OR = exp(fe),
+            CI_lower = exp(ci[,1]),
+            CI_upper = exp(ci[,2])
+        )
+        print(or_table)
+    }} else {{
+        cat("Odds ratios (no CI):\\n")
+        print(data.frame(OR = exp(fe)))
+    }}
+}}
+"""
+
+    output = run_r_glmer(
+        csv_path, r_script,
+        "MODEL 5: Detection × Resistance × Warden"
+    )
+
+    output_lines.append("## Model 5: Detection × Resistance × Warden\n")
+    output_lines.append(
+        "**Formula**: `success ~ detection_capacity * resistance_capacity * has_warden "
+        "+ (1|scenario) + (1|target_model)`\n"
+    )
+    output_lines.append("**Family**: Binomial (logit link)\n")
+    output_lines.append(
+        "**Data**: Adversary runs with CB5T-profiled targets\n"
+    )
+    output_lines.append(f"**N** = {n_obs:,} | {n_scenarios} scenarios\n")
+    output_lines.append(
+        "**Reference levels**: detection=LOW, resistance=LOW, has_warden=0\n"
+    )
+    output_lines.append("### Output\n")
+    output_lines.append("```")
+    output_lines.append(output)
+    output_lines.append("```\n")
+
+    return output
+
+
+def run_model_6(df: pd.DataFrame, output_lines: list) -> str | None:
+    """Model 6: Profile Family × Warden.
+
+    Tests whether warden effectiveness varies by profile family as predicted
+    by CB5T theory. The warden should help most for 'sitting_duck' and
+    'sees_cant_act' families and least for 'fortress'.
+    Subset: adversary runs with profiled targets that have CB5T data.
+    """
+    data = df[
+        (df["requester_type"] == "adversary")
+        & (df["has_profile"] == 1)
+        & (df["profile_family"] != "unknown")
+    ].copy()
+
+    if len(data) < 20:
+        msg = f"Model 6 skipped: only {len(data)} adversary+family observations."
+        print(f"\n  {msg}")
+        output_lines.append(f"## Model 6: Profile Family × Warden\n\n*{msg}*\n")
+        return None
+
+    n_obs = len(data)
+    n_scenarios = data["scenario"].nunique()
+    n_families = data["profile_family"].nunique()
+    family_counts = data["profile_family"].value_counts()
+
+    csv_path = "/tmp/lme_family_m6.csv"
+    data.to_csv(csv_path, index=False)
+
+    r_script = f"""
+library(lme4)
+library(car)
+
+{GLMER_FIT_BLOCK}
+
+d <- read.csv("{csv_path}")
+d$profile_family <- relevel(factor(d$profile_family), ref="sitting_duck")
+d$has_warden <- factor(d$has_warden)
+d$scenario <- factor(d$scenario)
+d$target_model <- factor(d$target_model)
+
+cat("\\n--- Data Summary ---\\n")
+cat(sprintf("Observations: %d\\n", nrow(d)))
+cat("\\nProfile family counts:\\n")
+print(table(d$profile_family))
+
+cat("\\nSuccess rate by family:\\n")
+sr_fam <- tapply(d$success, d$profile_family, mean)
+n_fam <- tapply(d$success, d$profile_family, length)
+for (f in names(sort(sr_fam, decreasing=TRUE))) {{
+    cat(sprintf("  %-30s  %.1f%%  (n=%d)\\n", f, sr_fam[f]*100, n_fam[f]))
+}}
+
+cat("\\nSuccess by family x warden:\\n")
+print(with(d, tapply(success, list(profile_family, has_warden), mean)))
+
+cat("\\n--- Fitting Model 6: Profile Family x Warden ---\\n")
+m6 <- fit_glmer(
+    success ~ profile_family * has_warden
+        + (1|scenario) + (1|target_model),
+    data=d, label="Model 6"
+)
+
+if (!is.null(m6)) {{
+    cat("\\n--- Fixed Effects ---\\n")
+    print(summary(m6))
+
+    cat("\\n--- Type III Wald Chi-Square Tests ---\\n")
+    print(Anova(m6, type="III"))
+
+    cat("\\n--- Random Effects ---\\n")
+    print(VarCorr(m6))
+
+    cat("\\n--- Odds Ratios ---\\n")
+    fe <- fixef(m6)
+    ci <- tryCatch(
+        confint(m6, parm="beta_", method="Wald"),
+        error = function(e) {{
+            cat("  CI computation failed:", e$message, "\\n")
+            NULL
+        }}
+    )
+    if (!is.null(ci)) {{
+        or_table <- data.frame(
+            OR = exp(fe),
+            CI_lower = exp(ci[,1]),
+            CI_upper = exp(ci[,2])
+        )
+        print(or_table)
+    }} else {{
+        cat("Odds ratios (no CI):\\n")
+        print(data.frame(OR = exp(fe)))
+    }}
+}}
+"""
+
+    output = run_r_glmer(
+        csv_path, r_script,
+        "MODEL 6: Profile Family × Warden"
+    )
+
+    output_lines.append("## Model 6: Profile Family × Warden\n")
+    output_lines.append(
+        "**Formula**: `success ~ profile_family * has_warden "
+        "+ (1|scenario) + (1|target_model)`\n"
+    )
+    output_lines.append("**Family**: Binomial (logit link)\n")
+    output_lines.append(
+        "**Data**: Adversary runs with CB5T-profiled targets\n"
+    )
+    output_lines.append(
+        f"**N** = {n_obs:,} | {n_scenarios} scenarios | "
+        f"{n_families} profile families\n"
+    )
+    output_lines.append(
+        "**Reference level**: profile_family=sitting_duck, has_warden=0\n"
+    )
+    output_lines.append("**Family counts**:\n")
+    for fam, count in family_counts.items():
+        output_lines.append(f"- {fam}: {count}")
+    output_lines.append("")
+    output_lines.append("### Output\n")
+    output_lines.append("```")
+    output_lines.append(output)
+    output_lines.append("```\n")
+
+    return output
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────
 
 
@@ -710,8 +965,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--models", type=int, nargs="+", default=[1, 2, 3],
-        choices=[1, 2, 3, 4],
-        help="Which models to run (default: 1 2 3). Use 4 for capability asymmetry.",
+        choices=[1, 2, 3, 4, 5, 6],
+        help="Which models to run (default: 1 2 3). 4=capability asymmetry, 5=detection×resistance×warden, 6=profile_family×warden.",
     )
     parser.add_argument(
         "--output", type=str, default=None,
@@ -829,6 +1084,14 @@ def main():
 
     if 4 in args.models:
         run_model_4(df, output_lines)
+        output_lines.append("\n---\n")
+
+    if 5 in args.models:
+        run_model_5(df, output_lines)
+        output_lines.append("\n---\n")
+
+    if 6 in args.models:
+        run_model_6(df, output_lines)
 
     # Write results
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)

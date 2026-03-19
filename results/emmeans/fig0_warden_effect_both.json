@@ -1,0 +1,30 @@
+[
+  {
+    "requester_type": "benign_agent",
+    "has_warden": 0,
+    "prob": 0.848012936682495,
+    "asymp.LCL": 0.790465310101462,
+    "asymp.UCL": 0.891916506108578
+  },
+  {
+    "requester_type": "adversary",
+    "has_warden": 0,
+    "prob": 0.351786310909723,
+    "asymp.LCL": 0.273136694445081,
+    "asymp.UCL": 0.439392746373727
+  },
+  {
+    "requester_type": "benign_agent",
+    "has_warden": 1,
+    "prob": 0.721064919794205,
+    "asymp.LCL": 0.622139114656664,
+    "asymp.UCL": 0.80232073279709
+  },
+  {
+    "requester_type": "adversary",
+    "has_warden": 1,
+    "prob": 0.0642882107524285,
+    "asymp.LCL": 0.041883821532803,
+    "asymp.UCL": 0.0974580556094025
+  }
+]

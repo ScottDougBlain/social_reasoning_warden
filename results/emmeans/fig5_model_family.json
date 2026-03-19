@@ -1,0 +1,38 @@
+[
+  {
+    "model_family": "claude",
+    "prob": 0.428492772939787,
+    "asymp.LCL": 0.268479308024917,
+    "asymp.UCL": 0.605000586471177
+  },
+  {
+    "model_family": "gemini",
+    "prob": 0.76404655284586,
+    "asymp.LCL": 0.647052730228347,
+    "asymp.UCL": 0.851179133900901
+  },
+  {
+    "model_family": "gemma",
+    "prob": 0.347568472722073,
+    "asymp.LCL": 0.225384303580026,
+    "asymp.UCL": 0.493768087521948
+  },
+  {
+    "model_family": "gpt",
+    "prob": 0.361648431041249,
+    "asymp.LCL": 0.187606786606865,
+    "asymp.UCL": 0.581565445181726
+  },
+  {
+    "model_family": "llama",
+    "prob": 0.328010210016137,
+    "asymp.LCL": 0.209475679649612,
+    "asymp.UCL": 0.473447990296906
+  },
+  {
+    "model_family": "mistral",
+    "prob": 0.314191520494075,
+    "asymp.LCL": 0.199130522023835,
+    "asymp.UCL": 0.457737618768502
+  }
+]
