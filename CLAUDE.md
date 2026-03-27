@@ -75,7 +75,6 @@ python main.py --target-profiles yes --profile-seed 123
 
 - Python 3.11 (conda env at `.conda/`)
 - API keys in `.env`: `OPENROUTER_API_KEY`
-- Default models: `arcee-ai/trinity-large-preview:free` (adversary/warden), `arcee-ai/trinity-mini:free` (target)
 - Dependencies: `openai`, `pyyaml`, `rich`, `python-dotenv`
 
 ## Key Design Decisions
@@ -85,9 +84,3 @@ python main.py --target-profiles yes --profile-seed 123
 - **Seeds define the round schedule**: `--profile-seed` ensures every condition cell in a run sees the same per-round profile list.
 - **Warden is observer-only**: Sends private advisory notes to target; never speaks to the requester.
 - **Reasoning tag extraction**: Client strips `<think>`, `<reasoning>`, `<scratchpad>` tags from model output for models like DeepSeek R1 / Chimera.
-
-## Known Issues / In Progress
-
-- System prompts (target, adversary) may be over-specified — Lennart is cleaning these up to be less prescriptive
-- Warden can false-positive on benign agents (identical opening messages, no base-rate anchor)
-- `src/data/generator.py` is legacy — kept for reference but no longer imported

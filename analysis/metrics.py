@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
+FIGURES_DIR = Path(__file__).resolve().parents[1] / "figures"
 console = Console()
 SPEAKER_ORDER = ("adversary", "benign_agent")
 RISK_LEVEL_RE = re.compile(r"RISK:\s*([A-Z]+)")
@@ -596,10 +597,12 @@ def plot_success_rates(logs: list[dict]) -> None:
                 col=col_index,
             )
 
+    y_tick_values = [step / 100 for step in range(0, 101, 20)]
     fig.update_yaxes(
         range=[0, 1.05],
-        tickformat=".0%",
-        title_text="<b>SR</b>",
+        tickvals=y_tick_values,
+        ticktext=[str(int(value * 100)) for value in y_tick_values],
+        title_text="<b>Success Rate (%)</b>",
         title_font=dict(size=10),
     )
     fig.update_xaxes(
@@ -618,6 +621,183 @@ def plot_success_rates(logs: list[dict]) -> None:
     for annotation in fig.layout.annotations:
         annotation.font = dict(size=14)
 
+    fig.show()
+
+
+def _save_plotly_pdf(fig: go.Figure, name: str) -> None:
+    """Save a Plotly figure as PDF in the shared figures directory."""
+    FIGURES_DIR.mkdir(exist_ok=True)
+    pdf_path = FIGURES_DIR / f"{name}.pdf"
+    try:
+        fig.write_image(str(pdf_path))
+    except Exception as exc:
+        print(f"Could not save PDF to {pdf_path}: {exc}")
+        print("Install `kaleido` in your plotting environment to enable Plotly PDF export.")
+        return
+    print(f"Saved {pdf_path}")
+
+
+def plot_success_rates_2(logs: list[dict]) -> None:
+    """Render a publication-style grouped SR chart and save it as a PDF."""
+    if not logs:
+        print("No logs found.")
+        return
+
+    def _format_plotting_2_label(label: object) -> str:
+        label_text = _shorten_model_label(label)
+        if label_text.startswith("gemma-3-") and label_text.endswith("-it"):
+            return label_text[:-3]
+        if label_text == "gemini-3.1-pro-preview":
+            return "gemini-3.1-pro"
+        if label_text.startswith("mistral") and label_text.endswith("-instruct"):
+            return label_text[: -len("-instruct")]
+        return label_text
+
+    grouped = _split_logs_by_speaker(logs)
+    metric_specs = [
+        ("agent_model", "by Requester Model Type"),
+        ("target_model", "by Target Model Type"),
+        ("warden_model", "Which Warden Performs Best?"),
+    ]
+    speaker_rates: dict[str, dict[str, dict]] = {}
+    for speaker in SPEAKER_ORDER:
+        speaker_logs = grouped.get(speaker, [])
+        if not speaker_logs:
+            continue
+        agent_key = "adversary" if speaker == "adversary" else "benign_agent"
+        speaker_rates[speaker] = {
+            "agent_model": _success_rate_by_label(
+                speaker_logs,
+                lambda log, key=agent_key: log.get("models", {}).get(key),
+                empty_label="unknown",
+            ),
+            "target_model": _success_rate_by_label(
+                speaker_logs,
+                lambda log: log.get("models", {}).get("target"),
+                empty_label="unknown",
+            ),
+            "warden_model": _success_rate_by_label(
+                speaker_logs,
+                lambda log: log.get("models", {}).get("warden"),
+                empty_label="none",
+            ),
+        }
+
+    def build_grouped_bars(
+        metric_key: str,
+    ) -> tuple[list[str], dict[str, tuple[list[float], list[list[int]]]]]:
+        labels_set = {
+            label
+            for speaker in SPEAKER_ORDER
+            for label in speaker_rates.get(speaker, {}).get(metric_key, {}).keys()
+        }
+        adversary_results = speaker_rates.get("adversary", {}).get(metric_key, {})
+
+        def _adversary_sort_key(label: object) -> tuple[float, str]:
+            counts = adversary_results.get(label)
+            adversary_rate = counts["rate"] if counts else float("inf")
+            return adversary_rate, str(label)
+
+        raw_labels = sorted(labels_set, key=_adversary_sort_key)
+        labels = [_format_plotting_2_label(label) for label in raw_labels]
+        grouped_values: dict[str, tuple[list[float], list[list[int]]]] = {}
+        for speaker in SPEAKER_ORDER:
+            results = speaker_rates.get(speaker, {}).get(metric_key, {})
+            rates: list[float] = []
+            custom: list[list[int]] = []
+            for label in raw_labels:
+                counts = results.get(label)
+                if counts:
+                    rates.append(counts["rate"])
+                    custom.append([counts["requester_success"], counts["total"]])
+                else:
+                    rates.append(0.0)
+                    custom.append([0, 0])
+            grouped_values[speaker] = (rates, custom)
+        return labels, grouped_values
+
+    fig = make_subplots(
+        rows=1,
+        cols=len(metric_specs),
+        subplot_titles=[f"<b>{metric_label}</b>" for _, metric_label in metric_specs],
+        horizontal_spacing=0.1,
+    )
+
+    speaker_labels = {"adversary": "Adversary", "benign_agent": "Benign Agent"}
+    speaker_colors = {
+        "adversary": "#ef553b",
+        "benign_agent": "#ffa15a",
+    }
+
+    for col_index, (metric_key, _) in enumerate(metric_specs, start=1):
+        labels, grouped_values = build_grouped_bars(metric_key)
+        for speaker in SPEAKER_ORDER:
+            rates, custom = grouped_values[speaker]
+            fig.add_trace(
+                go.Bar(
+                    name=speaker_labels[speaker],
+                    x=labels,
+                    y=rates,
+                    marker_color=speaker_colors[speaker],
+                    offsetgroup=speaker,
+                    legendgroup=speaker,
+                    showlegend=(col_index == 1),
+                    text=[
+                        f"{rate:.0%}" if totals[1] > 0 else ""
+                        for rate, totals in zip(rates, custom)
+                    ],
+                    textposition="outside",
+                    textfont=dict(size=9),
+                    customdata=custom,
+                    hovertemplate=(
+                        f"{speaker_labels[speaker]}<br>"
+                        "Success Rate: %{y:.1%}<br>"
+                        "Requester Success: %{customdata[0]} / %{customdata[1]}<extra></extra>"
+                    ),
+                ),
+                row=1,
+                col=col_index,
+            )
+
+    y_tick_values = [step / 100 for step in range(0, 101, 20)]
+    fig.update_yaxes(
+        range=[0, 1.12],
+        tickvals=y_tick_values,
+        ticktext=[str(int(value * 100)) for value in y_tick_values],
+        title_text="Success Rate (%)",
+        showgrid=True,
+        gridcolor="#D9D9D9",
+        gridwidth=1,
+        zeroline=True,
+        zerolinecolor="#D9D9D9",
+    )
+    fig.update_xaxes(
+        tickangle=-35,
+        title_text="Model Type",
+        showgrid=False,
+    )
+    fig.update_layout(
+        title=dict(text="Success Rate Overview", font=dict(size=18)),
+        barmode="group",
+        showlegend=True,
+        height=550,
+        width=1500,
+        margin=dict(t=140, b=120),
+        legend=dict(
+            orientation="h",
+            x=0.5,
+            xanchor="center",
+            y=1.08,
+            yanchor="bottom",
+        ),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(color="black"),
+    )
+    for annotation in fig.layout.annotations:
+        annotation.font = dict(size=14)
+
+    _save_plotly_pdf(fig, "success_rate_overview_plotting_2")
     fig.show()
 
 
@@ -1172,6 +1352,14 @@ if __name__ == "__main__":
         help="Show Plotly subplots (use --plotting or --plotting=True)",
     )
     parser.add_argument(
+        "--plotting-2",
+        nargs="?",
+        const=True,
+        default=False,
+        type=_parse_bool,
+        help="Show publication-style Plotly subplots and save them as a PDF",
+    )
+    parser.add_argument(
         "--heatmap",
         action="store_true",
         help="Show Scenario x Profile success rate heatmap",
@@ -1215,6 +1403,8 @@ if __name__ == "__main__":
     show_all = args.all_plots
     if args.plotting or show_all:
         plot_success_rates(logs)
+    if args.plotting_2:
+        plot_success_rates_2(logs)
     if args.heatmap or show_all:
         plot_heatmap(logs)
     if args.adversary_target_heatmap or show_all:
