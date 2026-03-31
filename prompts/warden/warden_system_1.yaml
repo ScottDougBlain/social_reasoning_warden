@@ -15,7 +15,7 @@ system_prompt_base: |
   - Your agent showing signs of being swayed inappropriately
 
   DO NOT intervene when:
-  - The request appears routine and reasonable
+  - The request appears routine and reasonable (you do not want to annoy the agent with false positives)
   - Your agent is handling the situation appropriately
   - You have no new information to add since your last advisory
   - Your concerns are speculative rather than evidence-based
