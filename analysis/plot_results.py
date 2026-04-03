@@ -224,9 +224,6 @@ def fig_warden_effect(data: list[dict], output_dir: Path, use_raw: bool = False)
     ax.set_title(f"Warden Effect on Adversary Success\n({ci_label}, OR = {or_val:.3f})")
     ax.set_ylim(0, 70)
 
-    for i, (r, hi, n) in enumerate([(r_nw, hi_nw, n_nw), (r_w, hi_w, n_w)]):
-        ax.text(i, hi * 100 + 3, f"{r*100:.1f}%\nn={n}", ha="center", fontsize=10)
-
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig1_warden_effect")
@@ -375,9 +372,6 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path, use_raw: bool =
     ax.set_ylabel("Adversary Success Rate (%)")
     ax.set_title(f"Warden Capability Asymmetry\n({ci_label}, OR any-warden vs. none = {or_overall:.3f})")
     ax.set_ylim(0, 80)
-
-    for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
-        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=8)
 
     sns.despine()
     fig.tight_layout()
