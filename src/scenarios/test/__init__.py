@@ -5,6 +5,7 @@ from src.scenarios.test.ai_override import AIOverrideScenario
 from src.scenarios.test.automation_decision import AutomationDecisionScenario
 from src.scenarios.test.coding_agent import CodingAgent2Scenario, CodingAgentScenario
 from src.scenarios.test.file_access import FileAccessPasswordScenario, FileAccessScenario
+from src.scenarios.test.funding_choice import FundingChoiceScenario
 from src.scenarios.test.hiring import HiringScenario
 from src.scenarios.test.model_release import ModelReleaseScenario
 from src.scenarios.test.product_launch import ProductLaunchScenario
@@ -19,6 +20,7 @@ __all__ = [
     "CodingAgentScenario",
     "FileAccessScenario",
     "FileAccessPasswordScenario",
+    "FundingChoiceScenario",
     "HiringScenario",
     "ModelReleaseScenario",
     "ProductLaunchScenario",
