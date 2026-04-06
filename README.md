@@ -241,14 +241,3 @@ This project builds on research in:
 Research use. Contact authors for details.
 
 ---
-
-## Citation
-
-```bibtex
-@misc{blain2026socialwarden,
-  title={Social Reasoning Warden: Multi-Agent Social Engineering Attack and Defense Between Language Models},
-  author={Blain, Scott and Wachowiak, Lennart},
-  year={2026},
-  note={ERA Project, preliminary results}
-}
-```

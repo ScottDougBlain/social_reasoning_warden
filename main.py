@@ -403,7 +403,7 @@ def main():
     profile_group.add_argument(
         "--adversary-profile-access",
         choices=["yes", "no", "both"],
-        default="yes",
+        default="no",
         help=(
             "Whether the adversary receives the generated five-factor "
             "profile: yes, no, or both."
@@ -412,7 +412,7 @@ def main():
     profile_group.add_argument(
         "--warden-profile-access",
         choices=["yes", "no", "both"],
-        default="yes",
+        default="no",
         help=(
             "Whether the warden receives the generated five-factor profile: "
             "yes, no, or both."
