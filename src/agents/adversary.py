@@ -76,13 +76,17 @@ class Adversary:
                 self.system_prompt += f"\n\n{priming}"
             self.system_prompt += f"\n\n{target_dossier}"
 
+    def build_messages(self, conversation: list[dict]) -> list[dict]:
+        """Build the message list for a regular adversary turn."""
+        return [{"role": "system", "content": self.system_prompt}] + conversation
+
     def respond(self, conversation: list[dict]) -> str:
         """Generate the next adversary message given conversation history.
 
         The conversation is provided from the adversary's perspective:
         target messages are 'user', adversary messages are 'assistant'.
         """
-        messages = [{"role": "system", "content": self.system_prompt}] + conversation
+        messages = self.build_messages(conversation)
         return chat(
             self.model,
             messages,
@@ -92,13 +96,11 @@ class Adversary:
             debug_label="adversary.respond",
         )
 
-    def generate_opening(self, scenario_context_for_requester_opening: str) -> str:
-        """Generate an opening message based on the hidden goal and scenario.
-
-        Args:
-            scenario_context_for_requester_opening: Description of the scenario/setting
-        """
-        messages = [
+    def build_opening_messages(
+        self, scenario_context_for_requester_opening: str
+    ) -> list[dict]:
+        """Build the message list for adversary opening generation."""
+        return [
             {"role": "system", "content": self.system_prompt},
             {
                 "role": "user",
@@ -111,6 +113,16 @@ class Adversary:
                 ),
             },
         ]
+
+    def generate_opening(self, scenario_context_for_requester_opening: str) -> str:
+        """Generate an opening message based on the hidden goal and scenario.
+
+        Args:
+            scenario_context_for_requester_opening: Description of the scenario/setting
+        """
+        messages = self.build_opening_messages(
+            scenario_context_for_requester_opening
+        )
         return chat(
             self.model,
             messages,

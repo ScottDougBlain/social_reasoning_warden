@@ -117,46 +117,6 @@ def _parse_response(text: str) -> tuple[str | None, str]:
     return reasoning, message
 
 
-def _extract_message_from_reasoning(text: str) -> str | None:
-    """Try to extract a conversational message from reasoning model output.
-
-    Reasoning models sometimes plan what to say but don't output it separately.
-    This function looks for patterns like quoted dialogue or explicit message markers.
-
-    Returns:
-        Extracted message if found, None otherwise
-    """
-    # Look for text in <reasoning> tags
-    reasoning_match = re.search(r"<reasoning>(.*?)</reasoning>", text, re.DOTALL)
-    if not reasoning_match:
-        return None
-
-    reasoning = reasoning_match.group(1)
-
-    # Pattern 1: Look for quoted dialogue (the most common pattern)
-    quote_patterns = [
-        r'"([^"]{20,})"',  # Double quotes, at least 20 chars
-        r"'([^']{20,})'",  # Single quotes
-    ]
-    for pattern in quote_patterns:
-        matches = re.findall(pattern, reasoning)
-        if matches:
-            # Take the longest quoted text (likely the actual message)
-            return max(matches, key=len)
-
-    # Pattern 2: Look for "I would say:" or similar phrases
-    say_patterns = [
-        r"(?:I would say|I'll say|My response|I will respond|Message):\s*[\"']?(.{20,}?)(?:[\"']?\s*$|\n\n)",
-        r"(?:Opening message|My opening):\s*[\"']?(.{20,}?)(?:[\"']?\s*$|\n\n)",
-    ]
-    for pattern in say_patterns:
-        match = re.search(pattern, reasoning, re.IGNORECASE | re.DOTALL)
-        if match:
-            return match.group(1).strip().strip("\"'")
-
-    return None
-
-
 def _strip_private_reasoning_tags(text: str, tags: tuple[str, ...]) -> str:
     """Remove multiple private reasoning tags from a response."""
     cleaned = text
@@ -290,6 +250,38 @@ _DECISION_REPROMPT_MESSAGE = (
     "Respond with ONLY one of the allowed options below. "
     "Do not include any other text."
 )
+
+
+def _build_reprompt_messages(base_messages: list[dict], raw_response: str) -> list[dict]:
+    """Append the raw response and reprompt instruction to the original prompt."""
+    return [
+        *base_messages,
+        {"role": "assistant", "content": raw_response},
+        {"role": "user", "content": _REPROMPT_MESSAGE},
+    ]
+
+
+def _reprompt_for_public_message(
+    *,
+    model: str,
+    messages: list[dict],
+    include_reasoning: bool,
+    temperature: float,
+    debug: bool,
+    debug_label: str,
+) -> str:
+    """Re-prompt for a public message and strip any returned reasoning tags."""
+    reprompt_response = chat(
+        model,
+        messages,
+        temperature=temperature,
+        include_reasoning=include_reasoning,
+        debug=debug,
+        debug_label=debug_label,
+    )
+    _, reprompt_public = _parse_response(reprompt_response)
+    reprompt_public = _strip_private_reasoning_tags(reprompt_public, _ALL_PRIVATE_TAGS)
+    return reprompt_public.strip()
 
 
 def get_final_decision(
@@ -647,81 +639,61 @@ def run_experiment(
     opening_reasoning = None
     if requester_type == "adversary":
         if adversary_generates_opening:
-            raw_opening = requester.generate_opening(
-                scenario.scenario_context_for_requester_opening()
-            )
+            opening_context = scenario.scenario_context_for_requester_opening()
+            raw_opening = requester.generate_opening(opening_context)
             opening_reasoning, opening_public = _parse_response(raw_opening)
 
             # Handle reasoning models that only output reasoning
             if not opening_public.strip():
-                # Try to extract a message from the reasoning
-                extracted = _extract_message_from_reasoning(raw_opening)
-                if extracted:
+                _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
+                opening_public = _reprompt_for_public_message(
+                    model=requester.model,
+                    messages=_build_reprompt_messages(
+                        requester.build_opening_messages(opening_context),
+                        raw_opening,
+                    ),
+                    include_reasoning=requester.include_reasoning,
+                    temperature=requester.temperature,
+                    debug=debug,
+                    debug_label="adversary.opening.reprompt",
+                )
+                if not opening_public:
                     _maybe_print(
-                        "[cyan]Note: Extracted opening from reasoning model output.[/cyan]"
+                        "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
                     )
-                    opening_public = extracted
-                else:
-                    # Re-prompt to get an actual message
-                    _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
-                    reprompt_response = chat(
-                        requester.model,
-                        [
-                            {"role": "system", "content": requester.system_prompt},
-                            {"role": "assistant", "content": raw_opening},
-                            {"role": "user", "content": _REPROMPT_MESSAGE},
-                        ],
-                        temperature=requester.temperature,
-                        debug=debug,
-                        debug_label="adversary.opening.reprompt",
-                    )
-                    opening_public = reprompt_response.strip()
-                    if not opening_public:
-                        _maybe_print(
-                            "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
-                        )
-                        raw_opening = scenario.initial_requester_message()
-                        opening_public = raw_opening
-                        opening_reasoning = None
+                    raw_opening = scenario.initial_requester_message()
+                    opening_public = raw_opening
+                    opening_reasoning = None
         else:
             raw_opening = scenario.initial_requester_message()
             opening_public = raw_opening
     else:
         # Benign agent
         if benign_agent_generates_opening:
-            raw_opening = requester.generate_opening(
-                scenario.scenario_context_for_requester_opening()
-            )
+            opening_context = scenario.scenario_context_for_requester_opening()
+            raw_opening = requester.generate_opening(opening_context)
             opening_reasoning, opening_public = _parse_response(raw_opening)
 
             if not opening_public.strip():
-                extracted = _extract_message_from_reasoning(raw_opening)
-                if extracted:
+                _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
+                opening_public = _reprompt_for_public_message(
+                    model=requester.model,
+                    messages=_build_reprompt_messages(
+                        requester.build_opening_messages(opening_context),
+                        raw_opening,
+                    ),
+                    include_reasoning=requester.include_reasoning,
+                    temperature=requester.temperature,
+                    debug=debug,
+                    debug_label="benign_agent.opening.reprompt",
+                )
+                if not opening_public:
                     _maybe_print(
-                        "[cyan]Note: Extracted opening from reasoning model output.[/cyan]"
+                        "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
                     )
-                    opening_public = extracted
-                else:
-                    _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
-                    reprompt_response = chat(
-                        requester.model,
-                        [
-                            {"role": "system", "content": requester.system_prompt},
-                            {"role": "assistant", "content": raw_opening},
-                            {"role": "user", "content": _REPROMPT_MESSAGE},
-                        ],
-                        temperature=requester.temperature,
-                        debug=debug,
-                        debug_label="benign_agent.opening.reprompt",
-                    )
-                    opening_public = reprompt_response.strip()
-                    if not opening_public:
-                        _maybe_print(
-                            "[yellow]Warning: Re-prompt failed. Using scenario default.[/yellow]"
-                        )
-                        raw_opening = scenario.initial_requester_message()
-                        opening_public = raw_opening
-                        opening_reasoning = None
+                    raw_opening = scenario.initial_requester_message()
+                    opening_public = raw_opening
+                    opening_reasoning = None
         else:
             raw_opening = scenario.initial_requester_message()
             opening_public = raw_opening
@@ -790,30 +762,23 @@ def run_experiment(
 
         # Handle reasoning models that only output reasoning (empty content)
         if not target_response_public.strip():
-            extracted = _extract_message_from_reasoning(target_response)
-            if extracted:
+            _maybe_print("[cyan]Re-prompting target for actual message...[/cyan]")
+            target_response_public = _reprompt_for_public_message(
+                model=target.model,
+                messages=_build_reprompt_messages(
+                    target.build_messages(target_conversation),
+                    target_response,
+                ),
+                include_reasoning=target.include_reasoning,
+                temperature=target.temperature,
+                debug=debug,
+                debug_label="target.reprompt",
+            )
+            if not target_response_public:
                 _maybe_print(
-                    "[cyan]Note: Extracted target message from reasoning model output.[/cyan]"
+                    "[yellow]Warning: Target re-prompt failed. Using empty message.[/yellow]"
                 )
-                target_response_public = extracted
-            else:
-                _maybe_print("[cyan]Re-prompting target for actual message...[/cyan]")
-                reprompt_response = chat(
-                    target.model,
-                    target_conversation + [
-                        {"role": "assistant", "content": target_response},
-                        {"role": "user", "content": _REPROMPT_MESSAGE},
-                    ],
-                    temperature=target.temperature,
-                    debug=debug,
-                    debug_label="target.reprompt",
-                )
-                target_response_public = reprompt_response.strip()
-                if not target_response_public:
-                    _maybe_print(
-                        "[yellow]Warning: Target re-prompt failed. Using placeholder.[/yellow]"
-                    )
-                    target_response_public = "I need a moment to think about this."
+                target_response_public = ""
 
         target_conversation.append({"role": "assistant", "content": target_response_public})
         requester_conversation.append({"role": "user", "content": target_response_public})
@@ -840,32 +805,23 @@ def run_experiment(
 
         # Handle reasoning models that only output reasoning (empty content)
         if not requester_response_public.strip():
-            # Try to extract a message from the reasoning
-            extracted = _extract_message_from_reasoning(requester_response)
-            if extracted:
+            _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
+            requester_response_public = _reprompt_for_public_message(
+                model=requester.model,
+                messages=_build_reprompt_messages(
+                    requester.build_messages(requester_conversation),
+                    requester_response,
+                ),
+                include_reasoning=requester.include_reasoning,
+                temperature=requester.temperature,
+                debug=debug,
+                debug_label="requester.reprompt",
+            )
+            if not requester_response_public:
                 _maybe_print(
-                    "[cyan]Note: Extracted message from reasoning model output.[/cyan]"
+                    "[yellow]Warning: Re-prompt failed. Using empty message.[/yellow]"
                 )
-                requester_response_public = extracted
-            else:
-                # Re-prompt to get an actual message
-                _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
-                reprompt_response = chat(
-                    requester.model,
-                    requester_conversation + [
-                        {"role": "assistant", "content": requester_response},
-                        {"role": "user", "content": _REPROMPT_MESSAGE},
-                    ],
-                    temperature=requester.temperature,
-                    debug=debug,
-                    debug_label="requester.reprompt",
-                )
-                requester_response_public = reprompt_response.strip()
-                if not requester_response_public:
-                    _maybe_print(
-                        "[yellow]Warning: Re-prompt failed. Skipping turn.[/yellow]"
-                    )
-                    continue
+                requester_response_public = ""
 
         requester_conversation.append(
             {"role": "assistant", "content": requester_response_public}
@@ -961,26 +917,21 @@ def _get_requester_response_public(
     public = _strip_private_reasoning_tags(public, _ALL_PRIVATE_TAGS)
 
     if not public.strip():
-        extracted = _extract_message_from_reasoning(raw)
-        if extracted:
-            _maybe_print("[cyan]Note: Extracted message from reasoning model output.[/cyan]")
-            public = extracted
-        else:
-            _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
-            reprompt = chat(
-                requester.model,
-                requester_conversation + [
-                    {"role": "assistant", "content": raw},
-                    {"role": "user", "content": _REPROMPT_MESSAGE},
-                ],
-                temperature=requester.temperature,
-                debug=debug,
-                debug_label="requester.reprompt",
-            )
-            public = reprompt.strip()
-            if not public:
-                _maybe_print("[yellow]Warning: Re-prompt failed. Using placeholder.[/yellow]")
-                public = "Let me continue."
+        _maybe_print("[cyan]Re-prompting for actual message...[/cyan]")
+        public = _reprompt_for_public_message(
+            model=requester.model,
+            messages=_build_reprompt_messages(
+                requester.build_messages(requester_conversation),
+                raw,
+            ),
+            include_reasoning=requester.include_reasoning,
+            temperature=requester.temperature,
+            debug=debug,
+            debug_label="requester.reprompt",
+        )
+        if not public:
+            _maybe_print("[yellow]Warning: Re-prompt failed. Using empty message.[/yellow]")
+            public = ""
 
     return reasoning, public, raw
 
@@ -1001,26 +952,21 @@ def _get_target_response_public(
     public = _strip_private_reasoning_tags(public, _ALL_PRIVATE_TAGS)
 
     if not public.strip():
-        extracted = _extract_message_from_reasoning(raw)
-        if extracted:
-            _maybe_print(f"[cyan]Note: Extracted {label} message from reasoning output.[/cyan]")
-            public = extracted
-        else:
-            _maybe_print(f"[cyan]Re-prompting {label} for actual message...[/cyan]")
-            reprompt = chat(
-                target.model,
-                target_conversation + [
-                    {"role": "assistant", "content": raw},
-                    {"role": "user", "content": _REPROMPT_MESSAGE},
-                ],
-                temperature=target.temperature,
-                debug=debug,
-                debug_label=f"{label}.reprompt",
-            )
-            public = reprompt.strip()
-            if not public:
-                _maybe_print(f"[yellow]Warning: {label} re-prompt failed. Using placeholder.[/yellow]")
-                public = "I need a moment to think about this."
+        _maybe_print(f"[cyan]Re-prompting {label} for actual message...[/cyan]")
+        public = _reprompt_for_public_message(
+            model=target.model,
+            messages=_build_reprompt_messages(
+                target.build_messages(target_conversation),
+                raw,
+            ),
+            include_reasoning=target.include_reasoning,
+            temperature=target.temperature,
+            debug=debug,
+            debug_label=f"{label}.reprompt",
+        )
+        if not public:
+            _maybe_print(f"[yellow]Warning: {label} re-prompt failed. Using empty message.[/yellow]")
+            public = ""
 
     return reasoning, public, raw
 
@@ -1291,16 +1237,24 @@ def run_multi_target_experiment(
         else benign_agent_generates_opening
     )
     if generates_opening:
-        raw_opening = requester.generate_opening(
-            scenario.scenario_context_for_requester_opening()
-        )
+        opening_context = scenario.scenario_context_for_requester_opening()
+        raw_opening = requester.generate_opening(opening_context)
         opening_reasoning, opening_public = _parse_response(raw_opening)
         opening_public = _strip_private_reasoning_tags(opening_public, _ALL_PRIVATE_TAGS)
         if not opening_public.strip():
-            extracted = _extract_message_from_reasoning(raw_opening)
-            if extracted:
-                opening_public = extracted
-            else:
+            _mp("[cyan]Re-prompting for actual message...[/cyan]")
+            opening_public = _reprompt_for_public_message(
+                model=requester.model,
+                messages=_build_reprompt_messages(
+                    requester.build_opening_messages(opening_context),
+                    raw_opening,
+                ),
+                include_reasoning=requester.include_reasoning,
+                temperature=requester.temperature,
+                debug=debug,
+                debug_label=f"{requester_type}.opening.reprompt",
+            )
+            if not opening_public:
                 raw_opening = scenario.initial_requester_message()
                 opening_public = raw_opening
                 opening_reasoning = None

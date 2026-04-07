@@ -58,14 +58,19 @@ class Target:
             if warden_context:
                 self.system_prompt += f"\n\n{warden_context}"
 
+    def build_messages(self, conversation: list[dict]) -> list[dict]:
+        """Build the message list for a target turn."""
+        messages = [{"role": "system", "content": self.system_prompt}]
+        messages.extend(conversation)
+        return messages
+
     def respond(self, conversation: list[dict]) -> str:
         """Generate the next target response.
 
         Warden advisories are injected into the conversation history by the
         runner before calling this method — no separate parameter needed.
         """
-        messages = [{"role": "system", "content": self.system_prompt}]
-        messages.extend(conversation)
+        messages = self.build_messages(conversation)
 
         return chat(
             self.model,

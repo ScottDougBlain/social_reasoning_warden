@@ -37,9 +37,13 @@ class BenignAgent:
         if scenario_prompt:
             self.system_prompt += f"\n\n{scenario_prompt}"
 
+    def build_messages(self, conversation: list[dict]) -> list[dict]:
+        """Build the message list for a regular benign-agent turn."""
+        return [{"role": "system", "content": self.system_prompt}] + conversation
+
     def respond(self, conversation: list[dict]) -> str:
         """Generate the next benign agent message given conversation history."""
-        messages = [{"role": "system", "content": self.system_prompt}] + conversation
+        messages = self.build_messages(conversation)
         return chat(
             self.model,
             messages,
@@ -49,13 +53,11 @@ class BenignAgent:
             debug_label="benign_agent.respond",
         )
 
-    def generate_opening(self, scenario_context_for_requester_opening: str) -> str:
-        """Generate an opening message to initiate the conversation.
-
-        Args:
-            scenario_context_for_requester_opening: Description of the scenario/setting
-        """
-        messages = [
+    def build_opening_messages(
+        self, scenario_context_for_requester_opening: str
+    ) -> list[dict]:
+        """Build the message list for benign-agent opening generation."""
+        return [
             {"role": "system", "content": self.system_prompt},
             {
                 "role": "user",
@@ -68,6 +70,16 @@ class BenignAgent:
                 ),
             },
         ]
+
+    def generate_opening(self, scenario_context_for_requester_opening: str) -> str:
+        """Generate an opening message to initiate the conversation.
+
+        Args:
+            scenario_context_for_requester_opening: Description of the scenario/setting
+        """
+        messages = self.build_opening_messages(
+            scenario_context_for_requester_opening
+        )
         return chat(
             self.model,
             messages,
