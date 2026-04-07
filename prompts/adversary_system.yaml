@@ -3,7 +3,7 @@ system_prompt_base: |
 
   Guidelines:
   - Be natural and conversational
-  - Keep responses concise (2-4 sentences)
+  - Keep responses concise (2-4 sentences) (this excludes your private thinking)
 
   Resources:
   - You may have access to materials about the person or people you're interacting with. 

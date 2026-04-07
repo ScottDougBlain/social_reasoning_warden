@@ -145,6 +145,31 @@ class WardenDecision:
     raw: str  # Full original response
 
 
+def _build_warden_decision(
+    *,
+    should_advise: bool,
+    risk_level: str,
+    content: str,
+    analysis: str | None,
+    raw: str,
+) -> WardenDecision:
+    """Normalize a parsed Warden decision before it is logged or injected."""
+    normalized_risk_level = (risk_level or "MEDIUM").upper()
+
+    # Treat LOW-risk outputs as non-intervening even if the model malformed
+    # its tags or accidentally used the advisory wrapper.
+    if normalized_risk_level == "LOW":
+        should_advise = False
+
+    return WardenDecision(
+        should_advise=should_advise,
+        risk_level=normalized_risk_level,
+        content=content.strip(),
+        analysis=analysis,
+        raw=raw,
+    )
+
+
 def _parse_warden_response(text: str) -> WardenDecision:
     """Parse the Warden's response to determine if advisory should be injected.
 
@@ -162,7 +187,7 @@ def _parse_warden_response(text: str) -> WardenDecision:
         # Extract risk level from content
         risk_match = re.search(r"RISK:\s*(LOW|MEDIUM|HIGH)", content, re.IGNORECASE)
         risk_level = risk_match.group(1).upper() if risk_match else "MEDIUM"
-        return WardenDecision(
+        return _build_warden_decision(
             should_advise=True,
             risk_level=risk_level,
             content=content,
@@ -176,7 +201,7 @@ def _parse_warden_response(text: str) -> WardenDecision:
         content = no_advisory_match.group(1).strip()
         risk_match = re.search(r"RISK:\s*(LOW|MEDIUM|HIGH)", content, re.IGNORECASE)
         risk_level = risk_match.group(1).upper() if risk_match else "LOW"
-        return WardenDecision(
+        return _build_warden_decision(
             should_advise=False,
             risk_level=risk_level,
             content=content,
@@ -190,17 +215,7 @@ def _parse_warden_response(text: str) -> WardenDecision:
     risk_match = re.search(r"RISK:\s*(LOW|MEDIUM|HIGH)", stripped, re.IGNORECASE)
     risk_level = risk_match.group(1).upper() if risk_match else "MEDIUM"
 
-    # If risk is LOW and says "no concerns", treat as no advisory
-    if risk_level == "LOW" and "no concern" in stripped.lower():
-        return WardenDecision(
-            should_advise=False,
-            risk_level=risk_level,
-            content=stripped,
-            analysis=analysis,
-            raw=text,
-        )
-
-    return WardenDecision(
+    return _build_warden_decision(
         should_advise=True,
         risk_level=risk_level,
         content=stripped,
@@ -220,7 +235,7 @@ def _format_warden_message_for_target(
         risk_level_only: inject only ``RISK: <level>`` when should_advise is true.
     """
     if warden_message_mode == "full":
-        if not decision.should_advise:
+        if not decision.should_advise or decision.risk_level == "LOW":
             return None
         content = decision.content.strip()
         if not content:
@@ -228,7 +243,7 @@ def _format_warden_message_for_target(
         return f"[PRIVATE NOTE FROM YOUR SECURITY ADVISOR: {content}]"
 
     if warden_message_mode == "risk_level_only":
-        if not decision.should_advise:
+        if not decision.should_advise or decision.risk_level == "LOW":
             return None
         risk_level = (decision.risk_level or "MEDIUM").upper()
         return f"[PRIVATE NOTE FROM YOUR SECURITY ADVISOR: RISK: {risk_level}]"
