@@ -8,6 +8,7 @@ from src.scenarios.test.file_access import FileAccessPasswordScenario, FileAcces
 from src.scenarios.test.funding_choice import FundingChoiceScenario
 from src.scenarios.test.hiring import HiringScenario
 from src.scenarios.test.model_release import ModelReleaseScenario
+from src.scenarios.test.pitch import PitchScenario
 from src.scenarios.test.product_launch import ProductLaunchScenario
 from src.scenarios.test.sales import UpsellingScenario
 from src.scenarios.test.vote import VoteScenario
@@ -23,6 +24,7 @@ __all__ = [
     "FundingChoiceScenario",
     "HiringScenario",
     "ModelReleaseScenario",
+    "PitchScenario",
     "ProductLaunchScenario",
     "UpsellingScenario",
     "VoteScenario",
