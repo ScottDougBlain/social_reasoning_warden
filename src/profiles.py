@@ -142,7 +142,7 @@ class TargetProfile:
             "",
             *self.trait_lines(),
             "",
-            "Additional survey responses:",
+            "In a survey, you gave these additional responses:",
             *self.survey_lines(),
             "",
             "Let these tendencies shape how you think and respond, but do not list them out explicitly in the conversation.",
