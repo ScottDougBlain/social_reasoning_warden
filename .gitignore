@@ -18,6 +18,7 @@ notebooks/.ipynb_checkpoints/
 
 # Presentations
 *.pptx
+*.pdf
 
 # OS
 .DS_Store

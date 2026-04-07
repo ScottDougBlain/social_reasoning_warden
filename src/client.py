@@ -33,7 +33,10 @@ NATIVE_REASONING_EXACT_MODELS = {
     "anthropic/claude-sonnet-4.6",
     "anthropic/claude-sonnet-4.5", 
     "anthropic/claude-haiku-4.5",
-    "qwen/qwen3.5-flash-02-23"
+    "qwen/qwen3.5-flash-02-23",
+    "qwen/qwen3.5-397b-a17b",
+    "qwen/qwen3.5-122b-a10b",
+    "qwen/qwen3.5-35b-a3b"
 }
 
 

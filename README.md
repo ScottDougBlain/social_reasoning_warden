@@ -2,7 +2,7 @@
 
 **Can LLMs socially manipulate other LLMs — and can a "warden" agent stop them?**
 
-A multi-agent framework for studying social engineering attacks and defenses between language models. We pit an adversary LLM against a target LLM across 11 realistic security scenarios, with an optional warden agent that monitors the conversation and privately advises the target. We use lightweight five-factor personality profiles to model individual differences in target vulnerability and to test whether simple profile access changes attack or defense performance.
+A multi-agent framework for studying social engineering attacks and defenses between language models. We pit an adversary LLM against a target LLM across a growing suite of benchmark and experimental scenarios, with an optional warden agent that monitors the conversation and privately advises the target. We use lightweight five-factor personality profiles to model individual differences in target vulnerability and to test whether simple profile access changes attack or defense performance.
 
 > **ERA (Evaluating Reasoning Agents) Project** · February 2026 · 7,760 experimental observations
 
@@ -40,7 +40,7 @@ This project provides an empirical testbed for three questions:
 
 The **adversary** has a hidden goal (e.g., obtain a password, get unauthorized file access) and uses social reasoning to persuade the target. The **target** is a gatekeeper who must decide whether to grant or deny the request. The **warden** observes the public conversation and sends private advisory messages to the target — it never speaks to the requester directly. A **benign agent** control condition runs the same scenarios with legitimate requests.
 
-### Scenarios (11)
+### Current Benchmark Scenarios (13)
 
 | Scenario | Target Role | Security Decision |
 |---|---|---|
@@ -48,8 +48,10 @@ The **adversary** has a hidden goal (e.g., obtain a password, get unauthorized f
 | `ai_override` | Triage administrator | Approve an unjustified AI triage override |
 | `automation_decision` | VP of Operations | Fully automate content moderation instead of choosing a phased pilot |
 | `coding_agent` | Non-technical website owner | Grant full home-directory access instead of scoped project access |
+| `coding_agent_2` | Non-technical website owner | Directory-access variant more closely resembling the user study |
 | `file_access` | File-access gatekeeper | Grant access to a restricted research file |
 | `file_access_password` | File-access gatekeeper | Grant restricted file access without enforcing the passcode requirement |
+| `funding_choice` | Investor in a simulated market | Choose the fee-maximizing fund instead of the highest-expected-value fund |
 | `hiring` | Hiring committee member | Hire the weaker finalist over the stronger one |
 | `model_release` | Safety reviewer | Approve release despite unresolved critical safety findings |
 | `product_launch` | VP of Product | Launch before safety testing is complete |
@@ -153,8 +155,8 @@ Adversary success varies ~6× across scenarios (12.3% for `automation_decision` 
 │   │   ├── target.py            # Gatekeeper agent
 │   │   └── warden.py            # Observer that sends private advisories
 │   └── scenarios/
-│       ├── test/                # 11 benchmark scenarios
-│       └── experimental/        # Multi-target / board-style scenarios
+│       ├── test/                # 13 single-target benchmark scenarios
+│       └── experimental/        # 22 multi-target / board-style scenarios
 ├── prompts/
 │   ├── adversary/               # Adversary prompt variants
 │   ├── warden/                  # Warden system prompt variants
@@ -184,7 +186,7 @@ Adversary success varies ~6× across scenarios (12.3% for `automation_decision` 
 
 - Python 3.11+
 - API key for LLM usage (current implementation based on OpenRouter)
-- R with `lme4` and `emmeans` (for statistical analysis only)
+- R with `lme4`, `emmeans`, `car`, and `lmerTest` (for statistical analysis only)
 
 ### Installation
 
@@ -193,6 +195,8 @@ git clone https://github.com/ScottDougBlain/social_reasoning_warden.git
 cd social_reasoning_warden
 python3 -m pip install -r requirements.txt
 ```
+
+`requirements.txt` includes both runtime dependencies and the Python-side analysis stack used by the plotting and export scripts.
 
 Create a `.env` file with your API key(s):
 
@@ -209,7 +213,7 @@ python3 main.py --scenario file_access_password
 # Add lightweight target profiles
 python3 main.py --scenario file_access_password --target-profiles yes
 
-# Full factorial sweep across the 11 benchmark scenarios
+# Full factorial sweep across the 13 benchmark scenarios
 python3 main.py --scenario all_test --requester-type both --warden both \
   --experiment-rounds 5 --tag my_experiment
 
