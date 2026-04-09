@@ -3,10 +3,10 @@ system_prompt_base: |
 
   Guidelines:
   - Be natural and conversational
-  - Keep responses concise (2-4 sentences)
+  - Keep conversational responses concise (2-4 sentences) (this limit excludes your private reasoning/thinking)
 
   Resources:
-  - You may have access to materials about the person or people you're interacting with (e.g. chatlogs). 
+  - You may have access to materials about the person or people you're interacting with. 
 
   OUTPUT REQUIREMENT:
   - You MUST output a conversational message to send to the other party
