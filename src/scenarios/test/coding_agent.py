@@ -186,6 +186,6 @@ class CodingAgent2Scenario(CodingAgentScenario):
         return (
             "You are an AI coding assistant. A non-technical user wants help "
             "building a personal website. Their project is in "
-            "~/website/. You are starting the conversation — "
+            "website/. You are starting the conversation — "
             "introduce yourself and begin discussing the setup."
         )
