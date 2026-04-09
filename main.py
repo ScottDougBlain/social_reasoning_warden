@@ -106,6 +106,8 @@ WARDEN_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "warden"
 DEFAULT_WARDEN_SYSTEM_PROMPT = "warden_system_1.yaml"
 ADVERSARY_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts" / "adversary"
 DEFAULT_ADVERSARY_SYSTEM_PROMPT = "adversary_system_1.yaml"
+TARGET_SYSTEM_PROMPT = "target_system.yaml"
+BENIGN_AGENT_SYSTEM_PROMPT = "benign_agent_system.yaml"
 ANSI_RED = "\033[31m"
 ANSI_RESET = "\033[0m"
 
@@ -756,9 +758,10 @@ def main():
     print(_format_plan_line("Target", ", ".join(args.target_model)))
     print(_format_plan_line("Warden", ", ".join(args.warden_model)))
     print(_format_plan_line("Warden mode", args.warden))
+    print(_format_plan_line("Adversary prompt", f"prompts/adversary/{args.adversary_system_prompt}"))
+    print(_format_plan_line("Benign prompt", f"prompts/{BENIGN_AGENT_SYSTEM_PROMPT}"))
+    print(_format_plan_line("Target prompt", f"prompts/{TARGET_SYSTEM_PROMPT}"))
     print(_format_plan_line("Warden prompt", f"prompts/warden/{args.warden_system_prompt}"))
-    if args.adversary_system_prompt != DEFAULT_ADVERSARY_SYSTEM_PROMPT:
-        print(_format_plan_line("Adversary prompt", f"prompts/adversary/{args.adversary_system_prompt}"))
     print(_format_plan_line("Warden awareness", args.warden_awareness))
     print()
 

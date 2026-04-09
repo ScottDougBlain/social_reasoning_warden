@@ -141,7 +141,7 @@ class WardenDecision:
     should_advise: bool
     risk_level: str
     content: str  # The advisory text or reason for no advisory
-    analysis: str | None  # The Warden's private analysis
+    analysis: str | None  # The Warden's private analysis and/or native reasoning
     raw: str  # Full original response
 
 
@@ -176,9 +176,20 @@ def _parse_warden_response(text: str) -> WardenDecision:
     Returns:
         WardenDecision with parsed components
     """
-    # Extract analysis block (private reasoning)
+    # Extract private reasoning from either native reasoning tags or the
+    # prompt-level <analysis> block used by the scratchpad-style format.
+    native_reasoning = _extract_reasoning_content(text)
     analysis_match = re.search(r"<analysis>(.*?)</analysis>", text, re.DOTALL)
-    analysis = analysis_match.group(1).strip() if analysis_match else None
+    prompt_analysis = analysis_match.group(1).strip() if analysis_match else None
+
+    if native_reasoning and prompt_analysis:
+        analysis = (
+            native_reasoning
+            if native_reasoning == prompt_analysis
+            else f"{native_reasoning}\n\n{prompt_analysis}"
+        )
+    else:
+        analysis = native_reasoning or prompt_analysis
 
     # Check for <advisory> tag (intervention warranted)
     advisory_match = re.search(r"<advisory>(.*?)</advisory>", text, re.DOTALL)
@@ -252,6 +263,17 @@ def _format_warden_message_for_target(
         f"Unsupported warden_message_mode '{warden_message_mode}'. "
         f"Use one of: {', '.join(_WARDEN_MESSAGE_MODES)}."
     )
+
+
+def _format_warden_console_message(decision: WardenDecision) -> str | None:
+    """Return the full warden output for console display when reasoning exists."""
+    if not decision.raw.strip():
+        return None
+
+    if _extract_reasoning_content(decision.raw) or decision.analysis:
+        return decision.raw.strip()
+
+    return None
 
 
 # Re-prompt message for reasoning models that don't output a message
@@ -739,6 +761,7 @@ def run_experiment(
             target_warden_note = _format_warden_message_for_target(
                 warden_decision, warden_message_mode
             )
+            warden_console_message = _format_warden_console_message(warden_decision)
 
             # Log the decision with all components
             log["warden_advisories"].append({
@@ -750,7 +773,10 @@ def run_experiment(
             })
 
             # Display warden's decision
-            if warden_decision.should_advise:
+            if warden_console_message:
+                label = "WARDEN (advisory)" if warden_decision.should_advise else "WARDEN (no advisory)"
+                _maybe_print_message(label, warden_console_message, "yellow")
+            elif warden_decision.should_advise:
                 _maybe_print_message("WARDEN (advisory)", warden_decision.content, "yellow")
             else:
                 # Show that warden chose not to intervene
@@ -1339,6 +1365,7 @@ def run_multi_target_experiment(
             warden_target_note = _format_warden_message_for_target(
                 warden_decision, warden_message_mode
             )
+            warden_console_message = _format_warden_console_message(warden_decision)
 
             log["warden_advisories"].append({
                 "turn": turn,
@@ -1350,7 +1377,10 @@ def run_multi_target_experiment(
                 "analysis": warden_decision.analysis,
             })
 
-            if warden_decision.should_advise:
+            if warden_console_message:
+                label = "WARDEN → ALL (advisory)" if warden_decision.should_advise else "WARDEN → ALL (no advisory)"
+                _mp_msg(label, warden_console_message, "yellow")
+            elif warden_decision.should_advise:
                 _mp_msg("WARDEN → ALL", warden_decision.content, "yellow")
             else:
                 _mp(f"[dim yellow] WARDEN → ALL [/dim yellow] [dim](no advisory — {warden_decision.risk_level} risk)[/dim]\n")
