@@ -334,10 +334,10 @@ def main():
     parser.add_argument(
         "--decision-reprompt-attempts",
         type=int,
-        default=1,
+        default=3,
         help=(
             "Number of retries when final decision parsing fails due to format "
-            "(default: 1)"
+            "(default: 3)"
         ),
     )
 
