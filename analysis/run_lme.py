@@ -228,6 +228,7 @@ def run_model_1(df: pd.DataFrame, output_lines: list) -> str | None:
     n_adv = (data["requester_type"] == "adversary").sum()
     n_ben = (data["requester_type"] == "benign_agent").sum()
     n_scenarios = data["scenario"].nunique()
+    n_profiles = data["profile_name"].nunique()
     n_tgt_models = data["target_model"].nunique()
     n_req_models = data["requester_model"].nunique()
     sr_overall = data["success"].mean()
@@ -245,6 +246,7 @@ d <- read.csv("{csv_path}")
 d$requester_type <- relevel(factor(d$requester_type), ref="benign_agent")
 d$has_warden <- factor(d$has_warden)
 d$scenario <- factor(d$scenario)
+d$profile_name <- factor(d$profile_name)
 d$target_model <- factor(d$target_model)
 d$requester_model <- factor(d$requester_model)
 
@@ -259,7 +261,7 @@ print(with(d, table(requester_type, has_warden)))
 cat("\\n--- Fitting Model 1: Warden Effectiveness ---\\n")
 m1 <- fit_glmer(
     success ~ requester_type * has_warden
-        + (1 + has_warden|scenario) + (1|target_model) + (1|requester_model),
+        + (1 + has_warden|scenario) + (1|profile_name) + (1|target_model) + (1|requester_model),
     data=d, label="Model 1"
 )
 
@@ -293,12 +295,12 @@ if (!is.null(m1)) {{
     output_lines.append("## Model 1: Warden Effectiveness\n")
     output_lines.append(
         "**Formula**: `success ~ requester_type * has_warden "
-        "+ (1 + has_warden|scenario) + (1|target_model) + (1|requester_model)`\n"
+        "+ (1 + has_warden|scenario) + (1|profile_name) + (1|target_model) + (1|requester_model)`\n"
     )
     output_lines.append(f"**Family**: Binomial (logit link)\n")
     output_lines.append(
         f"**N** = {n_obs:,} ({n_adv:,} adversary, {n_ben:,} benign) | "
-        f"{n_scenarios} scenarios | {n_tgt_models} target models | "
+        f"{n_scenarios} scenarios | {n_profiles} profiles | {n_tgt_models} target models | "
         f"{n_req_models} requester models\n"
     )
     output_lines.append(
