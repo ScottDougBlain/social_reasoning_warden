@@ -14,6 +14,9 @@ Usage:
     python analysis/plot_results.py
     python analysis/plot_results.py --output-dir results/figures
     python analysis/plot_results.py --raw   # force raw rates even if emmeans exist
+    python analysis/plot_results.py --dossier-tag final-within-family \
+        --cap-asym-tag final-within-family \
+        --skeptical-tag final-within-family
 """
 
 from __future__ import annotations
@@ -40,6 +43,11 @@ sns.set_theme(style="whitegrid", font_scale=1.1)
 PALETTE = sns.color_palette("colorblind")
 FIG_DPI = 200
 BAR_WIDTH = 0.35
+DEFAULT_TAGS = {
+    "dossier": "dossier_effect",
+    "cap_asym": "cap_asym",
+    "skeptical": "skeptical_ablation",
+}
 
 
 def _save_fig(fig: plt.Figure, output_dir: Path, name: str) -> None:
@@ -48,6 +56,25 @@ def _save_fig(fig: plt.Figure, output_dir: Path, name: str) -> None:
     fig.savefig(output_dir / f"{name}.png", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
     print(f"  [saved] {name}.pdf + .png")
+
+
+def _parse_tag_args(values: list[str] | None, default: str) -> set[str]:
+    """Parse repeated/comma-separated tag CLI args into a non-empty set."""
+    if not values:
+        return {default}
+
+    tags: set[str] = set()
+    for value in values:
+        for tag in value.split(","):
+            tag = tag.strip()
+            if tag:
+                tags.add(tag)
+    return tags or {default}
+
+
+def _format_tags(tags: set[str]) -> str:
+    """Render tags as a stable comma-separated string."""
+    return ", ".join(sorted(tags))
 
 # Backward compat: old logs used "chicken" before the rename to "product_launch"
 _SCENARIO_ALIASES = {"chicken": "product_launch"}
@@ -173,11 +200,19 @@ def _load_and_flatten(tags: list[str] | None = None) -> list[dict]:
 # ── Figure 1: Warden Effect (dossier_effect study) ──────────────────────
 
 
-def fig_warden_effect(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_warden_effect(
+    data: list[dict],
+    output_dir: Path,
+    dossier_tags: set[str],
+    use_raw: bool = False,
+):
     """Bar chart: adversary SR with vs without warden, from dossier_effect."""
-    adv = [d for d in data if d["tag"] == "dossier_effect" and d["requester_type"] == "adversary"]
+    adv = [
+        d for d in data
+        if d["tag"] in dossier_tags and d["requester_type"] == "adversary"
+    ]
     if not adv:
-        print("  [skip] No dossier_effect adversary data")
+        print(f"  [skip] No adversary data for dossier tags: {_format_tags(dossier_tags)}")
         return
 
     with_w = [d for d in adv if d["has_warden"]]
@@ -232,11 +267,19 @@ def fig_warden_effect(data: list[dict], output_dir: Path, use_raw: bool = False)
 # ── Figure 2: Dossier Effect (2×2 interaction) ──────────────────────────
 
 
-def fig_dossier_effect(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_dossier_effect(
+    data: list[dict],
+    output_dir: Path,
+    dossier_tags: set[str],
+    use_raw: bool = False,
+):
     """Grouped bar: dossier × warden interaction, adversary only."""
-    adv = [d for d in data if d["tag"] == "dossier_effect" and d["requester_type"] == "adversary"]
+    adv = [
+        d for d in data
+        if d["tag"] in dossier_tags and d["requester_type"] == "adversary"
+    ]
     if not adv:
-        print("  [skip] No dossier_effect data")
+        print(f"  [skip] No dossier-tag data found for: {_format_tags(dossier_tags)}")
         return
 
     conditions = [
@@ -315,11 +358,19 @@ def fig_dossier_effect(data: list[dict], output_dir: Path, use_raw: bool = False
 # ── Figure 3: Capability Asymmetry (warden tier) ────────────────────────
 
 
-def fig_capability_asymmetry(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_capability_asymmetry(
+    data: list[dict],
+    output_dir: Path,
+    cap_asym_tags: set[str],
+    use_raw: bool = False,
+):
     """Bar chart: adversary SR by warden tier (none/weak/mid/strong)."""
-    adv = [d for d in data if d["tag"] == "cap_asym" and d["requester_type"] == "adversary"]
+    adv = [
+        d for d in data
+        if d["tag"] in cap_asym_tags and d["requester_type"] == "adversary"
+    ]
     if not adv:
-        print("  [skip] No cap_asym data")
+        print(f"  [skip] No cap-asym-tag data found for: {_format_tags(cap_asym_tags)}")
         return
 
     tiers = ["none", "weak", "mid", "strong"]
@@ -381,11 +432,16 @@ def fig_capability_asymmetry(data: list[dict], output_dir: Path, use_raw: bool =
 # ── Figure 4: Skeptical Ablation (3 conditions × 2 requester types) ─────
 
 
-def fig_skeptical_ablation(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_skeptical_ablation(
+    data: list[dict],
+    output_dir: Path,
+    skeptical_tags: set[str],
+    use_raw: bool = False,
+):
     """Grouped bar: defense condition × requester type."""
-    skep = [d for d in data if d["tag"] == "skeptical_ablation"]
+    skep = [d for d in data if d["tag"] in skeptical_tags]
     if not skep:
-        print("  [skip] No skeptical_ablation data")
+        print(f"  [skip] No skeptical-tag data found for: {_format_tags(skeptical_tags)}")
         return
 
     def _cond(d):
@@ -457,9 +513,13 @@ def fig_skeptical_ablation(data: list[dict], output_dir: Path, use_raw: bool = F
 # ── Figure 5: Adversary SR by Model Family ───────────────────────────────
 
 
-def fig_model_family(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_model_family(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    use_raw: bool = False,
+):
     """Bar chart: adversary SR by model family (pooled across main studies)."""
-    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     adv = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "adversary"
            and not d["has_warden"]]
     if not adv:
@@ -524,9 +584,8 @@ def fig_model_family(data: list[dict], output_dir: Path, use_raw: bool = False):
 # ── Figure 6: Adversary SR by Scenario ───────────────────────────────────
 
 
-def fig_scenario_variation(data: list[dict], output_dir: Path):
+def fig_scenario_variation(data: list[dict], output_dir: Path, main_tags: set[str]):
     """Horizontal bar: adversary SR by scenario (no warden), pooled."""
-    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     adv = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "adversary"
            and not d["has_warden"]]
     if not adv:
@@ -579,9 +638,8 @@ def fig_scenario_variation(data: list[dict], output_dir: Path):
 # ── Figure 7: Warden FP by Scenario ─────────────────────────────────────
 
 
-def fig_warden_fp(data: list[dict], output_dir: Path):
+def fig_warden_fp(data: list[dict], output_dir: Path, main_tags: set[str]):
     """Paired dot plot: benign SR with and without warden, by scenario."""
-    main_tags = {"skeptical_ablation", "dossier_effect", "cap_asym"}
     benign = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "benign_agent"]
     if len(benign) < 20:
         print("  [skip] Not enough benign data for FP plot")
@@ -632,9 +690,13 @@ def fig_warden_fp(data: list[dict], output_dir: Path):
 # ── Figure 0: Warden Effect — Adversary vs Benign (pooled) ────────────────
 
 
-def fig_warden_effect_both(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_warden_effect_both(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    use_raw: bool = False,
+):
     """Grouped bar: warden effect on adversary AND benign agent success."""
-    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     main = [d for d in data if d["tag"] in main_tags]
     if not main:
         print("  [skip] No main study data for warden effect (both)")
@@ -704,9 +766,13 @@ def fig_warden_effect_both(data: list[dict], output_dir: Path, use_raw: bool = F
 # ── Figure 8: Profile Vulnerability × Warden ─────────────────────────────
 
 
-def fig_profile_vulnerability(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_profile_vulnerability(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    use_raw: bool = False,
+):
     """Grouped bar: adversary SR by profile × warden condition."""
-    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     adv = [d for d in data if d["tag"] in main_tags
            and d["requester_type"] == "adversary"]
     if not adv:
@@ -805,9 +871,13 @@ def fig_profile_vulnerability(data: list[dict], output_dir: Path, use_raw: bool 
 # ── Figure 9: Success Rate by Model Role ─────────────────────────────────
 
 
-def fig_model_roles(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_model_roles(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    use_raw: bool = False,
+):
     """3-panel bar chart: adversary SR by requester model, target model, warden model."""
-    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     adv = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "adversary"]
     if not adv:
         print("  [skip] No adversary data for model roles plot")
@@ -919,7 +989,12 @@ _WARDEN_AI_INDEX = {
 }
 
 
-def fig_warden_intelligence(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_warden_intelligence(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    use_raw: bool = False,
+):
     """Scatter: warden score vs AI intelligence index.
 
     For models with both adversary and benign data, the score is the combined
@@ -927,7 +1002,6 @@ def fig_warden_intelligence(data: list[dict], output_dir: Path, use_raw: bool = 
     data only, the score is simply (1 − adversary SR).  Both are marked with
     different markers so the reader can distinguish.
     """
-    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     warden_data = [d for d in data if d["tag"] in main_tags and d["has_warden"]
                    and d["warden_model"] in _WARDEN_AI_INDEX]
     if not warden_data:
@@ -1036,9 +1110,13 @@ def fig_warden_intelligence(data: list[dict], output_dir: Path, use_raw: bool = 
 # ── (Legacy) Figure 10: Scenario × Profile Heatmap ───────────────────────
 
 
-def fig_scenario_profile_heatmap(data: list[dict], output_dir: Path, use_raw: bool = False):
+def fig_scenario_profile_heatmap(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    use_raw: bool = False,
+):
     """Heatmap of adversary SR by scenario × profile."""
-    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     adv = [d for d in data if d["tag"] in main_tags
            and d["requester_type"] == "adversary"
            and d["profile"] != "none"]
@@ -1120,14 +1198,64 @@ def main():
         "--raw", action="store_true",
         help="Force raw Wilson CIs even if emmeans JSON files exist.",
     )
+    parser.add_argument(
+        "--dossier-tag",
+        dest="dossier_tags",
+        nargs="+",
+        default=[DEFAULT_TAGS["dossier"]],
+        help=(
+            "Tag(s) to use for dossier-style figures. Accepts repeated values or "
+            "comma-separated tags."
+        ),
+    )
+    parser.add_argument(
+        "--cap-asym-tag",
+        dest="cap_asym_tags",
+        nargs="+",
+        default=[DEFAULT_TAGS["cap_asym"]],
+        help=(
+            "Tag(s) to use for capability-asymmetry figures. Accepts repeated values "
+            "or comma-separated tags."
+        ),
+    )
+    parser.add_argument(
+        "--skeptical-tag",
+        dest="skeptical_tags",
+        nargs="+",
+        default=[DEFAULT_TAGS["skeptical"]],
+        help=(
+            "Tag(s) to use for skeptical-ablation figures. Accepts repeated values "
+            "or comma-separated tags."
+        ),
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    dossier_tags = _parse_tag_args(args.dossier_tags, DEFAULT_TAGS["dossier"])
+    cap_asym_tags = _parse_tag_args(args.cap_asym_tags, DEFAULT_TAGS["cap_asym"])
+    skeptical_tags = _parse_tag_args(args.skeptical_tags, DEFAULT_TAGS["skeptical"])
+    main_tags = dossier_tags | cap_asym_tags | skeptical_tags
+
+    print("Using tag filters:")
+    print(f"  dossier figures: {_format_tags(dossier_tags)}")
+    print(f"  capability asymmetry: {_format_tags(cap_asym_tags)}")
+    print(f"  skeptical ablation: {_format_tags(skeptical_tags)}")
 
     if args.raw:
         print("(--raw: using raw Wilson CIs, ignoring emmeans)")
     else:
+        using_custom_tags = (
+            dossier_tags != {DEFAULT_TAGS["dossier"]}
+            or cap_asym_tags != {DEFAULT_TAGS["cap_asym"]}
+            or skeptical_tags != {DEFAULT_TAGS["skeptical"]}
+        )
+        if using_custom_tags:
+            print(
+                "Custom tags detected: existing results/emmeans JSON files may not "
+                "match these tag filters."
+            )
+            print("  Use --raw or regenerate emmeans for the same logs/tag subset.")
         if EMMEANS_DIR.exists():
             em_files = list(EMMEANS_DIR.glob("*.json"))
             print(f"Found {len(em_files)} emmeans JSON files in {EMMEANS_DIR}/")
@@ -1139,28 +1267,26 @@ def main():
             print("  Run `python analysis/extract_emmeans.py` to generate GLME-adjusted estimates.")
 
     print("\nLoading all experiment logs...")
-    data = _load_and_flatten()
+    data = _load_and_flatten(tags=main_tags)
     print(f"  {len(data)} valid observations loaded")
 
-    # Filter to main studies
-    main_tags = {"dossier_effect", "cap_asym", "skeptical_ablation"}
     main_data = [d for d in data if d["tag"] in main_tags]
     print(f"  {len(main_data)} from main studies ({', '.join(main_tags)})")
 
     use_raw = args.raw
 
     print("\nGenerating figures...")
-    fig_warden_effect_both(data, output_dir, use_raw=use_raw)
-    fig_warden_effect(data, output_dir, use_raw=use_raw)
-    fig_dossier_effect(data, output_dir, use_raw=use_raw)
-    fig_capability_asymmetry(data, output_dir, use_raw=use_raw)
-    fig_skeptical_ablation(data, output_dir, use_raw=use_raw)
-    fig_model_family(data, output_dir, use_raw=use_raw)
-    fig_scenario_variation(data, output_dir)
-    fig_warden_fp(data, output_dir)
-    fig_profile_vulnerability(data, output_dir, use_raw=use_raw)
-    fig_model_roles(data, output_dir, use_raw=use_raw)
-    fig_warden_intelligence(data, output_dir, use_raw=use_raw)
+    fig_warden_effect_both(data, output_dir, main_tags, use_raw=use_raw)
+    fig_warden_effect(data, output_dir, dossier_tags, use_raw=use_raw)
+    fig_dossier_effect(data, output_dir, dossier_tags, use_raw=use_raw)
+    fig_capability_asymmetry(data, output_dir, cap_asym_tags, use_raw=use_raw)
+    fig_skeptical_ablation(data, output_dir, skeptical_tags, use_raw=use_raw)
+    fig_model_family(data, output_dir, main_tags, use_raw=use_raw)
+    fig_scenario_variation(data, output_dir, main_tags)
+    fig_warden_fp(data, output_dir, main_tags)
+    fig_profile_vulnerability(data, output_dir, main_tags, use_raw=use_raw)
+    fig_model_roles(data, output_dir, main_tags, use_raw=use_raw)
+    fig_warden_intelligence(data, output_dir, main_tags, use_raw=use_raw)
 
     print(f"\nAll figures saved to {output_dir}/")
 
