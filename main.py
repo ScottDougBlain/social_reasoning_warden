@@ -328,6 +328,15 @@ def main():
         ),
     )
     parser.add_argument(
+        "--start-run-index",
+        type=int,
+        default=1,
+        help=(
+            "One-based run index to start executing from after the full run "
+            "grid is enumerated (default: 1). Useful for resuming a failed batch."
+        ),
+    )
+    parser.add_argument(
         "--tag",
         type=str,
         default=None,
@@ -543,6 +552,8 @@ def main():
 
     if args.decision_reprompt_attempts < 0:
         parser.error("--decision-reprompt-attempts must be >= 0")
+    if args.start_run_index < 1:
+        parser.error("--start-run-index must be >= 1")
 
     profiles_requested = _profiles_requested(args)
     round_profile_seeds: list[int] | None = None
@@ -691,13 +702,19 @@ def main():
                 * len(target_skeptical_values)
             )
 
-    total_experiments = (
+    total_possible_experiments = (
         args.experiment_rounds
         * len(args.scenario)
         * len(args.requester_model)
         * len(args.target_model)
         * branch_multiplier
     )
+    if args.start_run_index > total_possible_experiments:
+        parser.error(
+            "--start-run-index exceeds the total number of planned runs "
+            f"({total_possible_experiments})."
+        )
+    total_experiments = total_possible_experiments - args.start_run_index + 1
 
     # Show plan and confirm
     def _format_plan_line(label: str, value: str, width: int = 88) -> str:
@@ -713,9 +730,12 @@ def main():
     print(
         _format_plan_line(
             "Planned runs",
-            f"{total_experiments} ({args.turns} conversation turns each)",
+            f"{total_possible_experiments} ({args.turns} conversation turns each)",
         )
     )
+    if args.start_run_index > 1:
+        print(_format_plan_line("Start run index", str(args.start_run_index)))
+        print(_format_plan_line("Runs to execute", str(total_experiments)))
     print(_format_plan_line("Experiment rounds", str(args.experiment_rounds)))
     print(_format_plan_line("Parallel workers", str(args.max_workers)))
     if grid_profile_schedule is not None:
@@ -843,6 +863,8 @@ def main():
                                                     for target_skeptical in target_skeptical_values:
                                                         for scenario_name in args.scenario:
                                                             run_index += 1
+                                                            if run_index < args.start_run_index:
+                                                                continue
                                                             scenario = SCENARIOS[scenario_name]()
                                                             warden_message_mode = warden_message_mode_for_run(use_warden)
                                                             future = executor.submit(
@@ -956,10 +978,12 @@ def main():
                                                     if target_skeptical:
                                                         print("=== Target: SKEPTICAL ===\n")
                                                     for scenario_name in args.scenario:
-                                                        if len(args.scenario) > 1:
-                                                            print(f"--- Scenario: {scenario_name} ---\n")
                                                         scenario = SCENARIOS[scenario_name]()
                                                         run_index += 1
+                                                        if run_index < args.start_run_index:
+                                                            continue
+                                                        if len(args.scenario) > 1:
+                                                            print(f"--- Scenario: {scenario_name} ---\n")
                                                         warden_message_mode = warden_message_mode_for_run(use_warden)
                                                         _run_scenario(
                                                             scenario=scenario,

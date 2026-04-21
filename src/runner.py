@@ -862,7 +862,7 @@ def run_experiment(
                 _maybe_print(
                     "[yellow]Warning: Re-prompt failed. Using empty message.[/yellow]"
                 )
-                requester_response_public = ""
+                requester_response_public = "..."
 
         requester_conversation.append(
             {"role": "assistant", "content": requester_response_public}
