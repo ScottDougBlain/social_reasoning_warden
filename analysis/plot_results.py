@@ -635,6 +635,97 @@ def fig_scenario_variation(data: list[dict], output_dir: Path, main_tags: set[st
     _save_fig(fig, output_dir, "fig6_scenario_variation")
 
 
+def fig_scenario_variation_contrast(
+    data: list[dict], output_dir: Path, main_tags: set[str]
+):
+    """Horizontal grouped bars: adversary SR by scenario with and without warden."""
+    adv = [
+        d for d in data
+        if d["tag"] in main_tags and d["requester_type"] == "adversary"
+    ]
+    if not adv:
+        print("  [skip] No data for scenario contrast plot")
+        return
+
+    by_sc = defaultdict(lambda: {"without": [], "with": []})
+    for d in adv:
+        key = "with" if d["has_warden"] else "without"
+        by_sc[d["scenario"]][key].append(d)
+
+    sc_data = []
+    for sc, groups in by_sc.items():
+        without_items = groups["without"]
+        with_items = groups["with"]
+        if len(without_items) < 10 or len(with_items) < 10:
+            continue
+
+        r_nw, lo_nw, hi_nw, n_nw = _rate_and_ci(without_items)
+        r_w, lo_w, hi_w, n_w = _rate_and_ci(with_items)
+        sc_data.append((sc, r_nw, lo_nw, hi_nw, n_nw, r_w, lo_w, hi_w, n_w))
+
+    sc_data.sort(key=lambda x: x[1])
+
+    if not sc_data:
+        print("  [skip] Not enough paired adversary data for scenario contrast plot")
+        return
+
+    fig, ax = plt.subplots(figsize=(9, 6.5))
+    scenarios = [s[0] for s in sc_data]
+    no_warden_rates = [s[1] * 100 for s in sc_data]
+    no_warden_err_lo = [(s[1] - s[2]) * 100 for s in sc_data]
+    no_warden_err_hi = [(s[3] - s[1]) * 100 for s in sc_data]
+    no_warden_hi_abs = [s[3] * 100 for s in sc_data]
+    no_warden_ns = [s[4] for s in sc_data]
+    with_warden_rates = [s[5] * 100 for s in sc_data]
+    with_warden_err_lo = [(s[5] - s[6]) * 100 for s in sc_data]
+    with_warden_err_hi = [(s[7] - s[5]) * 100 for s in sc_data]
+    with_warden_hi_abs = [s[7] * 100 for s in sc_data]
+    with_warden_ns = [s[8] for s in sc_data]
+
+    y = np.arange(len(scenarios))
+    bar_height = 0.34
+    offset = bar_height / 2
+
+    ax.barh(
+        y - offset,
+        no_warden_rates,
+        xerr=[no_warden_err_lo, no_warden_err_hi],
+        error_kw=dict(capsize=3, capthick=1, elinewidth=1),
+        color=PALETTE[0],
+        height=bar_height,
+        edgecolor="black",
+        linewidth=0.5,
+        label="No Warden",
+    )
+    ax.barh(
+        y + offset,
+        with_warden_rates,
+        xerr=[with_warden_err_lo, with_warden_err_hi],
+        error_kw=dict(capsize=3, capthick=1, elinewidth=1),
+        color=PALETTE[1],
+        height=bar_height,
+        edgecolor="black",
+        linewidth=0.5,
+        label="With Warden",
+    )
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(scenarios, fontsize=9)
+    ax.set_xlabel("Adversary Success Rate (%)")
+    ax.set_title("Adversary Success by Scenario\n(with vs. without warden)")
+    ax.set_xlim(0, 105)
+    ax.legend(loc="lower right", framealpha=0.9)
+
+    for i, (h, r, n) in enumerate(zip(no_warden_hi_abs, no_warden_rates, no_warden_ns)):
+        ax.text(h + 2, y[i] - offset, f"{r:.0f}% (n={n})", va="center", fontsize=7.5)
+    for i, (h, r, n) in enumerate(zip(with_warden_hi_abs, with_warden_rates, with_warden_ns)):
+        ax.text(h + 2, y[i] + offset, f"{r:.0f}% (n={n})", va="center", fontsize=7.5)
+
+    sns.despine()
+    fig.tight_layout()
+    _save_fig(fig, output_dir, "fig6b_scenario_variation")
+
+
 # ── Figure 7: Warden FP by Scenario ─────────────────────────────────────
 
 
@@ -1283,6 +1374,7 @@ def main():
     fig_skeptical_ablation(data, output_dir, skeptical_tags, use_raw=use_raw)
     fig_model_family(data, output_dir, main_tags, use_raw=use_raw)
     fig_scenario_variation(data, output_dir, main_tags)
+    fig_scenario_variation_contrast(data, output_dir, main_tags)
     fig_warden_fp(data, output_dir, main_tags)
     fig_profile_vulnerability(data, output_dir, main_tags, use_raw=use_raw)
     fig_model_roles(data, output_dir, main_tags, use_raw=use_raw)
