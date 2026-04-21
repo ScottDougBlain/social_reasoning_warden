@@ -31,6 +31,7 @@ import pandas as pd
 
 # Allow importing from project root
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from analysis.model_family import model_family_key
 from analysis.metrics import load_logs
 
 warnings.filterwarnings("ignore")
@@ -59,27 +60,6 @@ def _warden_tier(models: dict) -> str:
     if _base(warden) == _base(adversary):
         return "strong"
     return "mid"
-
-
-def _model_family(model_id: str) -> str:
-    """Derive model family from an OpenRouter model ID."""
-    if not model_id or model_id == "unknown":
-        return "unknown"
-    m = model_id.lower().removesuffix(":free")
-    if "gemini" in m:
-        return "gemini"
-    if "gemma" in m:
-        return "gemma"
-    if "llama" in m:
-        return "llama"
-    if "mistral" in m:
-        return "mistral"
-    if "claude" in m:
-        return "claude"
-    if "gpt" in m:
-        return "gpt"
-    # Fallback: use provider prefix
-    return m.split("/")[0] if "/" in m else "unknown"
 
 
 def _has_warden(log: dict) -> bool:
@@ -133,7 +113,7 @@ def logs_to_dataframe(logs: list[dict]) -> pd.DataFrame:
                 "target_model": models.get("target", "unknown"),
                 "warden_model": models.get("warden") or "none",
                 "warden_tier": _warden_tier(models),
-                "model_family": _model_family(requester_model or "unknown"),
+                "model_family": model_family_key(requester_model or "unknown"),
                 "target_skeptical": int(bool(log.get("target_skeptical"))),
                 "num_turns": log.get("num_turns", 0),
                 "success": int(decision == "requester_success"),

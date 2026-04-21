@@ -2,29 +2,29 @@
   {
     "requester_type": "benign_agent",
     "has_warden": 0,
-    "prob": 0.848012936682495,
-    "asymp.LCL": 0.790465310101462,
-    "asymp.UCL": 0.891916506108578
+    "prob": 0.930480435493207,
+    "asymp.LCL": 0.879526873184498,
+    "asymp.UCL": 0.960842866207068
   },
   {
     "requester_type": "adversary",
     "has_warden": 0,
-    "prob": 0.351786310909723,
-    "asymp.LCL": 0.273136694445081,
-    "asymp.UCL": 0.439392746373727
+    "prob": 0.322493015902677,
+    "asymp.LCL": 0.21378070792122,
+    "asymp.UCL": 0.454528045845702
   },
   {
     "requester_type": "benign_agent",
     "has_warden": 1,
-    "prob": 0.721064919794205,
-    "asymp.LCL": 0.622139114656664,
-    "asymp.UCL": 0.80232073279709
+    "prob": 0.823239751065961,
+    "asymp.LCL": 0.683041783199866,
+    "asymp.UCL": 0.909629565988624
   },
   {
     "requester_type": "adversary",
     "has_warden": 1,
-    "prob": 0.0642882107524285,
-    "asymp.LCL": 0.041883821532803,
-    "asymp.UCL": 0.0974580556094025
+    "prob": 0.0739784367965669,
+    "asymp.LCL": 0.0356729779410621,
+    "asymp.UCL": 0.147140019248498
   }
 ]

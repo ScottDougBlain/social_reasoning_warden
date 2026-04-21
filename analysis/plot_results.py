@@ -35,6 +35,7 @@ import numpy as np
 import seaborn as sns
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from analysis.model_family import model_family_key, model_family_label
 from analysis.metrics import load_logs
 
 # ── Style ────────────────────────────────────────────────────────────────
@@ -148,22 +149,7 @@ def _load_and_flatten(tags: list[str] | None = None) -> list[dict]:
         req_model = models.get("adversary") or models.get("benign_agent") or "unknown"
         req_short = req_model.split("/")[-1].split(":")[0]
 
-        # Model family
-        m = req_model.lower()
-        if "gemini" in m:
-            family = "Gemini"
-        elif "gemma" in m:
-            family = "Gemma"
-        elif "llama" in m:
-            family = "Llama"
-        elif "mistral" in m:
-            family = "Mistral"
-        elif "claude" in m:
-            family = "Claude"
-        elif "gpt" in m:
-            family = "GPT"
-        else:
-            family = "Other"
+        family = model_family_key(req_model)
 
         # Warden tier
         warden = models.get("warden")
@@ -553,7 +539,7 @@ def fig_model_family(
     ci_label = "GLME-adjusted" if em else "raw"
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    fams = [f[0] for f in family_data]
+    fams = [model_family_label(f[0]) for f in family_data]
     rates = [f[1] * 100 for f in family_data]
     err_lo = [(f[1] - f[2]) * 100 for f in family_data]
     err_hi = [(f[3] - f[1]) * 100 for f in family_data]
