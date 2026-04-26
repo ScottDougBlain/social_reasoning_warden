@@ -31,6 +31,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+from matplotlib.patches import Patch
 import numpy as np
 import seaborn as sns
 
@@ -52,11 +53,10 @@ DEFAULT_TAGS = {
 
 
 def _save_fig(fig: plt.Figure, output_dir: Path, name: str) -> None:
-    """Save figure as both PDF and PNG."""
+    """Save figure as PDF."""
     fig.savefig(output_dir / f"{name}.pdf", dpi=FIG_DPI, bbox_inches="tight")
-    fig.savefig(output_dir / f"{name}.png", dpi=FIG_DPI, bbox_inches="tight")
     plt.close(fig)
-    print(f"  [saved] {name}.pdf + .png")
+    print(f"  [saved] {name}.pdf")
 
 
 def _horizontal_grid_only(ax: plt.Axes) -> None:
@@ -343,6 +343,19 @@ def fig_dossier_effect(
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
         ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
+
+    legend_handles = [
+        Patch(facecolor=PALETTE[0], edgecolor="black", label="No Warden"),
+        Patch(facecolor=PALETTE[1], edgecolor="black", label="With Warden"),
+        Patch(facecolor="white", edgecolor="black", hatch="", label="No Dossier"),
+        Patch(facecolor="white", edgecolor="black", hatch="///", label="Dossier"),
+    ]
+    ax.legend(
+        handles=legend_handles,
+        title="Encoding",
+        loc="upper right",
+        framealpha=0.9,
+    )
 
     _horizontal_grid_only(ax)
     sns.despine()
@@ -850,6 +863,7 @@ def fig_warden_effect_both(
     ax.set_ylim(0, 115)
     ax.legend(loc="upper right", framealpha=0.9)
 
+    _horizontal_grid_only(ax)
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig0_warden_effect_both")
