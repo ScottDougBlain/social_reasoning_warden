@@ -856,31 +856,33 @@ def fig_profile_vulnerability(
         print("  [skip] No adversary data for profile vulnerability plot")
         return
 
-    # Map display names → canonical keys for matching
-    profile_map = {
-        "Idealistic True Believer": "Idealistic",
-        "Compliant Agreeable": "Compliant",
-        "Authority-Deferential Follower": "Authority\nDeferential",
-        "Authority-Deferential Junior Employee": "Authority\nDeferential",
-        "Overwhelmed Time-Pressured": "Time\nPressured",
-        "Overwhelmed Time-Pressured Worker": "Time\nPressured",
-    }
-    # Reverse map: canonical display label -> possible emmeans profile_name values
-    profile_em_map = {
-        "Idealistic": ["Idealistic True Believer"],
-        "Compliant": ["Compliant Agreeable"],
-        "Authority\nDeferential": ["Authority-Deferential Follower", "Authority-Deferential Junior Employee"],
-        "Time\nPressured": ["Overwhelmed Time-Pressured", "Overwhelmed Time-Pressured Worker"],
-    }
-    profile_order = ["Idealistic", "Compliant",
-                     "Authority\nDeferential", "Time\nPressured"]
+    def _display_profile_label(profile_name: str) -> str:
+        parts = [part.strip() for part in profile_name.split("|")]
+        if len(parts) <= 1:
+            return profile_name
+        lines = []
+        for i in range(0, len(parts), 2):
+            lines.append(" | ".join(parts[i:i + 2]))
+        return "\n".join(lines)
 
-    # Bucket data by canonical profile label
+    # Bucket data by the actual profile names present in the logs.
     bucketed = defaultdict(list)
     for d in adv:
-        label = profile_map.get(d["profile"])
-        if label:
-            bucketed[(label, d["has_warden"])].append(d)
+        profile_name = d["profile"]
+        if profile_name and profile_name != "none":
+            bucketed[(profile_name, d["has_warden"])].append(d)
+
+    profile_order = sorted(
+        {profile_name for profile_name, _ in bucketed},
+        key=lambda profile_name: (
+            -_rate_and_ci(bucketed.get((profile_name, False), []))[0],
+            profile_name,
+        ),
+    )
+    if not profile_order:
+        print("  [skip] No profiled adversary data for profile vulnerability plot")
+        return
+    profile_labels = [_display_profile_label(profile_name) for profile_name in profile_order]
 
     em = None if use_raw else _load_emmeans("fig8_profile_vulnerability")
     em_lookup = {}
@@ -890,7 +892,8 @@ def fig_profile_vulnerability(
 
     ci_label = "GLME-adjusted" if em else "raw"
 
-    fig, ax = plt.subplots(figsize=(7, 5.5))
+    fig_width = max(10.5, len(profile_order) * 1.5)
+    fig, ax = plt.subplots(figsize=(fig_width, 6))
     x = np.arange(len(profile_order))
     width = 0.32
 
@@ -899,15 +902,9 @@ def fig_profile_vulnerability(
         (True, "With Warden", PALETTE[1]),
     ]):
         rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
-        for prof in profile_order:
-            subset = bucketed.get((prof, has_w), [])
-            # Try to find emmeans match
-            e = None
-            if em_lookup:
-                for em_name in profile_em_map.get(prof, []):
-                    e = em_lookup.get((em_name, int(has_w)))
-                    if e:
-                        break
+        for profile_name in profile_order:
+            subset = bucketed.get((profile_name, has_w), [])
+            e = em_lookup.get((profile_name, int(has_w)))
             if e:
                 r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
                 n = len(subset)
@@ -932,7 +929,7 @@ def fig_profile_vulnerability(
                     ha="center", fontsize=7, color="0.35")
 
     ax.set_xticks(x)
-    ax.set_xticklabels(profile_order, fontsize=9)
+    ax.set_xticklabels(profile_labels, fontsize=8)
     ax.set_xlabel("Target Vulnerability Profile")
     ax.set_ylabel("Adversary Success Rate (%)")
     ax.set_title(f"Profile Vulnerability × Warden ({ci_label})\n"
