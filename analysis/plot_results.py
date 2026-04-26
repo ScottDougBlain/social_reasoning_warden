@@ -59,6 +59,13 @@ def _save_fig(fig: plt.Figure, output_dir: Path, name: str) -> None:
     print(f"  [saved] {name}.pdf + .png")
 
 
+def _horizontal_grid_only(ax: plt.Axes) -> None:
+    """Keep only horizontal gridlines on a plot."""
+    ax.set_axisbelow(True)
+    ax.grid(True, axis="y")
+    ax.grid(False, axis="x")
+
+
 def _parse_tag_args(values: list[str] | None, default: str) -> set[str]:
     """Parse repeated/comma-separated tag CLI args into a non-empty set."""
     if not values:
@@ -244,6 +251,7 @@ def fig_warden_effect(
     ax.set_ylabel("Adversary Success Rate (%)")
     ax.set_title(f"Warden Effect on Adversary Success\n({ci_label}, OR = {or_val:.3f})")
     ax.set_ylim(0, 70)
+    _horizontal_grid_only(ax)
 
     sns.despine()
     fig.tight_layout()
@@ -336,6 +344,7 @@ def fig_dossier_effect(
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
         ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
 
+    _horizontal_grid_only(ax)
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig2_dossier_interaction")
@@ -410,6 +419,10 @@ def fig_capability_asymmetry(
     ax.set_title(f"Warden Capability Asymmetry\n({ci_label}, OR any-warden vs. none = {or_overall:.3f})")
     ax.set_ylim(0, 80)
 
+    for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
+        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
+
+    _horizontal_grid_only(ax)
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig3_capability_asymmetry")
@@ -491,6 +504,7 @@ def fig_skeptical_ablation(
     ax.set_ylim(0, 110)
     ax.legend(loc="upper right", framealpha=0.9)
 
+    _horizontal_grid_only(ax)
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig4_skeptical_ablation")
@@ -562,6 +576,7 @@ def fig_model_family(
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
         ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
 
+    _horizontal_grid_only(ax)
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig5_model_family")
@@ -937,6 +952,7 @@ def fig_profile_vulnerability(
     ax.set_ylim(0, 90)
     ax.legend(loc="upper right", framealpha=0.9)
 
+    _horizontal_grid_only(ax)
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig8_profile_vulnerability")
