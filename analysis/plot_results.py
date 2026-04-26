@@ -1034,32 +1034,38 @@ def fig_model_roles(
 
 # ── Figure 10: Warden Intelligence Scatter ────────────────────────────────
 
-# Map short warden model names to AI Intelligence Index scores.
-# Sourced from Lennart's MODEL_TO_AI_INDEX (metrics.py) and extended for
-# additional models using approximate capability rankings.
 _WARDEN_AI_INDEX = {
-    # Gemma family (small → large)
-    "gemma-3-4b-it": 6,
-    "gemma-3-12b-it": 9,
-    "gemma-3-27b-it": 10,
-    # Gemini family
-    "gemini-2.5-flash-lite": 22,
-    "gemini-2.5-flash": 35,
-    "gemini-3-flash-preview": 40,
-    # Llama family
-    "llama-3.1-70b-instruct": 12,
-    "llama-4-scout": 14,
-    "llama-4-maverick": 18,
-    # Mistral family
-    "mistral-small-3.1-24b-instruct": 14,
-    "mistral-medium-3.1": 20,
-    "mistral-large-2512": 28,
-    # Claude family
-    "claude-haiku-4-5": 30,
-    "claude-haiku-4.5": 30,
-    "claude-sonnet-4": 50,
-    # OpenAI
-    "gpt-4o": 45,
+    "google/gemma-3-4b-it": 6,
+    "google/gemma-3-12b-it": 9,
+    "google/gemma-3-27b-it": 10,
+
+    "google/gemini-2.5-flash-lite": 18,  # reasoning
+    "google/gemini-2.5-flash": 27,  # reasoning
+    "google/gemini-3-flash-preview": 46,  # reasoning
+    "google/gemini-pro-1.5": 16,
+    "google/gemini-2.5-pro": 35,
+    "google/gemini-3.1-pro-preview": 57,
+
+    "meta-llama/llama-3.1-8b-instruct": 12,
+    "meta-llama/llama-3.1-70b-instruct": 12,
+    "meta-llama/llama-4-scout": 14,
+    "meta-llama/llama-4-maverick": 18,
+
+    "mistralai/mistral-small-3.1-24b-instruct": 14,
+    "mistralai/mistral-medium-3.1": 21,
+    "mistralai/mistral-large-2512": 23,
+
+    "qwen/qwen3.5-35b-a3b": 37,  # reasoning
+    "qwen/qwen3.5-122b-a10b": 42,
+    "qwen/qwen3.5-397b-a17b": 45,
+
+    "openai/gpt-4o-mini": 13,
+    "openai/gpt-4o": 17,
+    "openai/gpt-5.4": 57,
+
+    "anthropic/claude-haiku-4.5": 37,  # reasoning
+    "anthropic/claude-sonnet-4.6": 52,  # adaptive reasoning (max effort)
+    "anthropic/claude-opus-4.6": 53,  # adaptive reasoning (max effort)
 }
 
 
