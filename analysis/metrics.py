@@ -1396,6 +1396,22 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
             hovertemplate="%{hovertext}<extra></extra>",
         )
     )
+
+    if "none" in raw_labels:
+        baseline_idx = raw_labels.index("none")
+        baseline_score = score_rates[baseline_idx]
+        if baseline_score is not None:
+            fig.add_hline(
+                y=baseline_score,
+                line=dict(
+                    color=speaker_colors["warden_score"],
+                    width=2,
+                    dash="dash",
+                ),
+                opacity=0.95,
+                layer="below",
+            )
+
     for label, score, plus in zip(labels, score_rates, score_error_plus):
         if score is None:
             continue
@@ -1429,7 +1445,6 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
         showgrid=False,
     )
     fig.update_layout(
-        title=dict(text="Which Protection Performs Best?", font=dict(size=18)),
         barmode="group",
         showlegend=True,
         height=550,
