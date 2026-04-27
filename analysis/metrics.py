@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
-FIGURES_DIR = Path(__file__).resolve().parents[1] / "figures"
+FIGURES_DIR = Path(__file__).resolve().parents[1] / "results" / "figures"
 console = Console()
 SPEAKER_ORDER = ("adversary", "benign_agent")
 RISK_LEVEL_RE = re.compile(r"RISK:\s*([A-Z]+)")
@@ -944,7 +944,7 @@ def plot_success_rates(logs: list[dict]) -> None:
 
 def _save_plotly_pdf(fig: go.Figure, name: str) -> None:
     """Save a Plotly figure as PDF in the shared figures directory."""
-    FIGURES_DIR.mkdir(exist_ok=True)
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     pdf_path = FIGURES_DIR / f"{name}.pdf"
     try:
         fig.write_image(str(pdf_path))
