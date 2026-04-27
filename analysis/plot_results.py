@@ -5,7 +5,6 @@ Publication-quality figures for Social Reasoning Warden.
 Generates key result plots from the three main studies:
   - dossier_effect: dossier × warden factorial
   - cap_asym: warden capability tier
-  - skeptical_ablation: baseline vs skeptical vs warden × requester type
 
 When emmeans JSON files exist (from extract_emmeans.py), figures use GLME-adjusted
 estimated marginal means with asymptotic CIs. Otherwise falls back to raw Wilson CIs.
@@ -15,8 +14,7 @@ Usage:
     python analysis/plot_results.py --output-dir results/figures
     python analysis/plot_results.py --raw   # force raw rates even if emmeans exist
     python analysis/plot_results.py --dossier-tag final-within-family \
-        --cap-asym-tag final-within-family \
-        --skeptical-tag final-within-family
+        --cap-asym-tag final-within-family
 """
 
 from __future__ import annotations
@@ -48,7 +46,6 @@ BAR_WIDTH = 0.35
 DEFAULT_TAGS = {
     "dossier": "dossier_effect",
     "cap_asym": "cap_asym",
-    "skeptical": "skeptical_ablation",
 }
 
 
@@ -179,7 +176,6 @@ def _load_and_flatten(tags: list[str] | None = None) -> list[dict]:
             "has_warden": bool(warden),
             "warden_tier": tier,
             "has_dossier": bool(profile.get("adversary_has_data")),
-            "target_skeptical": bool(log.get("target_skeptical")),
             "profile": profile.get("name") or "none",
             "model_family": family,
             "req_model": req_short,
@@ -439,88 +435,6 @@ def fig_capability_asymmetry(
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig3_capability_asymmetry")
-
-
-# ── Figure 4: Skeptical Ablation (3 conditions × 2 requester types) ─────
-
-
-def fig_skeptical_ablation(
-    data: list[dict],
-    output_dir: Path,
-    skeptical_tags: set[str],
-    use_raw: bool = False,
-):
-    """Grouped bar: defense condition × requester type."""
-    skep = [d for d in data if d["tag"] in skeptical_tags]
-    if not skep:
-        print(f"  [skip] No skeptical-tag data found for: {_format_tags(skeptical_tags)}")
-        return
-
-    def _cond(d):
-        if d["target_skeptical"] and d["has_warden"]:
-            return "skeptical+warden"
-        elif d["target_skeptical"]:
-            return "skeptical"
-        elif d["has_warden"]:
-            return "warden"
-        else:
-            return "baseline"
-
-    conditions = ["baseline", "skeptical", "warden"]
-    cond_labels = ["Baseline\n(no defense)", "Skeptical\n(prompt)", "Warden\n(agent)"]
-
-    em = None if use_raw else _load_emmeans("fig4_skeptical_ablation")
-    em_lookup = {}
-    if em:
-        for e in em:
-            em_lookup[(e["defense"], e["requester_type"])] = e
-
-    fig, ax = plt.subplots(figsize=(7, 5.5))
-    x = np.arange(len(conditions))
-    width = 0.32
-
-    ci_label = "GLME-adjusted" if em else "raw"
-
-    for j, (rt, rt_label, color) in enumerate([
-        ("adversary", "Adversary", PALETTE[3]),
-        ("benign_agent", "Benign Agent", PALETTE[0]),
-    ]):
-        rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
-        for cond in conditions:
-            subset = [d for d in skep if d["requester_type"] == rt and _cond(d) == cond]
-            e = em_lookup.get((cond, rt))
-            if e:
-                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
-                n = len(subset)
-            else:
-                r, lo, hi, n = _rate_and_ci(subset)
-            rates.append(r * 100)
-            err_lo.append((r - lo) * 100)
-            err_hi.append((hi - r) * 100)
-            hi_abs.append(hi * 100)
-            ns_list.append(n)
-
-        offset = (j - 0.5) * width
-        bars = ax.bar(x + offset, rates, width, yerr=[err_lo, err_hi],
-                      label=rt_label, color=color,
-                      error_kw=dict(capsize=4, capthick=1.2, elinewidth=1.2),
-                      edgecolor="black", linewidth=0.5)
-
-        for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
-            ax.text(x[i] + offset, h + 2, f"{r:.0f}%\nn={n}", ha="center", fontsize=8)
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(cond_labels, fontsize=9)
-    ax.set_ylabel("Success Rate (%)")
-    ax.set_title(f"Defense Mechanism Comparison ({ci_label})\n"
-                 "(Adversary suppression vs. benign false positive cost)")
-    ax.set_ylim(0, 110)
-    ax.legend(loc="upper right", framealpha=0.9)
-
-    _horizontal_grid_only(ax)
-    sns.despine()
-    fig.tight_layout()
-    _save_fig(fig, output_dir, "fig4_skeptical_ablation")
 
 
 # ── Figure 5: Adversary SR by Model Family ───────────────────────────────
@@ -1316,29 +1230,17 @@ def main():
             "or comma-separated tags."
         ),
     )
-    parser.add_argument(
-        "--skeptical-tag",
-        dest="skeptical_tags",
-        nargs="+",
-        default=[DEFAULT_TAGS["skeptical"]],
-        help=(
-            "Tag(s) to use for skeptical-ablation figures. Accepts repeated values "
-            "or comma-separated tags."
-        ),
-    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     dossier_tags = _parse_tag_args(args.dossier_tags, DEFAULT_TAGS["dossier"])
     cap_asym_tags = _parse_tag_args(args.cap_asym_tags, DEFAULT_TAGS["cap_asym"])
-    skeptical_tags = _parse_tag_args(args.skeptical_tags, DEFAULT_TAGS["skeptical"])
-    main_tags = dossier_tags | cap_asym_tags | skeptical_tags
+    main_tags = dossier_tags | cap_asym_tags
 
     print("Using tag filters:")
     print(f"  dossier figures: {_format_tags(dossier_tags)}")
     print(f"  capability asymmetry: {_format_tags(cap_asym_tags)}")
-    print(f"  skeptical ablation: {_format_tags(skeptical_tags)}")
 
     if args.raw:
         print("(--raw: using raw Wilson CIs, ignoring emmeans)")
@@ -1346,7 +1248,6 @@ def main():
         using_custom_tags = (
             dossier_tags != {DEFAULT_TAGS["dossier"]}
             or cap_asym_tags != {DEFAULT_TAGS["cap_asym"]}
-            or skeptical_tags != {DEFAULT_TAGS["skeptical"]}
         )
         if using_custom_tags:
             print(
@@ -1378,7 +1279,6 @@ def main():
     fig_warden_effect(data, output_dir, dossier_tags, use_raw=use_raw)
     fig_dossier_effect(data, output_dir, dossier_tags, use_raw=use_raw)
     fig_capability_asymmetry(data, output_dir, cap_asym_tags, use_raw=use_raw)
-    fig_skeptical_ablation(data, output_dir, skeptical_tags, use_raw=use_raw)
     fig_model_family(data, output_dir, main_tags, use_raw=use_raw)
     fig_scenario_variation(data, output_dir, main_tags)
     fig_scenario_variation_contrast(data, output_dir, main_tags)

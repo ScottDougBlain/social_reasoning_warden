@@ -8,7 +8,7 @@ under results/emmeans/ for consumption by plot_results.py.
 
 Usage:
     python analysis/extract_emmeans.py
-    python analysis/extract_emmeans.py --figures 1 2 3 4 8
+    python analysis/extract_emmeans.py --figures 1 2 3 5 8
 """
 
 from __future__ import annotations
@@ -264,85 +264,6 @@ if (!is.null(m)) {{
             "asymp.UCL": float(row["asymp.UCL"]),
         })
     _save_emmeans(records, "fig3_capability_asymmetry")
-    return records
-
-
-# ── Figure 4: Skeptical Ablation (defense × requester_type) ──────────────
-
-def extract_fig4(df: pd.DataFrame) -> list[dict] | None:
-    """Emmeans for defense condition × requester type."""
-    # Build defense condition column
-    data = df.copy()
-
-    def _defense_cond(row):
-        if row["target_skeptical"] == 1 and row["has_warden"] == 1:
-            return "skeptical_warden"
-        elif row["target_skeptical"] == 1:
-            return "skeptical"
-        elif row["has_warden"] == 1:
-            return "warden"
-        else:
-            return "baseline"
-
-    data["defense"] = data.apply(_defense_cond, axis=1)
-    # Keep only the three main conditions
-    data = data[data["defense"].isin(["baseline", "skeptical", "warden"])].copy()
-
-    if len(data) < 20:
-        print("  [skip] Not enough data for fig4 emmeans")
-        return None
-
-    csv_path = "/tmp/emmeans_fig4.csv"
-    out_path = "/tmp/emmeans_fig4_out.csv"
-    data.to_csv(csv_path, index=False)
-
-    r_script = f"""
-library(lme4)
-library(emmeans)
-
-{GLMER_FIT_BLOCK}
-
-d <- read.csv("{csv_path}")
-d$defense <- factor(d$defense, levels=c("baseline", "skeptical", "warden"))
-d$requester_type <- relevel(factor(d$requester_type), ref="benign_agent")
-d$scenario <- factor(d$scenario)
-d$target_model <- factor(d$target_model)
-d$requester_model <- factor(d$requester_model)
-
-m <- fit_glmer(
-    success ~ defense * requester_type
-        + (1|scenario) + (1|target_model) + (1|requester_model),
-    data=d, label="fig4"
-)
-
-if (!is.null(m)) {{
-    em <- emmeans(m, ~ defense * requester_type, type="response")
-    cat("\\nEmmeans (response scale):\\n")
-    print(summary(em))
-
-    em_df <- as.data.frame(summary(em))
-    write.csv(em_df, "{out_path}", row.names=FALSE)
-}}
-"""
-
-    _run_r(r_script, "Fig 4: Skeptical Ablation emmeans")
-
-    try:
-        em_df = pd.read_csv(out_path)
-    except FileNotFoundError:
-        print("  [error] emmeans output CSV not found")
-        return None
-
-    records = []
-    for _, row in em_df.iterrows():
-        records.append({
-            "defense": row["defense"],
-            "requester_type": row["requester_type"],
-            "prob": float(row["prob"]),
-            "asymp.LCL": float(row["asymp.LCL"]),
-            "asymp.UCL": float(row["asymp.UCL"]),
-        })
-    _save_emmeans(records, "fig4_skeptical_ablation")
     return records
 
 
@@ -720,14 +641,13 @@ if (!is.null(m)) {{
 
 # ── Main ─────────────────────────────────────────────────────────────────
 
-ALL_FIGURES = [0, 1, 2, 3, 4, 5, 8, 9, 10]
+ALL_FIGURES = [0, 1, 2, 3, 5, 8, 9, 10]
 
 EXTRACTORS = {
     0: ("Fig 0: Warden Effect (both)", extract_fig0),
     1: ("Fig 1: Warden Effect (adversary)", extract_fig1),
     2: ("Fig 2: Dossier × Warden", extract_fig2),
     3: ("Fig 3: Capability Asymmetry", extract_fig3),
-    4: ("Fig 4: Skeptical Ablation", extract_fig4),
     5: ("Fig 5: Model Family", extract_fig5),
     8: ("Fig 8: Profile Vulnerability", extract_fig8),
     9: ("Fig 9: Model Roles", extract_fig9),
