@@ -384,7 +384,6 @@ def fig_dossier_effect(
     ]
     ax.legend(
         handles=legend_handles,
-        title="Encoding",
         loc="upper right",
         framealpha=0.9,
     )
@@ -865,7 +864,6 @@ def fig_warden_effect_both(
             Patch(facecolor="white", edgecolor="black", hatch="", label="Adversary"),
             Patch(facecolor="white", edgecolor="black", hatch="///", label="Benign Agent"),
         ],
-        title="Requester Type",
         loc="upper right",
         framealpha=0.9,
     )

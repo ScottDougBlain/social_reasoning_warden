@@ -1267,6 +1267,15 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
         return score is None, -(score if score is not None else 0.0), str(label)
 
     raw_labels = sorted(labels_set, key=_warden_score_sort_key)
+    baseline_labels = [
+        label for label in ("skeptical_system_prompt", "none") if label in raw_labels
+    ]
+    if baseline_labels:
+        baseline_set = set(baseline_labels)
+        raw_labels = [
+            label for label in raw_labels
+            if label not in baseline_set
+        ] + baseline_labels
     labels = [_format_label(label) for label in raw_labels]
 
     grouped_values: dict[str, tuple[list[float], list[list[int]]]] = {}
@@ -1352,7 +1361,10 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
                 name=speaker_labels[speaker],
                 x=labels,
                 y=rates,
-                marker_color=speaker_colors[speaker],
+                marker=dict(
+                    color=speaker_colors[speaker],
+                    line=dict(color="black", width=1),
+                ),
                 offsetgroup=speaker,
                 legendgroup=speaker,
                 showlegend=True,
@@ -1404,7 +1416,10 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
             name=speaker_labels["warden_score"],
             x=labels,
             y=score_rates,
-            marker_color=speaker_colors["warden_score"],
+            marker=dict(
+                color=speaker_colors["warden_score"],
+                line=dict(color="black", width=1),
+            ),
             offsetgroup="warden_score",
             legendgroup="warden_score",
             showlegend=True,
