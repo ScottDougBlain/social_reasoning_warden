@@ -2,7 +2,9 @@
 
 **Social Reasoning Warden — ERA Project**
 
-**Generated**: 2026-04-21 17:33
+**Generated**: 2026-04-28 15:34
+
+**Filters**: tag=final-within-family
 
 **Data**: 9,399 observations | 6,263 adversary, 3,136 benign | 14 scenarios | overall SR = 38.5%
 

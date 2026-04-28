@@ -13,6 +13,7 @@ Usage:
     python analysis/plot_results.py
     python analysis/plot_results.py --output-dir results/figures
     python analysis/plot_results.py --raw   # force raw rates even if emmeans exist
+    python analysis/plot_results.py --no-titles
     python analysis/plot_results.py --dossier-tag final-within-family \
         --cap-asym-tag final-within-family
 """
@@ -29,6 +30,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Patch
 import numpy as np
 import seaborn as sns
@@ -39,8 +41,17 @@ from analysis.metrics import load_logs
 
 # ── Style ────────────────────────────────────────────────────────────────
 
-sns.set_theme(style="whitegrid", font_scale=1.1)
-PALETTE = sns.color_palette("colorblind")
+sns.set_theme(style="whitegrid", font_scale=1.1, rc={"grid.alpha": 0.7})
+COLOR_DARK_BLUE = "#332288"
+COLOR_LIGHT_BLUE = "#88CCEE"
+COLOR_GREEN = "#117733"
+COLOR_ROSE = "#CC6677"
+PALETTE = [COLOR_DARK_BLUE, COLOR_LIGHT_BLUE, COLOR_GREEN, COLOR_ROSE]
+WARDEN_COLORS = {False: COLOR_ROSE, True: COLOR_LIGHT_BLUE}
+HEATMAP_CMAP = LinearSegmentedColormap.from_list(
+    "warden_heatmap",
+    [COLOR_GREEN, COLOR_LIGHT_BLUE, COLOR_DARK_BLUE, COLOR_ROSE],
+)
 FIG_DPI = 200
 BAR_WIDTH = 0.35
 DEFAULT_TAGS = {
@@ -59,8 +70,22 @@ def _save_fig(fig: plt.Figure, output_dir: Path, name: str) -> None:
 def _horizontal_grid_only(ax: plt.Axes) -> None:
     """Keep only horizontal gridlines on a plot."""
     ax.set_axisbelow(True)
-    ax.grid(True, axis="y")
+    ax.grid(True, axis="y", alpha=0.7)
     ax.grid(False, axis="x")
+
+
+def _maybe_set_title(ax: plt.Axes, title: str, show_titles: bool, **kwargs) -> None:
+    """Apply an axes title only when title display is enabled."""
+    if show_titles:
+        ax.set_title(title, **kwargs)
+
+
+def _maybe_set_suptitle(
+    fig: plt.Figure, title: str, show_titles: bool, **kwargs
+) -> None:
+    """Apply a figure-level title only when title display is enabled."""
+    if show_titles:
+        fig.suptitle(title, **kwargs)
 
 
 def _parse_tag_args(values: list[str] | None, default: str) -> set[str]:
@@ -194,6 +219,7 @@ def fig_warden_effect(
     output_dir: Path,
     dossier_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """Bar chart: adversary SR with vs without warden, from dossier_effect."""
     adv = [
@@ -231,7 +257,8 @@ def fig_warden_effect(
     # Asymmetric error bars
     ax.bar(
         [0, 1], [r_nw * 100, r_w * 100],
-        color=[PALETTE[0], PALETTE[1]], width=0.55, edgecolor="black", linewidth=0.5,
+        color=[WARDEN_COLORS[False], WARDEN_COLORS[True]],
+        width=0.55, edgecolor="black", linewidth=0.5,
     )
     ax.errorbar(
         [0, 1], [r_nw * 100, r_w * 100],
@@ -245,7 +272,11 @@ def fig_warden_effect(
     ax.set_xticks([0, 1])
     ax.set_xticklabels(["No Warden", "With Warden"])
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title(f"Warden Effect on Adversary Success\n({ci_label}, OR = {or_val:.3f})")
+    _maybe_set_title(
+        ax,
+        f"Warden Effect on Adversary Success\n({ci_label}, OR = {or_val:.3f})",
+        show_titles,
+    )
     ax.set_ylim(0, 70)
     _horizontal_grid_only(ax)
 
@@ -262,6 +293,7 @@ def fig_dossier_effect(
     output_dir: Path,
     dossier_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """Grouped bar: dossier × warden interaction, adversary only."""
     adv = [
@@ -313,7 +345,7 @@ def fig_dossier_effect(
         ci_label = "raw"
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    colors = [PALETTE[0], PALETTE[0], PALETTE[1], PALETTE[1]]
+    colors = [COLOR_ROSE, COLOR_ROSE, COLOR_LIGHT_BLUE, COLOR_LIGHT_BLUE]
     hatches = ["", "///", "", "///"]
     x = np.arange(4)
 
@@ -334,15 +366,19 @@ def fig_dossier_effect(
     ax.set_xticks(x)
     ax.set_xticklabels([c[0] for c in conditions], fontsize=9)
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title(f"Dossier × Warden Interaction\n({ci_label} OR: dossier = {or_dossier:.2f}, warden = {or_warden:.3f})")
+    _maybe_set_title(
+        ax,
+        f"Dossier × Warden Interaction\n({ci_label} OR: dossier = {or_dossier:.2f}, warden = {or_warden:.3f})",
+        show_titles,
+    )
     ax.set_ylim(0, 70)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
         ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
 
     legend_handles = [
-        Patch(facecolor=PALETTE[0], edgecolor="black", label="No Warden"),
-        Patch(facecolor=PALETTE[1], edgecolor="black", label="With Warden"),
+        Patch(facecolor=COLOR_ROSE, edgecolor="black", label="No Warden"),
+        Patch(facecolor=COLOR_LIGHT_BLUE, edgecolor="black", label="With Warden"),
         Patch(facecolor="white", edgecolor="black", hatch="", label="No Dossier"),
         Patch(facecolor="white", edgecolor="black", hatch="///", label="Dossier"),
     ]
@@ -367,6 +403,7 @@ def fig_capability_asymmetry(
     output_dir: Path,
     cap_asym_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """Bar chart: adversary SR by warden tier (none/weak/mid/strong)."""
     adv = [
@@ -411,7 +448,7 @@ def fig_capability_asymmetry(
 
     fig, ax = plt.subplots(figsize=(6, 5))
     x = np.arange(4)
-    colors = [PALETTE[3], PALETTE[2], PALETTE[1], PALETTE[0]]
+    colors = [COLOR_ROSE, COLOR_LIGHT_BLUE, COLOR_GREEN, COLOR_DARK_BLUE]
     ax.bar(x, rates, yerr=[los, his],
            error_kw=dict(capsize=6, capthick=1.3, elinewidth=1.3),
            color=colors, width=0.6, edgecolor="black", linewidth=0.5)
@@ -425,8 +462,12 @@ def fig_capability_asymmetry(
     ax.set_xticklabels(tier_labels, fontsize=9)
     ax.set_xlabel("Warden Capability Tier")
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title(f"Warden Capability Asymmetry\n({ci_label}, OR any-warden vs. none = {or_overall:.3f})")
-    ax.set_ylim(0, 80)
+    _maybe_set_title(
+        ax,
+        f"Warden Capability Asymmetry\n({ci_label}, OR any-warden vs. none = {or_overall:.3f})",
+        show_titles,
+    )
+    ax.set_ylim(0, 60)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
         ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
@@ -445,6 +486,7 @@ def fig_model_family(
     output_dir: Path,
     main_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """Bar chart: adversary SR by model family (pooled across main studies)."""
     adv = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "adversary"
@@ -490,14 +532,18 @@ def fig_model_family(
     x = np.arange(len(fams))
     ax.bar(x, rates, yerr=[err_lo, err_hi],
            error_kw=dict(capsize=5, capthick=1.3, elinewidth=1.3),
-           color=PALETTE[:len(fams)], width=0.55, edgecolor="black", linewidth=0.5)
+           color=COLOR_ROSE, width=0.55, edgecolor="black", linewidth=0.5)
 
     ax.set_xticks(x)
     ax.set_xticklabels(fams, fontsize=10)
     ax.set_xlabel("Adversary Model Family")
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title(f"Adversary Effectiveness by Model Family ({ci_label})\n"
-                 "(no warden, pooled across studies)")
+    _maybe_set_title(
+        ax,
+        f"Adversary Effectiveness by Model Family ({ci_label})\n"
+        "(no warden, pooled across studies)",
+        show_titles,
+    )
     ax.set_ylim(0, 80)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
@@ -512,7 +558,12 @@ def fig_model_family(
 # ── Figure 6: Adversary SR by Scenario ───────────────────────────────────
 
 
-def fig_scenario_variation(data: list[dict], output_dir: Path, main_tags: set[str]):
+def fig_scenario_variation(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    show_titles: bool = True,
+):
     """Horizontal bar: adversary SR by scenario (no warden), pooled."""
     adv = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "adversary"
            and not d["has_warden"]]
@@ -547,12 +598,16 @@ def fig_scenario_variation(data: list[dict], output_dir: Path, main_tags: set[st
     y = np.arange(len(scenarios))
     ax.barh(y, rates, xerr=[err_lo, err_hi],
             error_kw=dict(capsize=3, capthick=1, elinewidth=1),
-            color=PALETTE[0], height=0.6, edgecolor="black", linewidth=0.5)
+            color=COLOR_ROSE, height=0.6, edgecolor="black", linewidth=0.5)
 
     ax.set_yticks(y)
     ax.set_yticklabels(scenarios, fontsize=9)
     ax.set_xlabel("Adversary Success Rate (%)")
-    ax.set_title("Adversary Success by Scenario\n(no warden, pooled across studies)")
+    _maybe_set_title(
+        ax,
+        "Adversary Success by Scenario\n(no warden, pooled across studies)",
+        show_titles,
+    )
     ax.set_xlim(0, 105)
 
     for i, (h, r, n) in enumerate(zip(hi_abs, rates, ns)):
@@ -564,7 +619,10 @@ def fig_scenario_variation(data: list[dict], output_dir: Path, main_tags: set[st
 
 
 def fig_scenario_variation_contrast(
-    data: list[dict], output_dir: Path, main_tags: set[str]
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    show_titles: bool = True,
 ):
     """Horizontal grouped bars: adversary SR by scenario with and without warden."""
     adv = [
@@ -619,7 +677,7 @@ def fig_scenario_variation_contrast(
         no_warden_rates,
         xerr=[no_warden_err_lo, no_warden_err_hi],
         error_kw=dict(capsize=3, capthick=1, elinewidth=1),
-        color=PALETTE[0],
+        color=WARDEN_COLORS[False],
         height=bar_height,
         edgecolor="black",
         linewidth=0.5,
@@ -630,7 +688,7 @@ def fig_scenario_variation_contrast(
         with_warden_rates,
         xerr=[with_warden_err_lo, with_warden_err_hi],
         error_kw=dict(capsize=3, capthick=1, elinewidth=1),
-        color=PALETTE[1],
+        color=WARDEN_COLORS[True],
         height=bar_height,
         edgecolor="black",
         linewidth=0.5,
@@ -640,7 +698,11 @@ def fig_scenario_variation_contrast(
     ax.set_yticks(y)
     ax.set_yticklabels(scenarios, fontsize=9)
     ax.set_xlabel("Adversary Success Rate (%)")
-    ax.set_title("Adversary Success by Scenario\n(with vs. without warden)")
+    _maybe_set_title(
+        ax,
+        "Adversary Success by Scenario\n(with vs. without warden)",
+        show_titles,
+    )
     ax.set_xlim(0, 105)
     ax.legend(loc="lower right", framealpha=0.9)
 
@@ -657,7 +719,12 @@ def fig_scenario_variation_contrast(
 # ── Figure 7: Warden FP by Scenario ─────────────────────────────────────
 
 
-def fig_warden_fp(data: list[dict], output_dir: Path, main_tags: set[str]):
+def fig_warden_fp(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    show_titles: bool = True,
+):
     """Paired dot plot: benign SR with and without warden, by scenario."""
     benign = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "benign_agent"]
     if len(benign) < 20:
@@ -691,13 +758,23 @@ def fig_warden_fp(data: list[dict], output_dir: Path, main_tags: set[str]):
 
     for i, (sc, r_nw, r_w, delta, n_w, n_nw) in enumerate(sc_data):
         ax.plot([r_w, r_nw], [i, i], color="gray", linewidth=1, zorder=1)
-        ax.scatter(r_nw, i, color=PALETTE[0], s=50, zorder=2, label="No Warden" if i == 0 else None)
-        ax.scatter(r_w, i, color=PALETTE[1], s=50, zorder=2, label="With Warden" if i == 0 else None)
+        ax.scatter(
+            r_nw, i, color=WARDEN_COLORS[False], s=50, zorder=2,
+            label="No Warden" if i == 0 else None,
+        )
+        ax.scatter(
+            r_w, i, color=WARDEN_COLORS[True], s=50, zorder=2,
+            label="With Warden" if i == 0 else None,
+        )
 
     ax.set_yticks(y)
     ax.set_yticklabels(scenarios, fontsize=9)
     ax.set_xlabel("Benign Agent Success Rate (%)")
-    ax.set_title("Warden False Positive Cost by Scenario\n(lower = warden rejects legitimate requests)")
+    _maybe_set_title(
+        ax,
+        "Warden False Positive Cost by Scenario\n(lower = warden rejects legitimate requests)",
+        show_titles,
+    )
     ax.set_xlim(0, 110)
     ax.legend(loc="lower right", framealpha=0.9)
 
@@ -714,6 +791,7 @@ def fig_warden_effect_both(
     output_dir: Path,
     main_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """Grouped bar: warden effect on adversary AND benign agent success."""
     main = [d for d in data if d["tag"] in main_tags]
@@ -732,10 +810,11 @@ def fig_warden_effect_both(
     fig, ax = plt.subplots(figsize=(6, 5.5))
     x = np.arange(2)  # No Warden, With Warden
     width = 0.32
+    requester_hatches = {"adversary": "", "benign_agent": "///"}
 
-    for j, (rt, rt_label, color) in enumerate([
-        ("adversary", "Adversary", PALETTE[3]),
-        ("benign_agent", "Benign Agent", PALETTE[0]),
+    for j, (rt, rt_label) in enumerate([
+        ("adversary", "Adversary"),
+        ("benign_agent", "Benign Agent"),
     ]):
         rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
         for has_w in [False, True]:
@@ -754,10 +833,12 @@ def fig_warden_effect_both(
             ns_list.append(n)
 
         offset = (j - 0.5) * width
-        ax.bar(x + offset, rates, width, yerr=[err_lo, err_hi],
-               label=rt_label, color=color,
+        bars = ax.bar(x + offset, rates, width, yerr=[err_lo, err_hi],
+               label=rt_label, color=[WARDEN_COLORS[False], WARDEN_COLORS[True]],
                error_kw=dict(capsize=5, capthick=1.3, elinewidth=1.3),
                edgecolor="black", linewidth=0.5)
+        for bar in bars:
+            bar.set_hatch(requester_hatches[rt])
 
         for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
             ax.text(x[i] + offset, h + 2, f"{r:.1f}%\nn={n}",
@@ -772,10 +853,22 @@ def fig_warden_effect_both(
     ax.set_xticks(x)
     ax.set_xticklabels(["No Warden", "With Warden"], fontsize=10)
     ax.set_ylabel("Success Rate (%)")
-    ax.set_title(f"Warden Effect: Adversary vs. Benign Agent ({ci_label})\n"
-                 f"(adversary OR = {or_adv:.3f})")
+    _maybe_set_title(
+        ax,
+        f"Warden Effect: Adversary vs. Benign Agent ({ci_label})\n"
+        f"(adversary OR = {or_adv:.3f})",
+        show_titles,
+    )
     ax.set_ylim(0, 115)
-    ax.legend(loc="upper right", framealpha=0.9)
+    ax.legend(
+        handles=[
+            Patch(facecolor="white", edgecolor="black", hatch="", label="Adversary"),
+            Patch(facecolor="white", edgecolor="black", hatch="///", label="Benign Agent"),
+        ],
+        title="Requester Type",
+        loc="upper right",
+        framealpha=0.9,
+    )
 
     _horizontal_grid_only(ax)
     sns.despine()
@@ -791,6 +884,7 @@ def fig_profile_vulnerability(
     output_dir: Path,
     main_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """Grouped bar: adversary SR by profile × warden condition."""
     adv = [d for d in data if d["tag"] in main_tags
@@ -841,8 +935,8 @@ def fig_profile_vulnerability(
     width = 0.32
 
     for j, (has_w, w_label, color) in enumerate([
-        (False, "No Warden", PALETTE[3]),
-        (True, "With Warden", PALETTE[1]),
+        (False, "No Warden", COLOR_ROSE),
+        (True, "With Warden", COLOR_LIGHT_BLUE),
     ]):
         rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
         for profile_name in profile_order:
@@ -875,8 +969,12 @@ def fig_profile_vulnerability(
     ax.set_xticklabels(profile_labels, fontsize=8)
     ax.set_xlabel("Target Vulnerability Profile")
     ax.set_ylabel("Adversary Success Rate (%)")
-    ax.set_title(f"Profile Vulnerability × Warden ({ci_label})\n"
-                 "(pooled across studies, adversary only)")
+    _maybe_set_title(
+        ax,
+        f"Profile Vulnerability × Warden ({ci_label})\n"
+        "(pooled across studies, adversary only)",
+        show_titles,
+    )
     ax.set_ylim(0, 90)
     ax.legend(loc="upper right", framealpha=0.9)
 
@@ -894,6 +992,7 @@ def fig_model_roles(
     output_dir: Path,
     main_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """3-panel bar chart: adversary SR by requester model, target model, warden model."""
     adv = [d for d in data if d["tag"] in main_tags and d["requester_type"] == "adversary"]
@@ -956,21 +1055,28 @@ def fig_model_roles(
         ns = [m[4] for m in model_data]
 
         x = np.arange(len(names))
+        panel_color = COLOR_ROSE if role in {"requester", "target"} else COLOR_LIGHT_BLUE
         ax.bar(x, rates, yerr=[err_lo, err_hi],
                error_kw=dict(capsize=4, capthick=1, elinewidth=1),
-               color=PALETTE[:len(names)], width=0.6,
+               color=panel_color, width=0.6,
                edgecolor="black", linewidth=0.5)
 
         ax.set_xticks(x)
         ax.set_xticklabels(names, fontsize=7, rotation=30, ha="right")
         ax.set_ylabel("Adversary Success Rate (%)")
-        ax.set_title(title, fontsize=10)
+        _maybe_set_title(ax, title, show_titles, fontsize=10)
         ax.set_ylim(0, min(max(hi_abs) + 20, 110))
 
         for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
             ax.text(i, h + 1.5, f"{r:.0f}%\nn={n}", ha="center", fontsize=7)
 
-    fig.suptitle(f"Adversary Success by Model Role ({ci_label})", fontsize=13, y=1.02)
+    _maybe_set_suptitle(
+        fig,
+        f"Adversary Success by Model Role ({ci_label})",
+        show_titles,
+        fontsize=13,
+        y=1.02,
+    )
     sns.despine()
     fig.tight_layout()
     _save_fig(fig, output_dir, "fig9_model_roles")
@@ -1018,6 +1124,7 @@ def fig_warden_intelligence(
     output_dir: Path,
     main_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """Scatter: warden score vs AI intelligence index.
 
@@ -1086,7 +1193,7 @@ def fig_warden_intelligence(
 
     ax.scatter([p[1] for p in points],
                [p[2] * 100 for p in points],
-               s=90, color=PALETTE[0], edgecolors="white", linewidth=0.8,
+               s=90, color=COLOR_DARK_BLUE, edgecolors="white", linewidth=0.8,
                zorder=3, label="Combined score")
 
     # Label each point with adjustable text to reduce overlap
@@ -1106,7 +1213,11 @@ def fig_warden_intelligence(
     ax.yaxis.set_major_formatter(mticker.PercentFormatter())
     ax.set_xlabel("Model Intelligence Index Score")
     ax.set_ylabel("Warden Score (%)")
-    ax.set_title(f"Warden Effectiveness vs. Model Intelligence ({ci_label})")
+    _maybe_set_title(
+        ax,
+        f"Warden Effectiveness vs. Model Intelligence ({ci_label})",
+        show_titles,
+    )
 
     ax.set_xticks(sorted(set(xs)))
     x_span = max(xs) - min(xs)
@@ -1127,6 +1238,7 @@ def fig_scenario_profile_heatmap(
     output_dir: Path,
     main_tags: set[str],
     use_raw: bool = False,
+    show_titles: bool = True,
 ):
     """Heatmap of adversary SR by scenario × profile."""
     adv = [d for d in data if d["tag"] in main_tags
@@ -1172,7 +1284,7 @@ def fig_scenario_profile_heatmap(
     fig, ax = plt.subplots(figsize=(max(7, len(profiles) * 1.4 + 2),
                                      max(5, len(scenarios) * 0.7 + 2)))
 
-    im = ax.imshow(z, cmap="RdYlGn_r", vmin=0, vmax=1, aspect="auto")
+    im = ax.imshow(z, cmap=HEATMAP_CMAP, vmin=0, vmax=1, aspect="auto")
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
     cbar.set_label("Adversary Success Rate")
     cbar.ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1))
@@ -1183,7 +1295,11 @@ def fig_scenario_profile_heatmap(
     ax.set_yticklabels(scenarios, fontsize=8)
     ax.set_xlabel("Target Profile")
     ax.set_ylabel("Scenario")
-    ax.set_title(f"Adversary Success: Scenario × Profile ({ci_label})")
+    _maybe_set_title(
+        ax,
+        f"Adversary Success: Scenario × Profile ({ci_label})",
+        show_titles,
+    )
 
     # Add text annotations
     for i in range(len(scenarios)):
@@ -1209,6 +1325,11 @@ def main():
     parser.add_argument(
         "--raw", action="store_true",
         help="Force raw Wilson CIs even if emmeans JSON files exist.",
+    )
+    parser.add_argument(
+        "--no-titles",
+        action="store_true",
+        help="Omit figure titles from generated plots.",
     )
     parser.add_argument(
         "--dossier-tag",
@@ -1273,19 +1394,38 @@ def main():
     print(f"  {len(main_data)} from main studies ({', '.join(main_tags)})")
 
     use_raw = args.raw
+    show_titles = not args.no_titles
 
     print("\nGenerating figures...")
-    fig_warden_effect_both(data, output_dir, main_tags, use_raw=use_raw)
-    fig_warden_effect(data, output_dir, dossier_tags, use_raw=use_raw)
-    fig_dossier_effect(data, output_dir, dossier_tags, use_raw=use_raw)
-    fig_capability_asymmetry(data, output_dir, cap_asym_tags, use_raw=use_raw)
-    fig_model_family(data, output_dir, main_tags, use_raw=use_raw)
-    fig_scenario_variation(data, output_dir, main_tags)
-    fig_scenario_variation_contrast(data, output_dir, main_tags)
-    fig_warden_fp(data, output_dir, main_tags)
-    fig_profile_vulnerability(data, output_dir, main_tags, use_raw=use_raw)
-    fig_model_roles(data, output_dir, main_tags, use_raw=use_raw)
-    fig_warden_intelligence(data, output_dir, main_tags, use_raw=use_raw)
+    fig_warden_effect_both(
+        data, output_dir, main_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_warden_effect(
+        data, output_dir, dossier_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_dossier_effect(
+        data, output_dir, dossier_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_capability_asymmetry(
+        data, output_dir, cap_asym_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_model_family(
+        data, output_dir, main_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_scenario_variation(data, output_dir, main_tags, show_titles=show_titles)
+    fig_scenario_variation_contrast(
+        data, output_dir, main_tags, show_titles=show_titles
+    )
+    fig_warden_fp(data, output_dir, main_tags, show_titles=show_titles)
+    fig_profile_vulnerability(
+        data, output_dir, main_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_model_roles(
+        data, output_dir, main_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_warden_intelligence(
+        data, output_dir, main_tags, use_raw=use_raw, show_titles=show_titles
+    )
 
     print(f"\nAll figures saved to {output_dir}/")
 

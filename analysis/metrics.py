@@ -56,6 +56,10 @@ MODEL_TO_AI_INDEX = {
 
 # Backward compat: old logs used "chicken" before the rename to "product_launch"
 _SCENARIO_ALIASES = {"chicken": "product_launch"}
+COLOR_DARK_BLUE = "#332288"
+COLOR_LIGHT_BLUE = "#88CCEE"
+COLOR_GREEN = "#117733"
+COLOR_ROSE = "#CC6677"
 
 
 def _normalize_tags(tag: str | Iterable[str] | None) -> set[str] | None:
@@ -1321,9 +1325,9 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
         "warden_score": "Protection Score (↑)",
     }
     speaker_colors = {
-        "adversary": "#C66526",
-        "benign_agent": "#3D71AD",
-        "warden_score": "#529C76",
+        "adversary": COLOR_ROSE,
+        "benign_agent": COLOR_LIGHT_BLUE,
+        "warden_score": COLOR_GREEN,
     }
 
     fig = go.Figure()
