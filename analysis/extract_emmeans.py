@@ -565,83 +565,9 @@ if (!is.null(m)) {{
     return all_records
 
 
-# ── Figure 10: Scenario × Profile Heatmap ─────────────────────────────
-
-def extract_fig10(df: pd.DataFrame) -> list[dict] | None:
-    """Emmeans for scenario × profile interaction, adversary only."""
-    data = df[
-        (df["requester_type"] == "adversary") & (df["has_profile"] == 1)
-    ].copy()
-
-    # Check we have enough diversity: at least 3 profiles and 3 scenarios
-    n_profiles = data["profile_name"].nunique()
-    n_scenarios = data["scenario"].nunique()
-    if n_profiles < 3 or n_scenarios < 3:
-        print(
-            f"  [skip] Need >= 3 profiles and >= 3 scenarios for fig10 "
-            f"(got {n_profiles} profiles, {n_scenarios} scenarios)"
-        )
-        return None
-
-    if len(data) < 20:
-        print("  [skip] Not enough data for fig10 emmeans")
-        return None
-
-    csv_path = "/tmp/emmeans_fig10.csv"
-    out_path = "/tmp/emmeans_fig10_out.csv"
-    data.to_csv(csv_path, index=False)
-
-    r_script = f"""
-library(lme4)
-library(emmeans)
-
-{GLMER_FIT_BLOCK}
-
-d <- read.csv("{csv_path}")
-d$scenario <- factor(d$scenario)
-d$profile_name <- factor(d$profile_name)
-d$target_model <- factor(d$target_model)
-d$requester_model <- factor(d$requester_model)
-
-m <- fit_glmer(
-    success ~ scenario * profile_name + (1|target_model) + (1|requester_model),
-    data=d, label="fig10"
-)
-
-if (!is.null(m)) {{
-    em <- emmeans(m, ~ scenario * profile_name, type="response")
-    cat("\\nEmmeans (response scale):\\n")
-    print(summary(em))
-
-    em_df <- as.data.frame(summary(em))
-    write.csv(em_df, "{out_path}", row.names=FALSE)
-}}
-"""
-
-    _run_r(r_script, "Fig 10: Scenario × Profile Heatmap emmeans")
-
-    try:
-        em_df = pd.read_csv(out_path)
-    except FileNotFoundError:
-        print("  [error] emmeans output CSV not found")
-        return None
-
-    records = []
-    for _, row in em_df.iterrows():
-        records.append({
-            "scenario": row["scenario"],
-            "profile_name": row["profile_name"],
-            "prob": float(row["prob"]),
-            "asymp.LCL": float(row["asymp.LCL"]),
-            "asymp.UCL": float(row["asymp.UCL"]),
-        })
-    _save_emmeans(records, "fig10_scenario_profile_heatmap")
-    return records
-
-
 # ── Main ─────────────────────────────────────────────────────────────────
 
-ALL_FIGURES = [0, 1, 2, 3, 5, 8, 9, 10]
+ALL_FIGURES = [0, 1, 2, 3, 5, 8, 9]
 
 EXTRACTORS = {
     0: ("Fig 0: Warden Effect (both)", extract_fig0),
@@ -651,7 +577,6 @@ EXTRACTORS = {
     5: ("Fig 5: Model Family", extract_fig5),
     8: ("Fig 8: Profile Vulnerability", extract_fig8),
     9: ("Fig 9: Model Roles", extract_fig9),
-    10: ("Fig 10: Scenario × Profile Heatmap", extract_fig10),
 }
 
 

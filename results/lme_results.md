@@ -2,7 +2,7 @@
 
 **Social Reasoning Warden — ERA Project**
 
-**Generated**: 2026-04-28 15:34
+**Generated**: 2026-04-28 15:57
 
 **Filters**: tag=final-within-family
 
@@ -489,6 +489,143 @@ Warning messages:
 Correlation matrix not shown by default, as p = 16 > 12.
 Use print(summary(m3), correlation=TRUE)  or
     vcov(summary(m3))        if you need it
+```
+
+
+---
+
+## Model 4: Capability Asymmetry
+
+**Formula**: `success ~ warden_tier + (1|model_family) + (1 + warden_tier|scenario) + (1|profile_name)`
+
+**Family**: Binomial (logit link)
+
+**Data**: Adversary runs only (cap_asym study)
+
+**N** = 6,263 | 7 model families | 14 scenarios | 8 profiles
+
+**Reference level**: warden_tier=none
+
+**Warden tier counts**:
+
+- none: 1566
+- weak: 1565
+- mid: 1568
+- strong: 1564
+
+### Output
+
+```
+--- Data Summary ---
+Observations: 6263
+Model families: 7
+Scenarios: 14, Profiles: 8
+Overall success rate: 17.9%
+
+Runs by warden tier:
+
+  none   weak    mid strong 
+  1566   1565   1568   1564 
+
+Success rate by warden tier:
+  none        34.7%  (n=1566)
+  weak        13.5%  (n=1565)
+  mid         12.8%  (n=1568)
+  strong      10.8%  (n=1564)
+
+Success rate by model_family x warden_tier:
+             none          weak          mid           strong       
+claude       "27% (n=223)" "8% (n=221)"  "7% (n=224)"  "10% (n=220)"
+gemini_flash "47% (n=224)" "12% (n=224)" "4% (n=224)"  "2% (n=224)" 
+gemma        "37% (n=224)" "19% (n=224)" "16% (n=224)" "20% (n=224)"
+gpt          "46% (n=224)" "31% (n=224)" "36% (n=224)" "21% (n=224)"
+llama        "23% (n=224)" "10% (n=224)" "15% (n=224)" "13% (n=224)"
+mistral      "32% (n=224)" "11% (n=224)" "3% (n=224)"  "3% (n=224)" 
+qwen         "31% (n=223)" "4% (n=224)"  "9% (n=224)"  "6% (n=224)" 
+
+--- Fitting Model 4: Capability Asymmetry ---
+  [Model 4] Default optimizer warning: Model failed to converge with max|grad| = 0.0301367 (tol = 0.002, component 1)
+  See ?lme4::convergence and ?lme4::troubleshooting.
+  [Model 4] Retrying with bobyqa...
+
+--- Fixed Effects ---
+Generalized linear mixed model fit by maximum likelihood (Laplace
+  Approximation) [glmerMod]
+ Family: binomial  ( logit )
+Formula: success ~ warden_tier + (1 | model_family) + (1 + warden_tier |  
+    scenario) + (1 | profile_name)
+   Data: data
+Control: glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e+05))
+
+      AIC       BIC    logLik -2*log(L)  df.resid 
+   4331.1    4439.0   -2149.5    4299.1      6247 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-2.3836 -0.4353 -0.1782 -0.0434 27.5638 
+
+Random effects:
+ Groups       Name              Variance Std.Dev. Corr          
+ scenario     (Intercept)       1.5813   1.2575                 
+              warden_tierweak   0.5462   0.7391   0.80          
+              warden_tiermid    0.9735   0.9867   0.74 0.99     
+              warden_tierstrong 1.1526   1.0736   0.61 0.92 0.97
+ profile_name (Intercept)       0.1028   0.3207                 
+ model_family (Intercept)       0.3807   0.6170                 
+Number of obs: 6263, groups:  scenario, 14; profile_name, 8; model_family, 7
+
+Fixed effects:
+                  Estimate Std. Error z value Pr(>|z|)    
+(Intercept)        -0.9065     0.4299  -2.109    0.035 *  
+warden_tierweak    -2.0064     0.2322  -8.642  < 2e-16 ***
+warden_tiermid     -2.2451     0.2977  -7.542 4.63e-14 ***
+warden_tierstrong  -2.4834     0.3288  -7.552 4.27e-14 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Correlation of Fixed Effects:
+            (Intr) wrdn_trw wrdn_trm
+warden_trwk 0.504                   
+warden_trmd 0.489  0.873            
+wrdn_trstrn 0.389  0.799    0.888   
+optimizer (bobyqa) convergence code: 0 (OK)
+boundary (singular) fit: see help('isSingular')
+
+
+--- Type III Wald Chi-Square Tests ---
+Analysis of Deviance Table (Type III Wald chisquare tests)
+
+Response: success
+              Chisq Df Pr(>Chisq)    
+(Intercept)  4.4463  1    0.03498 *  
+warden_tier 76.7122  3    < 2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+--- Random Effects ---
+ Groups       Name              Std.Dev. Corr             
+ scenario     (Intercept)       1.25751                   
+              warden_tierweak   0.73905  0.804            
+              warden_tiermid    0.98666  0.742 0.985      
+              warden_tierstrong 1.07359  0.606 0.915 0.971
+ profile_name (Intercept)       0.32065                   
+ model_family (Intercept)       0.61702                   
+
+--- Odds Ratios (exp of fixed effects) ---
+                          OR   CI_lower  CI_upper
+(Intercept)       0.40393614 0.17393288 0.9380883
+warden_tierweak   0.13447251 0.08531226 0.2119608
+warden_tiermid    0.10591576 0.05909733 0.1898250
+warden_tierstrong 0.08345715 0.04380965 0.1589854
+Loading required package: Matrix
+Warning messages:
+1: package ‘lme4’ was built under R version 4.4.3 
+2: package ‘Matrix’ was built under R version 4.4.3 
+Loading required package: carData
+Warning messages:
+1: package ‘car’ was built under R version 4.4.3 
+2: package ‘carData’ was built under R version 4.4.3 
+boundary (singular) fit: see help('isSingular')
 ```
 
 

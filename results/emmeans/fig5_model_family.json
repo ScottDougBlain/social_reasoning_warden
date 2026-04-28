@@ -6,7 +6,7 @@
     "asymp.UCL": 0.372833107384361
   },
   {
-    "model_family": "gemini",
+    "model_family": "gemini_flash",
     "prob": 0.441261334641862,
     "asymp.LCL": 0.259705272572538,
     "asymp.UCL": 0.640010988223127

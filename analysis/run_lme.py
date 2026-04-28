@@ -624,21 +624,6 @@ if (!is.null(m4)) {{
         cat("Odds ratios (no CI):\\n")
         print(data.frame(OR = exp(fe)))
     }}
-
-    # Trend test: does success decrease monotonically with warden strength?
-    cat("\\n--- Linear Trend Test (ordered warden_tier) ---\\n")
-    d$warden_tier_ord <- as.numeric(factor(d$warden_tier,
-        levels=c("none", "weak", "mid", "strong"), ordered=TRUE))
-    m4_trend <- fit_glmer(
-        success ~ warden_tier_ord + (1|model_family) + (1 + warden_tier_ord|scenario) + (1|profile_name),
-        data=d, label="Model 4 trend"
-    )
-    if (!is.null(m4_trend)) {{
-        cat("Linear slope for warden tier (0=none -> 3=strong):\\n")
-        print(summary(m4_trend)$coefficients)
-        fe_t <- fixef(m4_trend)
-        cat(sprintf("\\nOR per tier increase: %.3f\\n", exp(fe_t["warden_tier_ord"])))
-    }}
 }}
 """
 
