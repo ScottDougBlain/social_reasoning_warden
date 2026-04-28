@@ -1,0 +1,56 @@
+[
+  {
+    "contrast": "weak / none",
+    "odds.ratio": 0.134472510932016,
+    "SE": 0.03122026123469,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -8.64198528511594,
+    "p.value": 3.31467275170867e-17
+  },
+  {
+    "contrast": "mid / none",
+    "odds.ratio": 0.10591575786419,
+    "SE": 0.0315298790757823,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -7.54181954480719,
+    "p.value": 9.26917583893584e-14
+  },
+  {
+    "contrast": "mid / weak",
+    "odds.ratio": 0.78763873099489,
+    "SE": 0.116421522562597,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -1.6150087383484,
+    "p.value": 0.115819597074846
+  },
+  {
+    "contrast": "strong / none",
+    "odds.ratio": 0.0834571534483948,
+    "SE": 0.0274425492970549,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -7.5524806851846,
+    "p.value": 9.26917583893584e-14
+  },
+  {
+    "contrast": "strong / weak",
+    "odds.ratio": 0.620626125517856,
+    "SE": 0.124243619213257,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -2.38285931547646,
+    "p.value": 0.0257681370190817
+  },
+  {
+    "contrast": "strong / mid",
+    "odds.ratio": 0.787957855670613,
+    "SE": 0.119409230930816,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -1.5725649146139,
+    "p.value": 0.115819597074846
+  }
+]

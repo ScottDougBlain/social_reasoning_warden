@@ -1,0 +1,13 @@
+[
+  {
+    "contrast": "has_warden1 / has_warden0",
+    "odds.ratio": 0.111708399504287,
+    "SE": 0.0299709337799444,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -8.16956694672316,
+    "p.value": 3.09498402237891e-16,
+    "contrast_family": "warden_effect_adversary_only",
+    "p.value.raw": 3.09498402237891e-16
+  }
+]

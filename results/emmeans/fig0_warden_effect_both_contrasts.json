@@ -1,0 +1,38 @@
+[
+  {
+    "contrast": "has_warden1 / has_warden0",
+    "requester_type": "benign_agent",
+    "odds.ratio": 0.347969777178356,
+    "SE": 0.109107115281465,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -3.36669788126919,
+    "p.value": 0.00076073981226,
+    "contrast_family": "warden_vs_no_warden_within_requester",
+    "p.value.raw": 0.00076073981226
+  },
+  {
+    "contrast": "has_warden1 / has_warden0",
+    "requester_type": "adversary",
+    "odds.ratio": 0.16783306014539,
+    "SE": 0.0486601990427601,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -6.15587307996301,
+    "p.value": 2.2399500894810803e-09,
+    "contrast_family": "warden_vs_no_warden_within_requester",
+    "p.value.raw": 7.466500298270271e-10
+  },
+  {
+    "contrast": "adversary_warden_effect_minus_benign_warden_effect",
+    "requester_type": null,
+    "odds.ratio": 0.482320796668975,
+    "SE": 0.0832031890937757,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -4.22678749359461,
+    "p.value": 3.5557701778144e-05,
+    "contrast_family": "requester_type_x_warden_interaction",
+    "p.value.raw": 2.37051345187627e-05
+  }
+]

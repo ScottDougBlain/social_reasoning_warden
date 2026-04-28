@@ -1,0 +1,67 @@
+[
+  {
+    "contrast": "adversary_has_data1 / adversary_has_data0",
+    "has_warden": 0.0,
+    "odds.ratio": 1.10290326269591,
+    "SE": 0.134366404974857,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": 0.80395839241163,
+    "p.value": 0.526776256168671,
+    "contrast_family": "dossier_vs_no_dossier_within_warden",
+    "adversary_has_data": null,
+    "p.value.raw": 0.421421004934937
+  },
+  {
+    "contrast": "adversary_has_data1 / adversary_has_data0",
+    "has_warden": 1.0,
+    "odds.ratio": 0.97039464578182,
+    "SE": 0.0966489799396809,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -0.301738578349256,
+    "p.value": 0.762851356873634,
+    "contrast_family": "dossier_vs_no_dossier_within_warden",
+    "adversary_has_data": null,
+    "p.value.raw": 0.762851356873634
+  },
+  {
+    "contrast": "has_warden1 / has_warden0",
+    "has_warden": null,
+    "odds.ratio": 0.119118260586201,
+    "SE": 0.0333085463548137,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -7.60887592427612,
+    "p.value": 6.912250479298721e-14,
+    "contrast_family": "warden_vs_no_warden_within_dossier",
+    "adversary_has_data": 0.0,
+    "p.value.raw": 2.76490019171949e-14
+  },
+  {
+    "contrast": "has_warden1 / has_warden0",
+    "has_warden": null,
+    "odds.ratio": 0.104806764289684,
+    "SE": 0.0292921040168118,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -8.07063949787799,
+    "p.value": 3.4965457095592602e-15,
+    "contrast_family": "warden_vs_no_warden_within_dossier",
+    "adversary_has_data": 1.0,
+    "p.value.raw": 6.99309141911852e-16
+  },
+  {
+    "contrast": "dossier_effect_with_warden_minus_without_warden",
+    "has_warden": null,
+    "odds.ratio": 0.879854723985325,
+    "SE": 0.138456452850239,
+    "df": Infinity,
+    "null": 1,
+    "z.ratio": -0.81339697435574,
+    "p.value": 0.526776256168671,
+    "contrast_family": "dossier_x_warden_interaction",
+    "adversary_has_data": null,
+    "p.value.raw": 0.41599049350146
+  }
+]

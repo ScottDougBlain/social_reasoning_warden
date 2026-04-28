@@ -66,6 +66,35 @@ def _save_emmeans(data: list[dict], name: str) -> Path:
     return path
 
 
+def _dataframe_to_json_records(df: pd.DataFrame) -> list[dict]:
+    """Convert a dataframe to JSON-safe row dictionaries."""
+    records: list[dict] = []
+    for _, row in df.iterrows():
+        record = {}
+        for key, value in row.items():
+            if pd.isna(value):
+                record[key] = None
+            elif hasattr(value, "item"):
+                record[key] = value.item()
+            else:
+                record[key] = value
+        records.append(record)
+    return records
+
+
+def _save_contrast_csv(csv_path: str, name: str) -> list[dict] | None:
+    """Read an R-written contrast CSV and save it as JSON."""
+    try:
+        contrast_df = pd.read_csv(csv_path)
+    except FileNotFoundError:
+        print(f"  [error] {name} contrast CSV not found")
+        return None
+
+    contrast_records = _dataframe_to_json_records(contrast_df)
+    _save_emmeans(contrast_records, name)
+    return contrast_records
+
+
 # ── Figure 1: Warden Effect (has_warden, adversary only) ─────────────────
 
 def extract_fig1(df: pd.DataFrame) -> list[dict] | None:
@@ -80,6 +109,7 @@ def extract_fig1(df: pd.DataFrame) -> list[dict] | None:
 
     csv_path = "/tmp/emmeans_fig1.csv"
     out_path = "/tmp/emmeans_fig1_out.csv"
+    contrast_out_path = "/tmp/emmeans_fig1_contrasts.csv"
     data.to_csv(csv_path, index=False)
 
     r_script = f"""
@@ -106,13 +136,18 @@ if (!is.null(m)) {{
     cat("\\nEmmeans (response scale):\\n")
     print(summary(em))
 
-    # Pairwise OR
-    cat("\\nPairwise contrasts (odds ratio):\\n")
-    print(pairs(em, type="response", reverse=TRUE))
+    em_contrasts <- pairs(em, type="response", reverse=TRUE, adjust="none")
+    contrast_df <- as.data.frame(summary(em_contrasts))
+    contrast_df$contrast_family <- "warden_effect_adversary_only"
+    contrast_df$p.value.raw <- contrast_df$p.value
+    contrast_df$p.value <- p.adjust(contrast_df$p.value.raw, method="BH")
 
-    # Save to CSV
+    cat("\\nPairwise contrasts (odds ratio):\\n")
+    print(contrast_df)
+
     em_df <- as.data.frame(summary(em))
     write.csv(em_df, "{out_path}", row.names=FALSE)
+    write.csv(contrast_df, "{contrast_out_path}", row.names=FALSE)
 }}
 """
 
@@ -133,6 +168,7 @@ if (!is.null(m)) {{
             "asymp.UCL": float(row["asymp.UCL"]),
         })
     _save_emmeans(records, "fig1_warden_effect")
+    _save_contrast_csv(contrast_out_path, "fig1_warden_effect_contrasts")
     return records
 
 
@@ -150,6 +186,7 @@ def extract_fig2(df: pd.DataFrame) -> list[dict] | None:
 
     csv_path = "/tmp/emmeans_fig2.csv"
     out_path = "/tmp/emmeans_fig2_out.csv"
+    contrast_out_path = "/tmp/emmeans_fig2_contrasts.csv"
     data.to_csv(csv_path, index=False)
 
     r_script = f"""
@@ -173,11 +210,57 @@ m <- fit_glmer(
 
 if (!is.null(m)) {{
     em <- emmeans(m, ~ adversary_has_data * has_warden, type="response")
+    em_link <- emmeans(m, ~ adversary_has_data * has_warden)
     cat("\\nEmmeans (response scale):\\n")
     print(summary(em))
 
+    dossier_contrasts <- pairs(
+        emmeans(m, ~ adversary_has_data | has_warden),
+        type="response", reverse=TRUE, adjust="none"
+    )
+    dossier_df <- as.data.frame(summary(dossier_contrasts))
+    dossier_df$contrast_family <- "dossier_vs_no_dossier_within_warden"
+
+    warden_contrasts <- pairs(
+        emmeans(m, ~ has_warden | adversary_has_data),
+        type="response", reverse=TRUE, adjust="none"
+    )
+    warden_df <- as.data.frame(summary(warden_contrasts))
+    warden_df$contrast_family <- "warden_vs_no_warden_within_dossier"
+
+    grid_df <- as.data.frame(em_link)
+    interaction_coef <- ifelse(
+        grid_df$adversary_has_data == "1" & grid_df$has_warden == "1", 1,
+        ifelse(
+            grid_df$adversary_has_data == "0" & grid_df$has_warden == "1", -1,
+            ifelse(
+                grid_df$adversary_has_data == "1" & grid_df$has_warden == "0", -1,
+                ifelse(grid_df$adversary_has_data == "0" & grid_df$has_warden == "0", 1, 0)
+            )
+        )
+    )
+    interaction_contrast <- contrast(
+        em_link,
+        list("dossier_effect_with_warden_minus_without_warden" = interaction_coef),
+        adjust="none"
+    )
+    interaction_df <- as.data.frame(summary(interaction_contrast, type="response"))
+    interaction_df$contrast_family <- "dossier_x_warden_interaction"
+
+    all_cols <- Reduce(union, list(names(dossier_df), names(warden_df), names(interaction_df)))
+    for (nm in setdiff(all_cols, names(dossier_df))) dossier_df[[nm]] <- NA
+    for (nm in setdiff(all_cols, names(warden_df))) warden_df[[nm]] <- NA
+    for (nm in setdiff(all_cols, names(interaction_df))) interaction_df[[nm]] <- NA
+    contrast_df <- rbind(dossier_df[all_cols], warden_df[all_cols], interaction_df[all_cols])
+    contrast_df$p.value.raw <- contrast_df$p.value
+    contrast_df$p.value <- p.adjust(contrast_df$p.value.raw, method="BH")
+
+    cat("\\nPairwise contrasts and interaction contrast (BH-adjusted):\\n")
+    print(contrast_df)
+
     em_df <- as.data.frame(summary(em))
     write.csv(em_df, "{out_path}", row.names=FALSE)
+    write.csv(contrast_df, "{contrast_out_path}", row.names=FALSE)
 }}
 """
 
@@ -199,6 +282,7 @@ if (!is.null(m)) {{
             "asymp.UCL": float(row["asymp.UCL"]),
         })
     _save_emmeans(records, "fig2_dossier_interaction")
+    _save_contrast_csv(contrast_out_path, "fig2_dossier_interaction_contrasts")
     return records
 
 
@@ -214,6 +298,7 @@ def extract_fig3(df: pd.DataFrame) -> list[dict] | None:
 
     csv_path = "/tmp/emmeans_fig3.csv"
     out_path = "/tmp/emmeans_fig3_out.csv"
+    contrast_out_path = "/tmp/emmeans_fig3_contrasts.csv"
     data.to_csv(csv_path, index=False)
 
     r_script = f"""
@@ -239,11 +324,15 @@ if (!is.null(m)) {{
     cat("\\nEmmeans (response scale):\\n")
     print(summary(em))
 
+    em_contrasts <- pairs(em, type="response", reverse=TRUE, adjust="BH")
     cat("\\nPairwise contrasts (odds ratio):\\n")
-    print(pairs(em, type="response", reverse=TRUE))
+    print(em_contrasts)
 
     em_df <- as.data.frame(summary(em))
     write.csv(em_df, "{out_path}", row.names=FALSE)
+
+    contrast_df <- as.data.frame(summary(em_contrasts))
+    write.csv(contrast_df, "{contrast_out_path}", row.names=FALSE)
 }}
 """
 
@@ -264,6 +353,15 @@ if (!is.null(m)) {{
             "asymp.UCL": float(row["asymp.UCL"]),
         })
     _save_emmeans(records, "fig3_capability_asymmetry")
+
+    try:
+        contrast_df = pd.read_csv(contrast_out_path)
+    except FileNotFoundError:
+        print("  [error] fig3 pairwise contrast CSV not found")
+    else:
+        contrast_records = _dataframe_to_json_records(contrast_df)
+        _save_emmeans(contrast_records, "fig3_capability_asymmetry_contrasts")
+
     return records
 
 
@@ -279,6 +377,7 @@ def extract_fig0(df: pd.DataFrame) -> list[dict] | None:
 
     csv_path = "/tmp/emmeans_fig0.csv"
     out_path = "/tmp/emmeans_fig0_out.csv"
+    contrast_out_path = "/tmp/emmeans_fig0_contrasts.csv"
     data.to_csv(csv_path, index=False)
 
     r_script = f"""
@@ -303,11 +402,49 @@ m <- fit_glmer(
 
 if (!is.null(m)) {{
     em <- emmeans(m, ~ requester_type * has_warden, type="response")
+    em_link <- emmeans(m, ~ requester_type * has_warden)
     cat("\\nEmmeans (response scale):\\n")
     print(summary(em))
 
+    warden_contrasts <- pairs(
+        emmeans(m, ~ has_warden | requester_type),
+        type="response", reverse=TRUE, adjust="none"
+    )
+    warden_df <- as.data.frame(summary(warden_contrasts))
+    warden_df$contrast_family <- "warden_vs_no_warden_within_requester"
+
+    grid_df <- as.data.frame(em_link)
+    did_coef <- ifelse(
+        grid_df$requester_type == "adversary" & grid_df$has_warden == "1", 1,
+        ifelse(
+            grid_df$requester_type == "adversary" & grid_df$has_warden == "0", -1,
+            ifelse(
+                grid_df$requester_type == "benign_agent" & grid_df$has_warden == "1", -1,
+                ifelse(grid_df$requester_type == "benign_agent" & grid_df$has_warden == "0", 1, 0)
+            )
+        )
+    )
+    did_contrast <- contrast(
+        em_link,
+        list("adversary_warden_effect_minus_benign_warden_effect" = did_coef),
+        adjust="none"
+    )
+    did_df <- as.data.frame(summary(did_contrast, type="response"))
+    did_df$contrast_family <- "requester_type_x_warden_interaction"
+
+    all_cols <- union(names(warden_df), names(did_df))
+    for (nm in setdiff(all_cols, names(warden_df))) warden_df[[nm]] <- NA
+    for (nm in setdiff(all_cols, names(did_df))) did_df[[nm]] <- NA
+    contrast_df <- rbind(warden_df[all_cols], did_df[all_cols])
+    contrast_df$p.value.raw <- contrast_df$p.value
+    contrast_df$p.value <- p.adjust(contrast_df$p.value.raw, method="BH")
+
+    cat("\\nPairwise contrasts and interaction contrast (BH-adjusted):\\n")
+    print(contrast_df)
+
     em_df <- as.data.frame(summary(em))
     write.csv(em_df, "{out_path}", row.names=FALSE)
+    write.csv(contrast_df, "{contrast_out_path}", row.names=FALSE)
 }}
 """
 
@@ -329,6 +466,7 @@ if (!is.null(m)) {{
             "asymp.UCL": float(row["asymp.UCL"]),
         })
     _save_emmeans(records, "fig0_warden_effect_both")
+    _save_contrast_csv(contrast_out_path, "fig0_warden_effect_both_contrasts")
     return records
 
 
