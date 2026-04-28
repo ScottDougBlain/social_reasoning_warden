@@ -305,10 +305,10 @@ def fig_dossier_effect(
         return
 
     conditions = [
-        ("No Dossier\nNo Warden", lambda d: not d["has_dossier"] and not d["has_warden"]),
-        ("Dossier\nNo Warden", lambda d: d["has_dossier"] and not d["has_warden"]),
-        ("No Dossier\nWith Warden", lambda d: not d["has_dossier"] and d["has_warden"]),
-        ("Dossier\nWith Warden", lambda d: d["has_dossier"] and d["has_warden"]),
+        ("No Personalization\nNo Warden", lambda d: not d["has_dossier"] and not d["has_warden"]),
+        ("Personalization\nNo Warden", lambda d: d["has_dossier"] and not d["has_warden"]),
+        ("No Personalization\nWith Warden", lambda d: not d["has_dossier"] and d["has_warden"]),
+        ("Personalization\nWith Warden", lambda d: d["has_dossier"] and d["has_warden"]),
     ]
 
     # Map emmeans cells to condition order: (dossier, warden) -> index
@@ -371,7 +371,7 @@ def fig_dossier_effect(
         f"Dossier × Warden Interaction\n({ci_label} OR: dossier = {or_dossier:.2f}, warden = {or_warden:.3f})",
         show_titles,
     )
-    ax.set_ylim(0, 70)
+    ax.set_ylim(0, 60)
 
     for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
         ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
@@ -379,8 +379,8 @@ def fig_dossier_effect(
     legend_handles = [
         Patch(facecolor=COLOR_ROSE, edgecolor="black", label="No Warden"),
         Patch(facecolor=COLOR_LIGHT_BLUE, edgecolor="black", label="With Warden"),
-        Patch(facecolor="white", edgecolor="black", hatch="", label="No Dossier"),
-        Patch(facecolor="white", edgecolor="black", hatch="///", label="Dossier"),
+        Patch(facecolor="white", edgecolor="black", hatch="", label="No Personalization"),
+        Patch(facecolor="white", edgecolor="black", hatch="///", label="Personalization"),
     ]
     ax.legend(
         handles=legend_handles,
@@ -445,7 +445,7 @@ def fig_capability_asymmetry(
             ns.append(n)
         ci_label = "raw"
 
-    fig, ax = plt.subplots(figsize=(6, 5))
+    fig, ax = plt.subplots(figsize=(7, 5))
     x = np.arange(4)
     colors = [COLOR_ROSE, COLOR_LIGHT_BLUE, COLOR_GREEN, COLOR_DARK_BLUE]
     ax.bar(x, rates, yerr=[los, his],

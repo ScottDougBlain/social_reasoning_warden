@@ -1211,6 +1211,58 @@ def _warden_overview_label(log: dict) -> object | None:
     return "none"
 
 
+def _format_warden_overview_label(label: object) -> str:
+    if label == "none":
+        return "no warden"
+    if label == "skeptical_system_prompt":
+        return "skeptical system prompt"
+    label_text = _shorten_model_label(label)
+    if label_text.startswith("gemma-3-") and label_text.endswith("-it"):
+        return label_text[:-3]
+    if label_text == "gemini-3.1-pro-preview":
+        return "gemini-3.1-pro"
+    if label_text.startswith("mistral") and label_text.endswith("-instruct"):
+        return label_text[: -len("-instruct")]
+    return label_text
+
+
+def _ordered_warden_overview_labels(
+    labels_set: set[object],
+    warden_scores: dict[object, dict[str, object]],
+) -> list[object]:
+    """Sort labels by protection score, keeping the two baselines at the end."""
+
+    def _warden_score_sort_key(label: object) -> tuple[bool, float, str]:
+        details = warden_scores.get(label)
+        score = details["score"] if details else None
+        return score is None, -(score if score is not None else 0.0), str(label)
+
+    raw_labels = sorted(labels_set, key=_warden_score_sort_key)
+    baseline_labels = [
+        label for label in ("skeptical_system_prompt", "none") if label in raw_labels
+    ]
+    if baseline_labels:
+        baseline_set = set(baseline_labels)
+        raw_labels = [
+            label for label in raw_labels
+            if label not in baseline_set
+        ] + baseline_labels
+    return raw_labels
+
+
+def _missing_warden_score_details() -> dict[str, object]:
+    return {
+        "score": None,
+        "method": "insufficient adversary data",
+        "adversary_total": 0,
+        "adversary_success": 0,
+        "adversary_rate": None,
+        "benign_total": 0,
+        "benign_success": 0,
+        "benign_rate": None,
+    }
+
+
 def plot_warden_overview_only(logs: list[dict]) -> None:
     """Render the overview's warden/defense comparison as a standalone PDF."""
     if not logs:
@@ -1218,20 +1270,6 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
         return
 
     rng = np.random.default_rng(0)
-
-    def _format_label(label: object) -> str:
-        if label == "none":
-            return "no warden"
-        if label == "skeptical_system_prompt":
-            return "skeptical system prompt"
-        label_text = _shorten_model_label(label)
-        if label_text.startswith("gemma-3-") and label_text.endswith("-it"):
-            return label_text[:-3]
-        if label_text == "gemini-3.1-pro-preview":
-            return "gemini-3.1-pro"
-        if label_text.startswith("mistral") and label_text.endswith("-instruct"):
-            return label_text[: -len("-instruct")]
-        return label_text
 
     grouped = _split_logs_by_speaker(logs)
     speaker_rates: dict[str, dict[str, dict]] = {}
@@ -1261,22 +1299,8 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
         print("No warden/defense comparison data found.")
         return
 
-    def _warden_score_sort_key(label: object) -> tuple[bool, float, str]:
-        details = warden_scores.get(label)
-        score = details["score"] if details else None
-        return score is None, -(score if score is not None else 0.0), str(label)
-
-    raw_labels = sorted(labels_set, key=_warden_score_sort_key)
-    baseline_labels = [
-        label for label in ("skeptical_system_prompt", "none") if label in raw_labels
-    ]
-    if baseline_labels:
-        baseline_set = set(baseline_labels)
-        raw_labels = [
-            label for label in raw_labels
-            if label not in baseline_set
-        ] + baseline_labels
-    labels = [_format_label(label) for label in raw_labels]
+    raw_labels = _ordered_warden_overview_labels(labels_set, warden_scores)
+    labels = [_format_warden_overview_label(label) for label in raw_labels]
 
     grouped_values: dict[str, tuple[list[float], list[list[int]]]] = {}
     grouped_intervals: dict[str, list[tuple[float, float] | None]] = {}
@@ -1314,16 +1338,7 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
             score_meta.append(details)
             score_intervals.append(_protection_score_interval(details, rng=rng))
         else:
-            details = {
-                "score": None,
-                "method": "insufficient adversary data",
-                "adversary_total": 0,
-                "adversary_success": 0,
-                "adversary_rate": None,
-                "benign_total": 0,
-                "benign_success": 0,
-                "benign_rate": None,
-            }
+            details = _missing_warden_score_details()
             score_rates.append(None)
             score_meta.append(details)
             score_intervals.append(None)
@@ -1506,6 +1521,326 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
     )
 
     _save_plotly_pdf(fig, "warden_comparison_only_plotting_2")
+    fig.show()
+
+
+def plot_warden_protection_score_only(logs: list[dict]) -> None:
+    """Render one protection-score bar per warden/defense condition."""
+    if not logs:
+        print("No logs found.")
+        return
+
+    rng = np.random.default_rng(0)
+    warden_scores = _warden_score_by_label(
+        logs,
+        _warden_overview_label,
+        empty_label="none",
+    )
+    labels_set = set(warden_scores.keys())
+    if not labels_set:
+        print("No warden/defense comparison data found.")
+        return
+
+    raw_labels = _ordered_warden_overview_labels(labels_set, warden_scores)
+    labels = [_format_warden_overview_label(label) for label in raw_labels]
+
+    score_rates: list[float | None] = []
+    score_meta: list[dict[str, object]] = []
+    score_intervals: list[tuple[float, float] | None] = []
+    for label in raw_labels:
+        details = warden_scores.get(label, _missing_warden_score_details())
+        score_rates.append(details["score"])
+        score_meta.append(details)
+        score_intervals.append(_protection_score_interval(details, rng=rng))
+
+    score_error_minus, score_error_plus = zip(
+        *[
+            _interval_error_from_center(score, interval)
+            for score, interval in zip(score_rates, score_intervals)
+        ]
+    )
+    bar_colors = [
+        COLOR_ROSE if label in {"skeptical_system_prompt", "none"} else COLOR_LIGHT_BLUE
+        for label in raw_labels
+    ]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            name="Protection Score",
+            x=labels,
+            y=score_rates,
+            marker=dict(
+                color=bar_colors,
+                line=dict(color="black", width=1),
+            ),
+            error_y=dict(
+                type="data",
+                array=list(score_error_plus),
+                arrayminus=list(score_error_minus),
+                visible=True,
+                color="#5A5A5A",
+                thickness=1.2,
+                width=4,
+            ),
+            hovertext=[
+                _format_protection_score_hover(details, interval)
+                for details, interval in zip(score_meta, score_intervals)
+            ],
+            hovertemplate="%{hovertext}<extra></extra>",
+        )
+    )
+
+    if "none" in raw_labels:
+        baseline_idx = raw_labels.index("none")
+        baseline_score = score_rates[baseline_idx]
+        if baseline_score is not None:
+            fig.add_hline(
+                y=baseline_score,
+                line=dict(
+                    color="black",
+                    width=2,
+                    dash="dash",
+                ),
+                opacity=0.95,
+                layer="below",
+            )
+
+    for label, score, plus in zip(labels, score_rates, score_error_plus):
+        if score is None:
+            continue
+        fig.add_annotation(
+            x=label,
+            y=min(score + plus + 0.012, 0.895),
+            text=f"{score:.0%}",
+            showarrow=False,
+            yshift=8,
+            font=dict(size=10, color="black"),
+            xanchor="center",
+            yanchor="bottom",
+        )
+
+    y_tick_values = [step / 100 for step in range(60, 91, 10)]
+    fig.update_yaxes(
+        range=[0.6, 0.9],
+        tickvals=y_tick_values,
+        ticktext=[str(int(value * 100)) for value in y_tick_values],
+        title_text="Protection Score (%)",
+        showgrid=True,
+        gridcolor="#D9D9D9",
+        gridwidth=1,
+        zeroline=False,
+    )
+    fig.update_xaxes(
+        tickangle=-35,
+        title_text="Warden Model / Skeptical System Prompt",
+        showgrid=False,
+    )
+    fig.update_layout(
+        showlegend=False,
+        height=500,
+        width=max(740, len(labels) * 70 + 180),
+        margin=dict(t=80, b=140),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(color="black"),
+    )
+
+    _save_plotly_pdf(fig, "warden_protection_score_only_plotting_2")
+    fig.show()
+
+
+def plot_warden_tradeoff(logs: list[dict]) -> None:
+    """Render adversary-vs-benign success tradeoff by warden/defense condition."""
+    if not logs:
+        print("No logs found.")
+        return
+
+    warden_scores = _warden_score_by_label(
+        logs,
+        _warden_overview_label,
+        empty_label="none",
+    )
+    raw_labels = _ordered_warden_overview_labels(set(warden_scores.keys()), warden_scores)
+    point_rows = [
+        (
+            label,
+            warden_scores[label],
+        )
+        for label in raw_labels
+        if warden_scores[label]["adversary_rate"] is not None
+        and warden_scores[label]["benign_rate"] is not None
+    ]
+    if not point_rows:
+        print("No paired adversary/benign data found for tradeoff plot.")
+        return
+
+    x_rates = [details["adversary_rate"] for _, details in point_rows]
+    y_rates = [details["benign_rate"] for _, details in point_rows]
+    frontier_points: list[tuple[float, float]] = []
+    best_benign_rate = -1.0
+    for _, details in sorted(
+        point_rows,
+        key=lambda row: (
+            float(row[1]["adversary_rate"]),
+            -float(row[1]["benign_rate"]),
+        ),
+    ):
+        adversary_rate = float(details["adversary_rate"])
+        benign_rate = float(details["benign_rate"])
+        if benign_rate > best_benign_rate + 1e-12:
+            frontier_points.append((adversary_rate, benign_rate))
+            best_benign_rate = benign_rate
+    warden_rows = [
+        (label, details)
+        for label, details in point_rows
+        if label not in {"none", "skeptical_system_prompt"}
+    ]
+    no_warden_rows = [
+        (label, details)
+        for label, details in point_rows
+        if label == "none"
+    ]
+    skeptical_rows = [
+        (label, details)
+        for label, details in point_rows
+        if label == "skeptical_system_prompt"
+    ]
+
+    x_max = min(1.0, max(x_rates) + 0.08)
+    x_axis_max = min(1.0, max(0.2, float(np.ceil(x_max * 5) / 5)))
+    x_tick_values = [
+        step / 100
+        for step in range(0, 101, 20)
+        if step / 100 <= x_axis_max
+    ]
+    y_tick_values = [step / 100 for step in range(60, 101, 10)]
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            name="y = x",
+            x=[0, 1],
+            y=[0, 1],
+            mode="lines",
+            line=dict(color="black", width=1.4, dash="dash"),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+    if len(frontier_points) >= 2:
+        fig.add_trace(
+            go.Scatter(
+                name="Pareto frontier",
+                x=[x for x, _ in frontier_points],
+                y=[y for _, y in frontier_points],
+                mode="lines",
+                line=dict(color="#333333", width=1),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+
+    def _add_tradeoff_trace(
+        rows: list[tuple[object, dict[str, object]]],
+        *,
+        name: str,
+        color: str,
+        symbol: str,
+        show_text: bool,
+    ) -> None:
+        if not rows:
+            return
+        trace_labels = [_format_warden_overview_label(label) for label, _ in rows]
+        trace = go.Scatter(
+            name=name,
+            x=[details["adversary_rate"] for _, details in rows],
+            y=[details["benign_rate"] for _, details in rows],
+            mode="markers+text" if show_text else "markers",
+            marker=dict(
+                size=12,
+                color=color,
+                symbol=symbol,
+                line=dict(color="black", width=1),
+            ),
+            hovertext=[
+                _format_protection_score_hover(details, None)
+                for _, details in rows
+            ],
+            hovertemplate="%{hovertext}<extra></extra>",
+        )
+        if show_text:
+            trace.update(
+                text=trace_labels,
+                textposition="top center",
+                textfont=dict(size=11, color="black"),
+            )
+        fig.add_trace(trace)
+
+    _add_tradeoff_trace(
+        warden_rows,
+        name="Warden",
+        color=COLOR_LIGHT_BLUE,
+        symbol="circle",
+        show_text=True,
+    )
+    _add_tradeoff_trace(
+        no_warden_rows,
+        name="No Warden",
+        color=COLOR_ROSE,
+        symbol="square",
+        show_text=False,
+    )
+    _add_tradeoff_trace(
+        skeptical_rows,
+        name="Skeptical System Prompt",
+        color=COLOR_ROSE,
+        symbol="diamond",
+        show_text=False,
+    )
+    fig.update_xaxes(
+        range=[0, x_axis_max],
+        tickvals=x_tick_values,
+        ticktext=[str(int(value * 100)) for value in x_tick_values],
+        title_text="Adversary Success Rate (%)",
+        title_font=dict(size=22),
+        tickfont=dict(size=16),
+        showgrid=True,
+        gridcolor="#D9D9D9",
+        gridwidth=1,
+        zeroline=True,
+        zerolinecolor="#D9D9D9",
+    )
+    fig.update_yaxes(
+        range=[0.6, 1.02],
+        tickvals=y_tick_values,
+        ticktext=[str(int(value * 100)) for value in y_tick_values],
+        title_text="Benign Agent Success Rate (%)",
+        title_font=dict(size=22),
+        tickfont=dict(size=16),
+        showgrid=True,
+        gridcolor="#D9D9D9",
+        gridwidth=1,
+        zeroline=False,
+    )
+    fig.update_layout(
+        showlegend=True,
+        height=800,
+        width=800,
+        margin=dict(t=100, b=90, l=90, r=60),
+        legend=dict(
+            orientation="h",
+            x=0.5,
+            xanchor="center",
+            y=1.08,
+            yanchor="bottom",
+            font=dict(size=22),
+        ),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(color="black"),
+    )
+
+    _save_plotly_pdf(fig, "warden_tradeoff_plotting_2")
     fig.show()
 
 
@@ -2076,6 +2411,22 @@ if __name__ == "__main__":
         help="Show the standalone warden/defense comparison and save it as a PDF",
     )
     parser.add_argument(
+        "--plotting-warden-score-only",
+        nargs="?",
+        const=True,
+        default=False,
+        type=_parse_bool,
+        help="Show the protection-score-only warden comparison and save it as a PDF",
+    )
+    parser.add_argument(
+        "--plotting-warden-tradeoff",
+        nargs="?",
+        const=True,
+        default=False,
+        type=_parse_bool,
+        help="Show the adversary/benign success tradeoff and save it as a PDF",
+    )
+    parser.add_argument(
         "--heatmap",
         action="store_true",
         help="Show Scenario x Profile success rate heatmap",
@@ -2123,6 +2474,10 @@ if __name__ == "__main__":
         plot_success_rates_2(logs)
     if args.plotting_warden_only or show_all:
         plot_warden_overview_only(logs)
+    if args.plotting_warden_score_only or show_all:
+        plot_warden_protection_score_only(logs)
+    if args.plotting_warden_tradeoff or show_all:
+        plot_warden_tradeoff(logs)
     if args.heatmap or show_all:
         plot_heatmap(logs)
     if args.adversary_target_heatmap or show_all:
