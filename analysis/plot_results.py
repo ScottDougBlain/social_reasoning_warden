@@ -874,6 +874,213 @@ def fig_warden_effect_both(
     _save_fig(fig, output_dir, "fig0_warden_effect_both")
 
 
+# ── Figure 0b: Warden Effect — grouped by requester type ────────────────
+
+
+def fig_warden_effect_both_by_requester(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    use_raw: bool = False,
+    show_titles: bool = True,
+):
+    """Grouped bar: adversary/benign groups with warden bars side by side."""
+    main = [d for d in data if d["tag"] in main_tags]
+    if not main:
+        print("  [skip] No main study data for warden effect (both by requester)")
+        return
+
+    em = None if use_raw else _load_emmeans("fig0_warden_effect_both")
+    em_lookup = {}
+    if em:
+        for e in em:
+            em_lookup[(e["requester_type"], int(e["has_warden"]))] = e
+
+    ci_label = "GLME-adjusted" if em else "raw"
+
+    fig, ax = plt.subplots(figsize=(6, 5.5))
+    x = np.arange(2)  # Adversary, Benign Agent
+    width = 0.32
+    requester_types = [
+        ("adversary", "Adversary"),
+        ("benign_agent", "Benign Agent"),
+    ]
+
+    for j, (has_w, warden_label) in enumerate([
+        (False, "No Warden"),
+        (True, "With Warden"),
+    ]):
+        rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
+        for rt, _rt_label in requester_types:
+            subset = [d for d in main if d["requester_type"] == rt
+                      and d["has_warden"] == has_w]
+            e = em_lookup.get((rt, int(has_w)))
+            if e:
+                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+                n = len(subset)
+            else:
+                r, lo, hi, n = _rate_and_ci(subset)
+            rates.append(r * 100)
+            err_lo.append((r - lo) * 100)
+            err_hi.append((hi - r) * 100)
+            hi_abs.append(hi * 100)
+            ns_list.append(n)
+
+        offset = (j - 0.5) * width
+        ax.bar(
+            x + offset, rates, width, yerr=[err_lo, err_hi],
+            label=warden_label, color=WARDEN_COLORS[has_w],
+            error_kw=dict(capsize=5, capthick=1.3, elinewidth=1.3),
+            edgecolor="black", linewidth=0.5,
+        )
+
+        for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
+            ax.text(x[i] + offset, h + 2, f"{r:.1f}%\nn={n}",
+                    ha="center", fontsize=9)
+
+    adv_data = [d for d in main if d["requester_type"] == "adversary"]
+    adv_w = [d for d in adv_data if d["has_warden"]]
+    adv_nw = [d for d in adv_data if not d["has_warden"]]
+    or_adv = _raw_odds_ratio(adv_w, adv_nw)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([label for _rt, label in requester_types], fontsize=10)
+    ax.set_ylabel("Success Rate (%)")
+    _maybe_set_title(
+        ax,
+        f"Warden Effect: Adversary vs. Benign Agent ({ci_label})\n"
+        f"(adversary OR = {or_adv:.3f})",
+        show_titles,
+    )
+    ax.set_ylim(0, 115)
+    ax.legend(loc="upper right", framealpha=0.9)
+
+    _horizontal_grid_only(ax)
+    sns.despine()
+    fig.tight_layout()
+    _save_fig(fig, output_dir, "fig0b_warden_effect_both")
+
+
+# ── Figure 0c: Warden Effect — dumbbell delta view ──────────────────────
+
+
+def fig_warden_effect_both_delta(
+    data: list[dict],
+    output_dir: Path,
+    main_tags: set[str],
+    use_raw: bool = False,
+    show_titles: bool = True,
+):
+    """Dumbbell plot: no-warden vs with-warden rates and delta by requester."""
+    main = [d for d in data if d["tag"] in main_tags]
+    if not main:
+        print("  [skip] No main study data for warden effect delta")
+        return
+
+    em = None if use_raw else _load_emmeans("fig0_warden_effect_both")
+    em_lookup = {}
+    if em:
+        for e in em:
+            em_lookup[(e["requester_type"], int(e["has_warden"]))] = e
+
+    ci_label = "GLME-adjusted" if em else "raw"
+    requester_types = [
+        ("adversary", "Adversary"),
+        ("benign_agent", "Benign Agent"),
+    ]
+
+    points = []
+    for rt, rt_label in requester_types:
+        row = {"requester_type": rt, "label": rt_label}
+        for has_w, key in [(False, "no_warden"), (True, "with_warden")]:
+            subset = [d for d in main if d["requester_type"] == rt
+                      and d["has_warden"] == has_w]
+            e = em_lookup.get((rt, int(has_w)))
+            if e:
+                r, lo, hi = e["prob"], e["asymp.LCL"], e["asymp.UCL"]
+                n = len(subset)
+            else:
+                r, lo, hi, n = _rate_and_ci(subset)
+            row[key] = {
+                "rate": r * 100,
+                "lo": lo * 100,
+                "hi": hi * 100,
+                "n": n,
+            }
+        row["delta"] = row["with_warden"]["rate"] - row["no_warden"]["rate"]
+        points.append(row)
+
+    adv_data = [d for d in main if d["requester_type"] == "adversary"]
+    adv_w = [d for d in adv_data if d["has_warden"]]
+    adv_nw = [d for d in adv_data if not d["has_warden"]]
+    or_adv = _raw_odds_ratio(adv_w, adv_nw)
+
+    fig, ax = plt.subplots(figsize=(7, 3.2))
+    y = np.arange(len(points))
+
+    for i, row in enumerate(points):
+        no_w = row["no_warden"]
+        with_w = row["with_warden"]
+        ax.annotate(
+            "",
+            xy=(with_w["rate"], i),
+            xytext=(no_w["rate"], i),
+            arrowprops=dict(
+                arrowstyle="->",
+                color="0.45",
+                linewidth=2.2,
+                shrinkA=7,
+                shrinkB=7,
+            ),
+            zorder=1,
+        )
+        for has_w, cell, label in [
+            (False, no_w, "No Warden"),
+            (True, with_w, "With Warden"),
+        ]:
+            ax.errorbar(
+                cell["rate"], i,
+                xerr=[
+                    [cell["rate"] - cell["lo"]],
+                    [cell["hi"] - cell["rate"]],
+                ],
+                fmt="o", markersize=8,
+                color=WARDEN_COLORS[has_w],
+                markeredgecolor="black", markeredgewidth=0.6,
+                ecolor=WARDEN_COLORS[has_w],
+                elinewidth=1.2, capsize=4, capthick=1.2,
+                label=label if i == 0 else None,
+                zorder=2,
+            )
+
+        label_x = min(max(no_w["rate"], with_w["rate"]) + 5, 108)
+        ax.text(
+            label_x, i,
+            f"{row['delta']:+.1f} pp",
+            va="center", ha="left", fontsize=10, fontweight="bold",
+        )
+
+    ax.set_yticks(y)
+    ax.set_yticklabels([row["label"] for row in points], fontsize=10)
+    ax.set_ylim(-0.4, len(points) - 0.6)
+    ax.set_xlabel("Success Rate (%)")
+    _maybe_set_title(
+        ax,
+        f"Warden Effect Delta: With Warden - No Warden ({ci_label})\n"
+        f"(adversary OR = {or_adv:.3f})",
+        show_titles,
+    )
+    ax.set_xlim(0, 115)
+    ax.xaxis.set_major_formatter(mticker.PercentFormatter())
+    ax.legend(loc="lower right", framealpha=0.9)
+
+    _horizontal_grid_only(ax)
+    ax.grid(True, axis="x", alpha=0.3)
+    sns.despine(left=True)
+    fig.tight_layout()
+    _save_fig(fig, output_dir, "fig0c_warden_effect_delta")
+
+
 # ── Figure 8: Profile Vulnerability × Warden ─────────────────────────────
 
 
@@ -1396,6 +1603,12 @@ def main():
 
     print("\nGenerating figures...")
     fig_warden_effect_both(
+        data, output_dir, main_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_warden_effect_both_by_requester(
+        data, output_dir, main_tags, use_raw=use_raw, show_titles=show_titles
+    )
+    fig_warden_effect_both_delta(
         data, output_dir, main_tags, use_raw=use_raw, show_titles=show_titles
     )
     fig_warden_effect(
