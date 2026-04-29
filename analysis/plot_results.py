@@ -898,7 +898,7 @@ def fig_warden_effect_both_by_requester(
 
     ci_label = "GLME-adjusted" if em else "raw"
 
-    fig, ax = plt.subplots(figsize=(6, 5.5))
+    fig, ax = plt.subplots(figsize=(7, 5))
     x = np.arange(2)  # Adversary, Benign Agent
     width = 0.32
     requester_types = [

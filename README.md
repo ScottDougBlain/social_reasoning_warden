@@ -197,7 +197,7 @@ cd social_reasoning_warden
 python3 -m pip install -r requirements.txt
 ```
 
-`requirements.txt` includes both runtime dependencies and the Python-side analysis stack used by the plotting and export scripts.
+`requirements.txt` includes both runtime dependencies and the Python-side analysis stack used by the plotting and export scripts. Alternatievely you can use the `environment.yml` file to create a conda environment with all dependencies.
 
 Create a `.env` file with your API key(s):
 

@@ -1215,7 +1215,7 @@ def _format_warden_overview_label(label: object) -> str:
     if label == "none":
         return "no warden"
     if label == "skeptical_system_prompt":
-        return "skeptical system prompt"
+        return "skeptical prompt"
     label_text = _shorten_model_label(label)
     if label_text.startswith("gemma-3-") and label_text.endswith("-it"):
         return label_text[:-3]
@@ -1499,7 +1499,7 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
     )
     fig.update_xaxes(
         tickangle=-35,
-        title_text="Warden Model / Skeptical System Prompt",
+        title_text="Warden Model / Skeptical Prompt",
         showgrid=False,
     )
     fig.update_layout(
@@ -1633,7 +1633,7 @@ def plot_warden_protection_score_only(logs: list[dict]) -> None:
     )
     fig.update_xaxes(
         tickangle=-35,
-        title_text="Warden Model / Skeptical System Prompt",
+        title_text="Warden Model / Skeptical Prompt",
         showgrid=False,
     )
     fig.update_layout(
@@ -1707,13 +1707,8 @@ def plot_warden_tradeoff(logs: list[dict]) -> None:
         if label == "skeptical_system_prompt"
     ]
 
-    x_max = min(1.0, max(x_rates) + 0.08)
-    x_axis_max = min(1.0, max(0.2, float(np.ceil(x_max * 5) / 5)))
-    x_tick_values = [
-        step / 100
-        for step in range(0, 101, 20)
-        if step / 100 <= x_axis_max
-    ]
+    x_axis_max = 0.70
+    x_tick_values = [0, 0.20, 0.40, 0.60, 0.70]
     y_tick_values = [step / 100 for step in range(60, 101, 10)]
     fig = go.Figure()
     fig.add_trace(
@@ -1792,7 +1787,7 @@ def plot_warden_tradeoff(logs: list[dict]) -> None:
     )
     _add_tradeoff_trace(
         skeptical_rows,
-        name="Skeptical System Prompt",
+        name="Skeptical Prompt",
         color=COLOR_ROSE,
         symbol="diamond",
         show_text=False,
@@ -1802,7 +1797,7 @@ def plot_warden_tradeoff(logs: list[dict]) -> None:
         tickvals=x_tick_values,
         ticktext=[str(int(value * 100)) for value in x_tick_values],
         title_text="Adversary Success Rate (%)",
-        title_font=dict(size=22),
+        title_font=dict(size=20),
         tickfont=dict(size=16),
         showgrid=True,
         gridcolor="#D9D9D9",
@@ -1815,7 +1810,7 @@ def plot_warden_tradeoff(logs: list[dict]) -> None:
         tickvals=y_tick_values,
         ticktext=[str(int(value * 100)) for value in y_tick_values],
         title_text="Benign Agent Success Rate (%)",
-        title_font=dict(size=22),
+        title_font=dict(size=20),
         tickfont=dict(size=16),
         showgrid=True,
         gridcolor="#D9D9D9",
@@ -1824,16 +1819,19 @@ def plot_warden_tradeoff(logs: list[dict]) -> None:
     )
     fig.update_layout(
         showlegend=True,
-        height=800,
-        width=800,
-        margin=dict(t=100, b=90, l=90, r=60),
+        height=500,
+        width=700,
+        margin=dict(t=40, b=90, l=90, r=60),
         legend=dict(
-            orientation="h",
-            x=0.5,
-            xanchor="center",
-            y=1.08,
-            yanchor="bottom",
-            font=dict(size=22),
+            orientation="v",
+            x=0.98,
+            xanchor="right",
+            y=0.5,
+            yanchor="middle",
+            font=dict(size=18),
+            bgcolor="rgba(255,255,255,0.85)",
+            bordercolor="#D9D9D9",
+            borderwidth=1,
         ),
         paper_bgcolor="white",
         plot_bgcolor="white",
