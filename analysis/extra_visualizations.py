@@ -2145,35 +2145,9 @@ def plot_scenario_warden_comparison(
         return
 
     scenarios = sorted({log.get("scenario", "unknown") for log in adversary_logs})
-
-    # Compute rates by (scenario, has_warden)
-    counts: dict[tuple[str, bool], dict] = {}
-    for log in adversary_logs:
-        scenario = log.get("scenario", "unknown")
-        has_warden = _has_warden(log)
-        key = (scenario, has_warden)
-        if key not in counts:
-            counts[key] = {"total": 0, "success": 0}
-        decision = _get_decision(log)
-        if decision in {"requester_success", "requester_failure"}:
-            counts[key]["total"] += 1
-            if decision == "requester_success":
-                counts[key]["success"] += 1
-
-    # Build bar data
-    no_warden_rates = []
-    warden_rates = []
-    no_warden_text = []
-    warden_text = []
-    for scenario in scenarios:
-        for has_warden, rates_list, text_list in [
-            (False, no_warden_rates, no_warden_text),
-            (True, warden_rates, warden_text),
-        ]:
-            c = counts.get((scenario, has_warden), {"total": 0, "success": 0})
-            rate = c["success"] / c["total"] if c["total"] > 0 else 0
-            rates_list.append(rate)
-            text_list.append(f"{c['success']}/{c['total']}")
+    no_warden_rates, warden_rates, no_warden_text, warden_text = (
+        _scenario_warden_bar_data(adversary_logs, scenarios)
+    )
 
     fig = go.Figure(data=[
         go.Bar(
@@ -2203,6 +2177,141 @@ def plot_scenario_warden_comparison(
         width=max(700, len(scenarios) * 100 + 200),
     )
     _show_plotly_figure(fig, "scenario_warden_comparison", save_output)
+
+
+def _scenario_warden_bar_data(
+    logs: list[dict],
+    scenarios: list[str],
+) -> tuple[list[float], list[float], list[str], list[str]]:
+    """Build warden/no-warden grouped bar values for each scenario."""
+    counts: dict[tuple[str, bool], dict] = {}
+    for log in logs:
+        scenario = log.get("scenario", "unknown")
+        has_warden = _has_warden(log)
+        key = (scenario, has_warden)
+        if key not in counts:
+            counts[key] = {"total": 0, "success": 0}
+        decision = _get_decision(log)
+        if decision in {"requester_success", "requester_failure"}:
+            counts[key]["total"] += 1
+            if decision == "requester_success":
+                counts[key]["success"] += 1
+
+    no_warden_rates = []
+    warden_rates = []
+    no_warden_text = []
+    warden_text = []
+    for scenario in scenarios:
+        for has_warden, rates_list, text_list in [
+            (False, no_warden_rates, no_warden_text),
+            (True, warden_rates, warden_text),
+        ]:
+            c = counts.get((scenario, has_warden), {"total": 0, "success": 0})
+            rate = c["success"] / c["total"] if c["total"] > 0 else 0
+            rates_list.append(rate)
+            text_list.append(f"{c['success']}/{c['total']}")
+    return no_warden_rates, warden_rates, no_warden_text, warden_text
+
+
+def plot_scenario_warden_comparison_by_target(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
+    """Plot scenario warden/no-warden success rates by speaker and target model."""
+    speaker_logs = {
+        speaker: [log for log in logs if _log_speaker(log) == speaker]
+        for speaker in SPEAKER_ORDER
+    }
+    comparison_logs = [
+        log for speaker in SPEAKER_ORDER for log in speaker_logs[speaker]
+    ]
+    if not comparison_logs:
+        print("No adversary or benign-agent logs found.")
+        return
+
+    def target_model_name(log: dict) -> str:
+        return str((log.get("models") or {}).get("target") or "unknown")
+
+    scenarios = sorted({log.get("scenario", "unknown") for log in comparison_logs})
+    target_models = sorted({target_model_name(log) for log in comparison_logs})
+    row_specs: list[tuple[str, str | None]] = [
+        ("Average Across Targets", None),
+    ]
+    row_specs.extend(
+        (_shorten_model_label(target_model), target_model)
+        for target_model in target_models
+    )
+    speaker_specs = [
+        ("adversary", "Adversary"),
+        ("benign_agent", "Benign Agent"),
+    ]
+
+    rows = len(row_specs)
+    vertical_spacing = min(0.08, 0.8 / max(rows - 1, 1))
+    fig = make_subplots(
+        rows=rows,
+        cols=2,
+        subplot_titles=[
+            f"{row_label}: {speaker_label}"
+            for row_label, _target_model in row_specs
+            for _speaker, speaker_label in speaker_specs
+        ],
+        vertical_spacing=vertical_spacing,
+    )
+
+    for row_index, (_row_label, target_model) in enumerate(row_specs, start=1):
+        for col_index, (speaker, _speaker_label) in enumerate(speaker_specs, start=1):
+            row_logs = speaker_logs[speaker]
+            if target_model is not None:
+                row_logs = [
+                    log
+                    for log in row_logs
+                    if target_model_name(log) == target_model
+                ]
+            no_warden_rates, warden_rates, no_warden_text, warden_text = (
+                _scenario_warden_bar_data(row_logs, scenarios)
+            )
+            fig.add_trace(
+                go.Bar(
+                    name="No Warden",
+                    x=scenarios,
+                    y=no_warden_rates,
+                    text=no_warden_text,
+                    textposition="auto",
+                    marker_color="#ef553b",
+                    showlegend=row_index == 1 and col_index == 1,
+                ),
+                row=row_index,
+                col=col_index,
+            )
+            fig.add_trace(
+                go.Bar(
+                    name="With Warden",
+                    x=scenarios,
+                    y=warden_rates,
+                    text=warden_text,
+                    textposition="auto",
+                    marker_color="#636efa",
+                    showlegend=row_index == 1 and col_index == 1,
+                ),
+                row=row_index,
+                col=col_index,
+            )
+            fig.update_yaxes(
+                title_text="Success Rate",
+                range=[0, 1],
+                tickformat=".0%",
+                row=row_index,
+                col=col_index,
+            )
+            fig.update_xaxes(title_text="Scenario", row=row_index, col=col_index)
+
+    fig.update_layout(
+        title="Requester Success Rate: Warden vs No Warden by Target",
+        barmode="group",
+        height=max(500, rows * 360),
+        width=max(1200, len(scenarios) * 180 + 300),
+    )
+    _show_plotly_figure(fig, "scenario_warden_comparison_by_target", save_output)
 
 
 def _requester_sr_by_warden(
@@ -2455,6 +2564,14 @@ if __name__ == "__main__":
         help="Show per-scenario adversary success rates for warden vs no-warden runs",
     )
     parser.add_argument(
+        "--scenario-warden-comparison-by-target",
+        action="store_true",
+        help=(
+            "Show per-scenario warden vs no-warden success rates for "
+            "adversary and benign-agent runs, overall and split by target model"
+        ),
+    )
+    parser.add_argument(
         "--warden-ai-index",
         action="store_true",
         help="Show warden score vs model intelligence index score",
@@ -2503,6 +2620,8 @@ if __name__ == "__main__":
         plot_adversary_target_heatmap(logs, save_output=save_output)
     if args.scenario_warden_comparison or show_all:
         plot_scenario_warden_comparison(logs, save_output=save_output)
+    if args.scenario_warden_comparison_by_target or show_all:
+        plot_scenario_warden_comparison_by_target(logs, save_output=save_output)
     if args.warden_ai_index or show_all:
         plot_warden_ai_index(logs, save_output=save_output)
     if args.outcome_breakdown or show_all:
