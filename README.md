@@ -77,8 +77,6 @@ All inferential results use **Generalized Linear Mixed-Effects Models** (GLME) w
 │   ├── client.py                # OpenRouter chat client
 │   ├── profiles.py              # Lightweight five-factor profile utilities
 │   ├── profile_generator.py      # Profile generation utilities
-│   ├── data/
-│   │   └── dossier.py            # Static behavioral dossier assembly
 │   ├── agents/
 │   │   ├── adversary.py         # Hidden-goal requester agent
 │   │   ├── benign_agent.py      # Legitimate requester control
