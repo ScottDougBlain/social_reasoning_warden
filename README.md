@@ -72,6 +72,8 @@ All inferential results use **Generalized Linear Mixed-Effects Models** (GLME) w
 
 ```
 ├── main.py                      # CLI entry point
+├── replicate_within_family_runs.sh # Reproduce within-family experiment logs
+├── replicate_across_family_runs.sh # Reproduce across-family experiment logs
 ├── src/
 │   ├── runner.py                # Experiment orchestration, turn-taking, and logging
 │   ├── client.py                # OpenRouter chat client
@@ -156,6 +158,17 @@ python3 main.py --target-profiles yes --adversary-profile-access yes \
 python3 main.py --target-profiles yes --profile-seed 123
 
 ```
+
+### Replicating Logged Experiments
+
+The top-level replication scripts rerun the exact command batches used for the logged model-family experiments:
+
+```bash
+./replicate_within_family_runs.sh  # Within-family sweeps for Gemma, Gemini, Mistral, Llama, Qwen, GPT, and Claude
+./replicate_across_family_runs.sh  # Across-family discovery grid, selected across-family runs, and skeptical ablations
+```
+
+Both scripts run from the repository root, stop on the first failing command, and require the same API credentials as `main.py`.
 
 ---
 
