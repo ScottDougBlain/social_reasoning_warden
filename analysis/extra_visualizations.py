@@ -184,21 +184,6 @@ def load_logs(
     return logs
 
 
-def _parse_bool(value: str | bool | None) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    normalized = value.strip().lower()
-    if normalized in {"true", "1", "yes", "y", "t"}:
-        return True
-    if normalized in {"false", "0", "no", "n", "f"}:
-        return False
-    raise argparse.ArgumentTypeError(
-        "plotting must be a boolean (true/false, 1/0, yes/no)"
-    )
-
-
 def _get_decision(log: dict) -> str | None:
     """Extract the decision from a log, handling both single and multi-target formats."""
     outcome = log.get("outcome") or {}
@@ -748,7 +733,7 @@ def _format_protection_score_hover(
     )
 
 
-def plot_success_rates(logs: list[dict]) -> None:
+def plot_success_rate_overview(logs: list[dict], *, save_output: bool = False) -> None:
     """Render grouped SR + warden-score bar charts by model category."""
     if not logs:
         print("No logs found.")
@@ -969,7 +954,7 @@ def plot_success_rates(logs: list[dict]) -> None:
     for annotation in fig.layout.annotations:
         annotation.font = dict(size=14)
 
-    fig.show()
+    _show_plotly_figure(fig, "success_rate_overview", save_output)
 
 
 def _save_plotly_pdf(fig: go.Figure, name: str) -> None:
@@ -985,13 +970,22 @@ def _save_plotly_pdf(fig: go.Figure, name: str) -> None:
     print(f"Saved {pdf_path}")
 
 
-def plot_success_rates_2(logs: list[dict]) -> None:
-    """Render a publication-style grouped SR + warden-score chart and save it as a PDF."""
+def _show_plotly_figure(fig: go.Figure, name: str, save_output: bool) -> None:
+    """Show a Plotly figure and optionally save it to the figures directory."""
+    if save_output:
+        _save_plotly_pdf(fig, name)
+    fig.show()
+
+
+def plot_publication_success_rate_overview(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
+    """Render a publication-style grouped SR + warden-score chart."""
     if not logs:
         print("No logs found.")
         return
 
-    def _format_plotting_2_label(label: object) -> str:
+    def _format_publication_success_rate_label(label: object) -> str:
         label_text = _shorten_model_label(label)
         if label_text.startswith("gemma-3-") and label_text.endswith("-it"):
             return label_text[:-3]
@@ -1065,7 +1059,7 @@ def plot_success_rates_2(logs: list[dict]) -> None:
 
         sort_key = _warden_score_sort_key if include_warden_score else _adversary_rate_sort_key
         raw_labels = sorted(labels_set, key=sort_key)
-        labels = [_format_plotting_2_label(label) for label in raw_labels]
+        labels = [_format_publication_success_rate_label(label) for label in raw_labels]
         grouped_values: dict[str, tuple[list[float], list[list[int]]]] = {}
         for speaker in SPEAKER_ORDER:
             results = speaker_rates.get(speaker, {}).get(metric_key, {})
@@ -1220,8 +1214,7 @@ def plot_success_rates_2(logs: list[dict]) -> None:
     for annotation in fig.layout.annotations:
         annotation.font = dict(size=14)
 
-    _save_plotly_pdf(fig, "success_rate_overview_plotting_2")
-    fig.show()
+    _show_plotly_figure(fig, "publication_success_rate_overview", save_output)
 
 
 def _warden_overview_label(log: dict) -> object | None:
@@ -1289,8 +1282,10 @@ def _missing_warden_score_details() -> dict[str, object]:
     }
 
 
-def plot_warden_overview_only(logs: list[dict]) -> None:
-    """Render the overview's warden/defense comparison as a standalone PDF."""
+def plot_warden_defense_overview(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
+    """Render the overview's warden/defense comparison as a standalone chart."""
     if not logs:
         print("No logs found.")
         return
@@ -1546,11 +1541,12 @@ def plot_warden_overview_only(logs: list[dict]) -> None:
         font=dict(color="black"),
     )
 
-    _save_plotly_pdf(fig, "warden_comparison_only_plotting_2")
-    fig.show()
+    _show_plotly_figure(fig, "warden_defense_overview", save_output)
 
 
-def plot_warden_protection_score_only(logs: list[dict]) -> None:
+def plot_warden_protection_score(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
     """Render one protection-score bar per warden/defense condition."""
     if not logs:
         print("No logs found.")
@@ -1672,11 +1668,10 @@ def plot_warden_protection_score_only(logs: list[dict]) -> None:
         font=dict(color="black"),
     )
 
-    _save_plotly_pdf(fig, "warden_protection_score_only_plotting_2")
-    fig.show()
+    _show_plotly_figure(fig, "warden_protection_score", save_output)
 
 
-def plot_warden_tradeoff(logs: list[dict]) -> None:
+def plot_warden_tradeoff(logs: list[dict], *, save_output: bool = False) -> None:
     """Render adversary-vs-benign success tradeoff by warden/defense condition."""
     if not logs:
         print("No logs found.")
@@ -1864,8 +1859,7 @@ def plot_warden_tradeoff(logs: list[dict]) -> None:
         font=dict(color="black"),
     )
 
-    _save_plotly_pdf(fig, "warden_tradeoff_plotting_2")
-    fig.show()
+    _show_plotly_figure(fig, "warden_tradeoff", save_output)
 
 
 def _extract_profile_name(log: dict) -> str | None:
@@ -1883,7 +1877,9 @@ def _extract_profile_name(log: dict) -> str | None:
     return None
 
 
-def plot_heatmap(logs: list[dict]) -> None:
+def plot_scenario_profile_heatmap(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
     """Plot a Scenario x Profile heatmap of adversary success rates."""
     # Filter to adversary runs with profiles
     adversary_logs = [
@@ -1950,10 +1946,12 @@ def plot_heatmap(logs: list[dict]) -> None:
         height=max(400, len(scenarios) * 60 + 200),
         width=max(700, len(profiles) * 120 + 200),
     )
-    fig.show()
+    _show_plotly_figure(fig, "scenario_profile_heatmap", save_output)
 
 
-def plot_adversary_target_heatmap(logs: list[dict]) -> None:
+def plot_adversary_target_heatmap(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
     """Plot an adversary-model x target-model heatmap of adversary success rates."""
     adversary_logs = [log for log in logs if _log_speaker(log) == "adversary"]
     if not adversary_logs:
@@ -2134,10 +2132,12 @@ def plot_adversary_target_heatmap(logs: list[dict]) -> None:
         width=max(620, len(target_models_sorted) * 120 + 200),
     )
     fig.update_xaxes(tickangle=-20)
-    fig.show()
+    _show_plotly_figure(fig, "adversary_target_heatmap", save_output)
 
 
-def plot_warden_comparison(logs: list[dict]) -> None:
+def plot_scenario_warden_comparison(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
     """Plot adversary success rates per scenario, grouped by warden presence."""
     adversary_logs = [log for log in logs if _log_speaker(log) == "adversary"]
     if not adversary_logs:
@@ -2202,7 +2202,7 @@ def plot_warden_comparison(logs: list[dict]) -> None:
         height=500,
         width=max(700, len(scenarios) * 100 + 200),
     )
-    fig.show()
+    _show_plotly_figure(fig, "scenario_warden_comparison", save_output)
 
 
 def _requester_sr_by_warden(
@@ -2241,7 +2241,7 @@ def _requester_sr_by_warden(
     return results
 
 
-def plot_warden_ai_index(logs: list[dict]) -> None:
+def plot_warden_ai_index(logs: list[dict], *, save_output: bool = False) -> None:
     """Plot combined score vs warden AI-index score."""
     adversary_sr_by_warden = _requester_sr_by_warden(logs, "adversary")
     benign_sr_by_warden = _requester_sr_by_warden(logs, "benign_agent")
@@ -2322,10 +2322,10 @@ def plot_warden_ai_index(logs: list[dict]) -> None:
         tickvals=sorted(set(x_values)),
         range=[x_min - (x_pad * 0.2), x_max + x_pad],
     )
-    fig.show()
+    _show_plotly_figure(fig, "warden_ai_index", save_output)
 
 
-def plot_outcome_breakdown(logs: list[dict]) -> None:
+def plot_outcome_breakdown(logs: list[dict], *, save_output: bool = False) -> None:
     """Plot stacked bar of outcome types per scenario (adversary runs)."""
     adversary_logs = [log for log in logs if _log_speaker(log) == "adversary"]
     if not adversary_logs:
@@ -2376,7 +2376,7 @@ def plot_outcome_breakdown(logs: list[dict]) -> None:
         height=500,
         width=max(700, len(scenarios) * 100 + 200),
     )
-    fig.show()
+    _show_plotly_figure(fig, "outcome_breakdown", save_output)
 
 
 if __name__ == "__main__":
@@ -2415,74 +2415,64 @@ if __name__ == "__main__":
         help="Filter by warden model(s) (space/comma-separated, use 'none' for no-warden logs)",
     )
     parser.add_argument(
-        "--plotting",
-        nargs="?",
-        const=True,
-        default=False,
-        type=_parse_bool,
-        help="Show Plotly subplots (use --plotting or --plotting=True)",
-    )
-    parser.add_argument(
-        "--plotting-2",
-        nargs="?",
-        const=True,
-        default=False,
-        type=_parse_bool,
-        help="Show publication-style Plotly subplots and save them as a PDF",
-    )
-    parser.add_argument(
-        "--plotting-warden-only",
-        nargs="?",
-        const=True,
-        default=False,
-        type=_parse_bool,
-        help="Show the standalone warden/defense comparison and save it as a PDF",
-    )
-    parser.add_argument(
-        "--plotting-warden-score-only",
-        nargs="?",
-        const=True,
-        default=False,
-        type=_parse_bool,
-        help="Show the protection-score-only warden comparison and save it as a PDF",
-    )
-    parser.add_argument(
-        "--plotting-warden-tradeoff",
-        nargs="?",
-        const=True,
-        default=False,
-        type=_parse_bool,
-        help="Show the adversary/benign success tradeoff and save it as a PDF",
-    )
-    parser.add_argument(
-        "--heatmap",
+        "--success-rate-overview",
         action="store_true",
-        help="Show Scenario x Profile success rate heatmap",
+        help="Show grouped success rates by requester, target, and warden model",
     )
     parser.add_argument(
-        "--warden-comparison",
+        "--publication-success-rate-overview",
         action="store_true",
-        help="Show warden vs no-warden success rate comparison",
+        help="Show the publication-style grouped success-rate overview",
     )
     parser.add_argument(
-        "--outcome-breakdown",
+        "--warden-defense-overview",
         action="store_true",
-        help="Show stacked bar of outcome types per scenario",
+        help="Show the standalone warden/defense comparison",
+    )
+    parser.add_argument(
+        "--warden-protection-score",
+        action="store_true",
+        help="Show protection score per warden/defense condition",
+    )
+    parser.add_argument(
+        "--warden-tradeoff",
+        action="store_true",
+        help="Show adversary-vs-benign success tradeoff by warden/defense condition",
+    )
+    parser.add_argument(
+        "--scenario-profile-heatmap",
+        action="store_true",
+        help="Show Scenario x Profile adversary success-rate heatmap",
     )
     parser.add_argument(
         "--adversary-target-heatmap",
         action="store_true",
-        help="Show adversary-model x target-model success rate heatmap",
+        help="Show adversary-model x target-model adversary success-rate heatmap",
+    )
+    parser.add_argument(
+        "--scenario-warden-comparison",
+        action="store_true",
+        help="Show per-scenario adversary success rates for warden vs no-warden runs",
     )
     parser.add_argument(
         "--warden-ai-index",
         action="store_true",
-        help="Show average adversary SR vs warden AI-index score",
+        help="Show warden score vs model intelligence index score",
+    )
+    parser.add_argument(
+        "--outcome-breakdown",
+        action="store_true",
+        help="Show stacked outcome counts per scenario for adversary runs",
     )
     parser.add_argument(
         "--all-plots",
         action="store_true",
         help="Show all available plots",
+    )
+    parser.add_argument(
+        "--save-output",
+        action="store_true",
+        help="Save selected plots as PDFs in results/figures",
     )
 
     args = parser.parse_args()
@@ -2496,23 +2486,24 @@ if __name__ == "__main__":
     summarize(scenario=args.scenario, logs=logs)
 
     show_all = args.all_plots
-    if args.plotting or show_all:
-        plot_success_rates(logs)
-    if args.plotting_2:
-        plot_success_rates_2(logs)
-    if args.plotting_warden_only or show_all:
-        plot_warden_overview_only(logs)
-    if args.plotting_warden_score_only or show_all:
-        plot_warden_protection_score_only(logs)
-    if args.plotting_warden_tradeoff or show_all:
-        plot_warden_tradeoff(logs)
-    if args.heatmap or show_all:
-        plot_heatmap(logs)
+    save_output = args.save_output
+    if args.success_rate_overview or show_all:
+        plot_success_rate_overview(logs, save_output=save_output)
+    if args.publication_success_rate_overview or show_all:
+        plot_publication_success_rate_overview(logs, save_output=save_output)
+    if args.warden_defense_overview or show_all:
+        plot_warden_defense_overview(logs, save_output=save_output)
+    if args.warden_protection_score or show_all:
+        plot_warden_protection_score(logs, save_output=save_output)
+    if args.warden_tradeoff or show_all:
+        plot_warden_tradeoff(logs, save_output=save_output)
+    if args.scenario_profile_heatmap or show_all:
+        plot_scenario_profile_heatmap(logs, save_output=save_output)
     if args.adversary_target_heatmap or show_all:
-        plot_adversary_target_heatmap(logs)
-    if args.warden_comparison or show_all:
-        plot_warden_comparison(logs)
+        plot_adversary_target_heatmap(logs, save_output=save_output)
+    if args.scenario_warden_comparison or show_all:
+        plot_scenario_warden_comparison(logs, save_output=save_output)
     if args.warden_ai_index or show_all:
-        plot_warden_ai_index(logs)
+        plot_warden_ai_index(logs, save_output=save_output)
     if args.outcome_breakdown or show_all:
-        plot_outcome_breakdown(logs)
+        plot_outcome_breakdown(logs, save_output=save_output)
