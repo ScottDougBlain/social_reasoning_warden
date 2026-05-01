@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Basic analysis utilities for experiment logs."""
+"""Extra visualization and summary utilities for experiment logs."""
 
 import argparse
 import json
@@ -78,6 +78,28 @@ def _normalize_tags(tag: str | Iterable[str] | None) -> set[str] | None:
     return tags
 
 
+def _normalize_scenarios(scenario: str | Iterable[str] | None) -> set[str] | None:
+    if scenario is None:
+        return None
+    if isinstance(scenario, str):
+        entries = [scenario]
+    else:
+        entries = scenario
+
+    scenarios: set[str] = set()
+    for entry in entries:
+        if entry is None:
+            continue
+        if not isinstance(entry, str):
+            raise TypeError("scenario filter list must contain strings")
+        for candidate in entry.split(","):
+            value = candidate.strip()
+            if not value:
+                continue
+            scenarios.add(_SCENARIO_ALIASES.get(value, value))
+    return scenarios
+
+
 def _normalize_models(model: str | Iterable[str] | None) -> set[str] | None:
     if model is None:
         return None
@@ -120,13 +142,14 @@ def _shorten_model_label(label: object) -> str:
 
 
 def load_logs(
-    scenario: str | None = None,
+    scenario: str | Iterable[str] | None = None,
     tag: str | Iterable[str] | None = None,
     requester_model: str | Iterable[str] | None = None,
     target_model: str | Iterable[str] | None = None,
     warden_model: str | Iterable[str] | None = None,
 ) -> list[dict]:
     """Load all experiment logs, optionally filtered by scenario/tag/model fields."""
+    scenarios = _normalize_scenarios(scenario)
     tags = _normalize_tags(tag)
     requester_models = _normalize_models(requester_model)
     target_models = _normalize_models(target_model)
@@ -139,7 +162,7 @@ def load_logs(
         raw_sc = log.get("scenario")
         if raw_sc in _SCENARIO_ALIASES:
             log["scenario"] = _SCENARIO_ALIASES[raw_sc]
-        if scenario is not None and log.get("scenario") != scenario:
+        if scenarios is not None and log.get("scenario") not in scenarios:
             continue
         if tags is not None and log.get("tag") not in tags:
             continue
@@ -430,7 +453,10 @@ def risk_rate(logs: list[dict]) -> dict:
     return _risk_rate_by_label(logs, _condition_flags)
 
 
-def summarize(scenario: str | None = None, logs: list[dict] | None = None) -> None:
+def summarize(
+    scenario: str | Iterable[str] | None = None,
+    logs: list[dict] | None = None,
+) -> None:
     """Print a summary of experiment results."""
     if logs is None:
         logs = load_logs(scenario)
@@ -2358,7 +2384,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--scenario",
         default=None,
-        help="Filter by scenario name (default: all scenarios)",
+        nargs="+",
+        help=(
+            "Filter by scenario name(s), space/comma-separated "
+            "(default: all scenarios)"
+        ),
     )
     parser.add_argument(
         "--tag",

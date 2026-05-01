@@ -37,7 +37,7 @@ import seaborn as sns
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from analysis.model_family import model_family_key, model_family_label
-from analysis.metrics import load_logs
+from analysis.extra_visualizations import load_logs
 
 # ── Style ────────────────────────────────────────────────────────────────
 

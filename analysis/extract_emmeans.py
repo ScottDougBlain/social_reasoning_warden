@@ -22,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from analysis.metrics import load_logs
+from analysis.extra_visualizations import load_logs
 from analysis.run_lme import (
     GLMER_FIT_BLOCK,
     logs_to_dataframe,
