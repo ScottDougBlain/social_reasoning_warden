@@ -2144,45 +2144,224 @@ def plot_scenario_warden_comparison(
         print("No adversary logs found.")
         return
 
-    scenarios = sorted({log.get("scenario", "unknown") for log in adversary_logs})
-    no_warden_rates, warden_rates, no_warden_text, warden_text = (
+    scenarios = _scenario_warden_ordered_scenarios(
+        {log.get("scenario", "unknown") for log in adversary_logs}
+    )
+    scenario_labels = [_scenario_warden_display_label(scenario) for scenario in scenarios]
+    no_warden_rates, warden_rates, no_warden_intervals, warden_intervals = (
         _scenario_warden_bar_data(adversary_logs, scenarios)
+    )
+    centers, no_warden_y, warden_y = _scenario_warden_y_positions(len(scenarios))
+    no_warden_error_minus, no_warden_error_plus = zip(
+        *[
+            _interval_error_from_center(rate, interval)
+            for rate, interval in zip(no_warden_rates, no_warden_intervals)
+        ]
+    )
+    warden_error_minus, warden_error_plus = zip(
+        *[
+            _interval_error_from_center(rate, interval)
+            for rate, interval in zip(warden_rates, warden_intervals)
+        ]
+    )
+    user_study_x, user_study_y, user_study_custom = (
+        _scenario_warden_user_study_marker_data(
+            scenarios,
+            scenario_labels,
+            no_warden_y,
+            warden_y,
+        )
     )
 
     fig = go.Figure(data=[
         go.Bar(
-            name="No Warden",
-            x=scenarios,
-            y=no_warden_rates,
-            text=no_warden_text,
-            textposition="auto",
-            marker_color="#ef553b",
+            name="Without Warden",
+            x=no_warden_rates,
+            y=no_warden_y,
+            orientation="h",
+            width=0.34,
+            marker=dict(color=COLOR_ROSE, line=dict(color="black", width=1)),
+            customdata=scenario_labels,
+            error_x=dict(
+                type="data",
+                array=list(no_warden_error_plus),
+                arrayminus=list(no_warden_error_minus),
+                visible=True,
+                color="black",
+                thickness=1.2,
+                width=4,
+            ),
+            hovertemplate=(
+                "Scenario: %{customdata}<br>"
+                "Success Rate: %{x:.1%}<extra>Without Warden</extra>"
+            ),
+            legendrank=1,
         ),
         go.Bar(
             name="With Warden",
-            x=scenarios,
-            y=warden_rates,
-            text=warden_text,
-            textposition="auto",
-            marker_color="#636efa",
+            x=warden_rates,
+            y=warden_y,
+            orientation="h",
+            width=0.34,
+            marker=dict(color=COLOR_LIGHT_BLUE, line=dict(color="black", width=1)),
+            customdata=scenario_labels,
+            error_x=dict(
+                type="data",
+                array=list(warden_error_plus),
+                arrayminus=list(warden_error_minus),
+                visible=True,
+                color="black",
+                thickness=1.2,
+                width=4,
+            ),
+            hovertemplate=(
+                "Scenario: %{customdata}<br>"
+                "Success Rate: %{x:.1%}<extra>With Warden</extra>"
+            ),
+            legendrank=2,
+        ),
+        go.Scatter(
+            name="User Study Value",
+            x=user_study_x,
+            y=user_study_y,
+            mode="markers",
+            marker=dict(
+                color="black",
+                line=dict(color="white", width=1),
+                size=11,
+                symbol="diamond",
+            ),
+            customdata=user_study_custom,
+            hovertemplate=(
+                "Scenario: %{customdata[0]}<br>"
+                "Condition: %{customdata[1]}<br>"
+                "User Study Value: %{x:.1%}<extra></extra>"
+            ),
+            legendrank=3,
         ),
     ])
     fig.update_layout(
-        title="Adversary Success Rate: Warden vs No Warden",
-        xaxis_title="Scenario",
-        yaxis_title="Success Rate",
-        yaxis=dict(range=[0, 1], tickformat=".0%"),
+        xaxis_title="Success Rate",
+        yaxis_title="Scenario",
+        xaxis=dict(
+            range=[0, 1],
+            tickformat=".0%",
+            showgrid=True,
+            gridcolor="rgba(128, 128, 128, 0.3)",
+            gridwidth=1,
+        ),
+        yaxis=dict(
+            tickvals=centers,
+            ticktext=scenario_labels,
+            range=[-0.5, len(scenarios) - 0.5],
+        ),
         barmode="group",
-        height=500,
-        width=max(700, len(scenarios) * 100 + 200),
+        height=520,
+        width=1400,
+        margin=dict(l=140),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
     )
     _show_plotly_figure(fig, "scenario_warden_comparison", save_output)
+
+
+def _scenario_warden_display_label(scenario: str) -> str:
+    """Return scenario display labels for the warden comparison plots only."""
+    labels = {
+        "coding_agent_2": "File Access",
+        "funding_choice": "Investment",
+        "hiring": "Hiring",
+        "pitch": "Board Pitch",
+    }
+    return labels.get(scenario, scenario)
+
+
+def _scenario_warden_ordered_scenarios(scenarios: Iterable[str]) -> list[str]:
+    """Return scenarios bottom-to-top for the requested visual ordering."""
+    top_to_bottom = ("hiring", "coding_agent_2", "funding_choice", "pitch")
+    scenarios_set = set(scenarios)
+    extras = sorted(scenario for scenario in scenarios_set if scenario not in top_to_bottom)
+    ordered = [scenario for scenario in reversed(top_to_bottom) if scenario in scenarios_set]
+    return extras + ordered
+
+
+def _scenario_warden_y_positions(
+    count: int,
+) -> tuple[list[int], list[float], list[float]]:
+    """Return center and bar y-positions with no-warden above warden."""
+    centers = list(range(count))
+    no_warden_y = [center + 0.18 for center in centers]
+    warden_y = [center - 0.18 for center in centers]
+    return centers, no_warden_y, warden_y
+
+
+def _scenario_warden_user_study_marker_data(
+    scenarios: list[str],
+    scenario_labels: list[str],
+    no_warden_y: list[float],
+    warden_y: list[float],
+) -> tuple[list[float], list[float], list[tuple[str, str]]]:
+    """Return marker data for user-study reference values on the comparison plot."""
+    user_study_rates = {
+        "hiring": {False: 0.607, True: 0.419},
+        "coding_agent_2": {False: 0.656, True: 0.269},
+        "funding_choice": {False: 0.64, True: 0.194},
+        "pitch": {False: 0.714, True: 0.333},
+    }
+    marker_x: list[float] = []
+    marker_y: list[float] = []
+    marker_custom: list[tuple[str, str]] = []
+
+    for scenario, label, without_y, with_y in zip(
+        scenarios,
+        scenario_labels,
+        no_warden_y,
+        warden_y,
+    ):
+        rates = user_study_rates.get(scenario)
+        if rates is None:
+            continue
+        marker_x.extend([rates[False], rates[True]])
+        marker_y.extend([without_y, with_y])
+        marker_custom.extend([
+            (label, "Without Warden"),
+            (label, "With Warden"),
+        ])
+
+    return marker_x, marker_y, marker_custom
+
+
+def _wilson_interval_from_counts(
+    successes: int,
+    total: int,
+    *,
+    level: float = 0.95,
+) -> tuple[float, float] | None:
+    """Return Wilson score interval for a binomial success rate."""
+    if total <= 0:
+        return None
+    if level != 0.95:
+        raise ValueError("Only the 95% Wilson interval is currently supported.")
+    z = 1.959963984540054
+    p_hat = successes / total
+    z2 = z * z
+    denominator = 1 + z2 / total
+    center = (p_hat + z2 / (2 * total)) / denominator
+    half_width = (
+        z * ((p_hat * (1 - p_hat) + z2 / (4 * total)) / total) ** 0.5
+    ) / denominator
+    return max(0.0, center - half_width), min(1.0, center + half_width)
 
 
 def _scenario_warden_bar_data(
     logs: list[dict],
     scenarios: list[str],
-) -> tuple[list[float], list[float], list[str], list[str]]:
+) -> tuple[
+    list[float],
+    list[float],
+    list[tuple[float, float] | None],
+    list[tuple[float, float] | None],
+]:
     """Build warden/no-warden grouped bar values for each scenario."""
     counts: dict[tuple[str, bool], dict] = {}
     for log in logs:
@@ -2199,18 +2378,20 @@ def _scenario_warden_bar_data(
 
     no_warden_rates = []
     warden_rates = []
-    no_warden_text = []
-    warden_text = []
+    no_warden_intervals = []
+    warden_intervals = []
     for scenario in scenarios:
-        for has_warden, rates_list, text_list in [
-            (False, no_warden_rates, no_warden_text),
-            (True, warden_rates, warden_text),
+        for has_warden, rates_list, intervals_list in [
+            (False, no_warden_rates, no_warden_intervals),
+            (True, warden_rates, warden_intervals),
         ]:
             c = counts.get((scenario, has_warden), {"total": 0, "success": 0})
             rate = c["success"] / c["total"] if c["total"] > 0 else 0
             rates_list.append(rate)
-            text_list.append(f"{c['success']}/{c['total']}")
-    return no_warden_rates, warden_rates, no_warden_text, warden_text
+            intervals_list.append(
+                _wilson_interval_from_counts(c["success"], c["total"])
+            )
+    return no_warden_rates, warden_rates, no_warden_intervals, warden_intervals
 
 
 def plot_scenario_warden_comparison_by_target(
@@ -2231,7 +2412,11 @@ def plot_scenario_warden_comparison_by_target(
     def target_model_name(log: dict) -> str:
         return str((log.get("models") or {}).get("target") or "unknown")
 
-    scenarios = sorted({log.get("scenario", "unknown") for log in comparison_logs})
+    scenarios = _scenario_warden_ordered_scenarios(
+        {log.get("scenario", "unknown") for log in comparison_logs}
+    )
+    scenario_labels = [_scenario_warden_display_label(scenario) for scenario in scenarios]
+    centers, no_warden_y, warden_y = _scenario_warden_y_positions(len(scenarios))
     target_models = sorted({target_model_name(log) for log in comparison_logs})
     row_specs: list[tuple[str, str | None]] = [
         ("Average Across Targets", None),
@@ -2267,17 +2452,23 @@ def plot_scenario_warden_comparison_by_target(
                     for log in row_logs
                     if target_model_name(log) == target_model
                 ]
-            no_warden_rates, warden_rates, no_warden_text, warden_text = (
+            no_warden_rates, warden_rates, _no_warden_intervals, _warden_intervals = (
                 _scenario_warden_bar_data(row_logs, scenarios)
             )
             fig.add_trace(
                 go.Bar(
-                    name="No Warden",
-                    x=scenarios,
-                    y=no_warden_rates,
-                    text=no_warden_text,
-                    textposition="auto",
-                    marker_color="#ef553b",
+                    name="Without Warden",
+                    x=no_warden_rates,
+                    y=no_warden_y,
+                    orientation="h",
+                    width=0.34,
+                    marker=dict(color=COLOR_ROSE, line=dict(color="black", width=1)),
+                    customdata=scenario_labels,
+                    hovertemplate=(
+                        "Scenario: %{customdata}<br>"
+                        "Success Rate: %{x:.1%}<extra>Without Warden</extra>"
+                    ),
+                    legendrank=1,
                     showlegend=row_index == 1 and col_index == 1,
                 ),
                 row=row_index,
@@ -2286,30 +2477,49 @@ def plot_scenario_warden_comparison_by_target(
             fig.add_trace(
                 go.Bar(
                     name="With Warden",
-                    x=scenarios,
-                    y=warden_rates,
-                    text=warden_text,
-                    textposition="auto",
-                    marker_color="#636efa",
+                    x=warden_rates,
+                    y=warden_y,
+                    orientation="h",
+                    width=0.34,
+                    marker=dict(color=COLOR_LIGHT_BLUE, line=dict(color="black", width=1)),
+                    customdata=scenario_labels,
+                    hovertemplate=(
+                        "Scenario: %{customdata}<br>"
+                        "Success Rate: %{x:.1%}<extra>With Warden</extra>"
+                    ),
+                    legendrank=2,
                     showlegend=row_index == 1 and col_index == 1,
                 ),
                 row=row_index,
                 col=col_index,
             )
-            fig.update_yaxes(
+            fig.update_xaxes(
                 title_text="Success Rate",
                 range=[0, 1],
                 tickformat=".0%",
+                showgrid=True,
+                gridcolor="rgba(128, 128, 128, 0.3)",
+                gridwidth=1,
                 row=row_index,
                 col=col_index,
             )
-            fig.update_xaxes(title_text="Scenario", row=row_index, col=col_index)
+            fig.update_yaxes(
+                title_text="Scenario",
+                tickvals=centers,
+                ticktext=scenario_labels,
+                range=[-0.5, len(scenarios) - 0.5],
+                row=row_index,
+                col=col_index,
+            )
 
     fig.update_layout(
         title="Requester Success Rate: Warden vs No Warden by Target",
         barmode="group",
         height=max(500, rows * 360),
-        width=max(1200, len(scenarios) * 180 + 300),
+        width=1200,
+        margin=dict(l=140),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
     )
     _show_plotly_figure(fig, "scenario_warden_comparison_by_target", save_output)
 
