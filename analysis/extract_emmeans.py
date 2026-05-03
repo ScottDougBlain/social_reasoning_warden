@@ -391,12 +391,11 @@ d$requester_type <- relevel(factor(d$requester_type), ref="benign_agent")
 d$has_warden <- factor(d$has_warden)
 d$scenario <- factor(d$scenario)
 d$profile_name <- factor(d$profile_name)
-d$target_model <- factor(d$target_model)
-d$requester_model <- factor(d$requester_model)
+d$model_family <- factor(d$model_family)
 
 m <- fit_glmer(
     success ~ requester_type * has_warden
-        + (1 + has_warden|scenario) + (1|profile_name) + (1|target_model) + (1|requester_model),
+        + (1 + has_warden|scenario) + (1|profile_name) + (1|model_family),
     data=d, label="fig0"
 )
 

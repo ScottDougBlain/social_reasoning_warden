@@ -2,7 +2,7 @@
 
 **Social Reasoning Warden — ERA Project**
 
-**Generated**: 2026-04-28 15:57
+**Generated**: 2026-05-03 18:20
 
 **Filters**: tag=final-within-family
 
@@ -14,11 +14,11 @@
 
 ## Model 1: Warden Effectiveness
 
-**Formula**: `success ~ requester_type * has_warden + (1 + has_warden|scenario) + (1|profile_name) + (1|target_model) + (1|requester_model)`
+**Formula**: `success ~ requester_type * has_warden + (1 + has_warden|scenario) + (1|profile_name) + (1|model_family)`
 
 **Family**: Binomial (logit link)
 
-**N** = 9,399 (6,263 adversary, 3,136 benign) | 14 scenarios | 8 profiles | 7 target models | 7 requester models
+**N** = 9,399 (6,263 adversary, 3,136 benign) | 14 scenarios | 8 profiles | 7 model families
 
 **Overall success rate**: 38.5%
 
@@ -49,72 +49,64 @@ Generalized linear mixed model fit by maximum likelihood (Laplace
   Approximation) [glmerMod]
  Family: binomial  ( logit )
 Formula: success ~ requester_type * has_warden + (1 + has_warden | scenario) +  
-    (1 | profile_name) + (1 | target_model) + (1 | requester_model)
+    (1 | profile_name) + (1 | model_family)
    Data: data
 
       AIC       BIC    logLik -2*log(L)  df.resid 
-   7302.9    7374.4   -3641.5    7282.9      9389 
+   7300.9    7365.3   -3641.5    7282.9      9390 
 
 Scaled residuals: 
     Min      1Q  Median      3Q     Max 
--9.8996 -0.4455 -0.1789  0.3448 15.1232 
+-9.9000 -0.4455 -0.1789  0.3448 15.1229 
 
 Random effects:
- Groups          Name        Variance Std.Dev. Corr 
- scenario        (Intercept) 0.574034 0.75765       
-                 has_warden1 1.082928 1.04064  -0.04
- profile_name    (Intercept) 0.038870 0.19715       
- target_model    (Intercept) 0.007989 0.08938       
- requester_model (Intercept) 0.218401 0.46733       
-Number of obs: 9399, groups:  
-scenario, 14; profile_name, 8; target_model, 7; requester_model, 7
+ Groups       Name        Variance Std.Dev. Corr 
+ scenario     (Intercept) 0.57410  0.7577        
+              has_warden1 1.08258  1.0405   -0.04
+ profile_name (Intercept) 0.03888  0.1972        
+ model_family (Intercept) 0.22637  0.4758        
+Number of obs: 9399, groups:  scenario, 14; profile_name, 8; model_family, 7
 
 Fixed effects:
                                     Estimate Std. Error z value Pr(>|z|)    
-(Intercept)                           2.5941     0.3093   8.388  < 2e-16 ***
-requester_typeadversary              -3.3364     0.1480 -22.544  < 2e-16 ***
-has_warden1                          -1.0556     0.3136  -3.367 0.000761 ***
-requester_typeadversary:has_warden1  -0.7291     0.1725  -4.227 2.37e-05 ***
+(Intercept)                           2.5942     0.3095   8.382  < 2e-16 ***
+requester_typeadversary              -3.3365     0.1481 -22.535  < 2e-16 ***
+has_warden1                          -1.0557     0.3136  -3.366 0.000763 ***
+requester_typeadversary:has_warden1  -0.7290     0.1726  -4.224  2.4e-05 ***
 ---
 Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 Correlation of Fixed Effects:
             (Intr) rqstr_ hs_wr1
-rqstr_typdv -0.392              
+rqstr_typdv -0.393              
 has_warden1 -0.203  0.385       
-rqstr_ty:_1  0.332 -0.845 -0.407
-optimizer (Nelder_Mead) convergence code: 0 (OK)
-unable to evaluate scaled gradient
-Model failed to converge: degenerate  Hessian with 1 negative eigenvalues
-  See ?lme4::convergence and ?lme4::troubleshooting.
-
+rqstr_ty:_1  0.333 -0.845 -0.407
 
 --- Type III Wald Chi-Square Tests ---
 Analysis of Deviance Table (Type III Wald chisquare tests)
 
 Response: success
                             Chisq Df Pr(>Chisq)    
-(Intercept)                70.360  1  < 2.2e-16 ***
-requester_type            508.210  1  < 2.2e-16 ***
-has_warden                 11.335  1  0.0007607 ***
-requester_type:has_warden  17.866  1  2.371e-05 ***
+(Intercept)                70.253  1  < 2.2e-16 ***
+requester_type            507.831  1  < 2.2e-16 ***
+has_warden                 11.329  1  0.0007629 ***
+requester_type:has_warden  17.845  1  2.396e-05 ***
 ---
 Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 --- Random Effects ---
- Groups          Name        Std.Dev. Corr  
- scenario        (Intercept) 0.757651       
-                 has_warden1 1.040638 -0.040
- profile_name    (Intercept) 0.197154       
- target_model    (Intercept) 0.089379       
- requester_model (Intercept) 0.467334       
+ Groups       Name        Std.Dev. Corr  
+ scenario     (Intercept) 0.75770        
+              has_warden1 1.04047  -0.040
+ profile_name (Intercept) 0.19717        
+ model_family (Intercept) 0.47579        
 
 --- Odds Ratios (exp of fixed effects) ---
                                              OR   CI_lower    CI_upper
-(Intercept)                         13.38443994 7.30060634 24.53813068
-requester_typeadversary              0.03556365 0.02660901  0.04753176
-has_warden1                          0.34796978 0.18821072  0.64333723
-requester_typeadversary:has_warden1  0.48232080 0.34395267  0.67635279
+(Intercept)                         13.38550350 7.29766825 24.55191137
+requester_typeadversary              0.03556076 0.02660379  0.04753337
+has_warden1                          0.34794695 0.18816403  0.64341248
+requester_typeadversary:has_warden1  0.48237739 0.34394417  0.67652825
 Loading required package: Matrix
 Warning messages:
 1: package ‘lme4’ was built under R version 4.4.3 
@@ -122,15 +114,7 @@ Warning messages:
 Loading required package: carData
 Warning messages:
 1: package ‘car’ was built under R version 4.4.3 
-2: package ‘carData’ was built under R version 4.4.3 
-Warning messages:
-1: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  unable to evaluate scaled gradient
-2: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  unable to evaluate scaled gradient
-3: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-  Model failed to converge: degenerate  Hessian with 1 negative eigenvalues
-  See ?lme4::convergence and ?lme4::troubleshooting.
+2: package ‘carData’ was built under R version 4.4.3
 ```
 
 
