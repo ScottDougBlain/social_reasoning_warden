@@ -13,7 +13,7 @@ Usage:
     python analysis/plot_results.py
     python analysis/plot_results.py --output-dir results/figures
     python analysis/plot_results.py --raw   # force raw rates even if emmeans exist
-    python analysis/plot_results.py --no-titles
+    python analysis/plot_results.py --titles
     python analysis/plot_results.py --dossier-tag final-within-family \
         --cap-asym-tag final-within-family
 """
@@ -1548,8 +1548,16 @@ def main():
     )
     parser.add_argument(
         "--no-titles",
+        dest="no_titles",
         action="store_true",
-        help="Omit figure titles from generated plots.",
+        default=True,
+        help="Omit figure titles from generated plots (default).",
+    )
+    parser.add_argument(
+        "--titles",
+        dest="no_titles",
+        action="store_false",
+        help="Include figure titles in generated plots.",
     )
     parser.add_argument(
         "--dossier-tag",
