@@ -62,6 +62,8 @@ COLOR_GREEN = "#117733"
 COLOR_ROSE = "#CC6677"
 COLOR_YELLOW = "#DDCC77"
 COLOR_GREY = "#B8B8B8"
+SELECTED_FIG_TICK_FONTSIZE = 13.0
+SELECTED_FIG_AXIS_LABEL_FONTSIZE = 14.52
 SCENARIO_WARDEN_AXIS_TITLE_FONTSIZE = 18
 SCENARIO_WARDEN_LEGEND_FONTSIZE = 18
 SCENARIO_WARDEN_TICK_FONTSIZE = 15.6
@@ -1122,6 +1124,189 @@ def _show_plotly_figure(fig: go.Figure, name: str, save_output: bool) -> None:
     fig.show()
 
 
+def plot_warden_message_ablation(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
+    """Compare full warden messages against risk-level-only notifications."""
+    if not logs:
+        print("No logs found.")
+        return
+
+    warden_logs = [
+        log
+        for log in logs
+        if _warden_message_mode(log) in {"full", "risk_level_only"}
+    ]
+    modes_present = {_warden_message_mode(log) for log in warden_logs}
+    required_modes = {"full", "risk_level_only"}
+    if not required_modes.issubset(modes_present):
+        missing = ", ".join(
+            _format_warden_message_mode_label(mode)
+            for mode in sorted(required_modes - modes_present)
+        )
+        print(
+            "Need both full-message and notification-only warden logs for "
+            f"this plot. Missing: {missing}."
+        )
+        return
+
+    rng = np.random.default_rng(0)
+    requester_types = [
+        ("adversary", "Adversary"),
+        ("benign_agent", "Benign Agent"),
+    ]
+    mode_specs = [
+        ("full", "Full Message", COLOR_LIGHT_BLUE),
+        ("risk_level_only", "Notifications Only", COLOR_DARK_BLUE),
+    ]
+
+    fig = go.Figure()
+    label_y_pad = 0.025
+    bar_width = 0.32
+    requester_positions = list(range(len(requester_types)))
+    requester_tick_labels = [label for _requester_type, label in requester_types]
+    mode_offsets = {
+        "full": -bar_width / 2,
+        "risk_level_only": bar_width / 2,
+    }
+    axis_label_font_size = SELECTED_FIG_AXIS_LABEL_FONTSIZE * 1.5
+    tick_font_size = SELECTED_FIG_TICK_FONTSIZE * 1.5
+
+    for mode, mode_label, color in mode_specs:
+        x_positions = [position + mode_offsets[mode] for position in requester_positions]
+        rates: list[float] = []
+        custom: list[list[int]] = []
+        intervals: list[tuple[float, float] | None] = []
+        for requester_type, _requester_label in requester_types:
+            subset = [
+                log
+                for log in warden_logs
+                if _log_speaker(log) == requester_type
+                and _warden_message_mode(log) == mode
+            ]
+            counts = _success_rate_by_label(subset, lambda _log: mode).get(mode)
+            if counts is None:
+                successes = 0
+                total = 0
+                rate = 0.0
+            else:
+                successes = int(counts["requester_success"])
+                total = int(counts["total"])
+                rate = float(counts["rate"])
+            rates.append(rate)
+            custom.append([successes, total])
+            intervals.append(
+                _jeffreys_interval_from_counts(successes, total, rng=rng)
+            )
+
+        error_minus, error_plus = zip(
+            *[
+                _interval_error_from_center(rate, interval)
+                for rate, interval in zip(rates, intervals)
+            ]
+        )
+        fig.add_trace(
+            go.Bar(
+                name=mode_label,
+                x=x_positions,
+                y=rates,
+                width=bar_width,
+                marker=dict(
+                    color=color,
+                    line=dict(color="black", width=1),
+                ),
+                legendgroup=mode,
+                showlegend=True,
+                error_y=dict(
+                    type="data",
+                    array=list(error_plus),
+                    arrayminus=list(error_minus),
+                    visible=True,
+                    color="#5A5A5A",
+                    thickness=1.2,
+                    width=4,
+                ),
+                hovertext=[
+                    _format_rate_interval_hover(
+                        mode_label,
+                        rate,
+                        totals[0],
+                        totals[1],
+                        interval,
+                    )
+                    for rate, totals, interval in zip(rates, custom, intervals)
+                ],
+                hovertemplate="%{hovertext}<extra></extra>",
+            )
+        )
+
+        for x_position, rate, totals, plus in zip(
+            x_positions,
+            rates,
+            custom,
+            error_plus,
+        ):
+            if totals[1] <= 0:
+                continue
+            fig.add_annotation(
+                x=x_position,
+                y=rate + plus + label_y_pad,
+                text=f"{rate:.0%}",
+                showarrow=False,
+                yshift=2,
+                font=dict(size=20, color="black"),
+                xanchor="center",
+                yanchor="bottom",
+            )
+
+    y_tick_values = [step / 100 for step in range(0, 101, 20)]
+    fig.update_yaxes(
+        range=[0, 1.18],
+        tickvals=y_tick_values,
+        ticktext=[str(int(value * 100)) for value in y_tick_values],
+        title_text="Success Rate (%)",
+        title_font=dict(size=axis_label_font_size),
+        tickfont=dict(size=tick_font_size),
+        showgrid=True,
+        gridcolor="#D9D9D9",
+        gridwidth=1,
+        zeroline=True,
+        zerolinecolor="#D9D9D9",
+    )
+    fig.update_xaxes(
+        tickvals=requester_positions,
+        ticktext=requester_tick_labels,
+        title_text="Requester Type",
+        title_font=dict(size=axis_label_font_size),
+        tickfont=dict(size=tick_font_size),
+        range=[-0.55, len(requester_positions) - 0.45],
+        showgrid=False,
+    )
+    fig.update_layout(
+        barmode="group",
+        showlegend=True,
+        height=500,
+        width=972,
+        margin=dict(t=80, b=90, l=90, r=60),
+        legend=dict(
+            orientation="v",
+            x=0.02,
+            xanchor="left",
+            y=0.98,
+            yanchor="top",
+            font=dict(size=18),
+            bgcolor="rgba(255,255,255,0.85)",
+            bordercolor="#D9D9D9",
+            borderwidth=1,
+        ),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(color="black"),
+    )
+
+    _show_plotly_figure(fig, "warden_message_ablation", save_output)
+
+
 def plot_publication_success_rate_overview(
     logs: list[dict], *, save_output: bool = False
 ) -> None:
@@ -1388,6 +1573,31 @@ def _format_warden_overview_label(label: object) -> str:
     if label_text.startswith("mistral") and label_text.endswith("-instruct"):
         return label_text[: -len("-instruct")]
     return label_text
+
+
+def _warden_message_mode(log: dict) -> str | None:
+    """Return the target-facing warden message mode for defended runs."""
+    if not _has_warden(log):
+        return None
+
+    mode = log.get("warden_message_mode")
+    if mode == "risk_level_only":
+        return "risk_level_only"
+    if mode == "full":
+        return "full"
+
+    condition = log.get("condition")
+    if isinstance(condition, str) and "risk_level_only" in condition:
+        return "risk_level_only"
+    return "full"
+
+
+def _format_warden_message_mode_label(mode: str) -> str:
+    if mode == "risk_level_only":
+        return "Notifications Only"
+    if mode == "full":
+        return "Full Message"
+    return str(mode)
 
 
 def _ordered_warden_overview_labels(
@@ -3000,6 +3210,14 @@ if __name__ == "__main__":
         help="Show the standalone warden/defense comparison",
     )
     parser.add_argument(
+        "--warden-message-ablation",
+        action="store_true",
+        help=(
+            "Show grouped success rates comparing full warden messages against "
+            "risk-level-only notifications"
+        ),
+    )
+    parser.add_argument(
         "--warden-protection-score",
         action="store_true",
         help="Show protection score per warden/defense condition",
@@ -3086,6 +3304,8 @@ if __name__ == "__main__":
         plot_publication_success_rate_overview(logs, save_output=save_output)
     if args.warden_defense_overview or show_all:
         plot_warden_defense_overview(logs, save_output=save_output)
+    if args.warden_message_ablation or show_all:
+        plot_warden_message_ablation(logs, save_output=save_output)
     if args.warden_protection_score or show_all:
         plot_warden_protection_score(logs, save_output=save_output)
     if args.warden_tradeoff or show_all:

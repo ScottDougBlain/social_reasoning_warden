@@ -19,5 +19,8 @@ notebooks/.ipynb_checkpoints/
 # Presentations
 *.pptx
 
+# Local notes
+figure_generation_commands.md
+
 # OS
 .DS_Store
