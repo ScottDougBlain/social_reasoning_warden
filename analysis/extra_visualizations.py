@@ -60,6 +60,8 @@ COLOR_DARK_BLUE = "#332288"
 COLOR_LIGHT_BLUE = "#88CCEE"
 COLOR_GREEN = "#117733"
 COLOR_ROSE = "#CC6677"
+COLOR_YELLOW = "#DDCC77"
+COLOR_GREY = "#B8B8B8"
 
 
 def _normalize_tags(tag: str | Iterable[str] | None) -> set[str] | None:
@@ -383,6 +385,145 @@ def _log_speaker(log: dict) -> str | None:
         if "benign_agent" in speakers:
             return "benign_agent"
     return None
+
+
+def _extract_turn_value(value: object) -> int | None:
+    """Normalize logged turn values for conversation/advisory linkage."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _is_boardroom_log(log: dict) -> bool:
+    conversation = log.get("conversation")
+    if not isinstance(conversation, list):
+        return False
+    return any(
+        isinstance(item, dict)
+        and isinstance(item.get("speaker"), str)
+        and item["speaker"].startswith("target_")
+        for item in conversation
+    )
+
+
+def _normalize_warden_risk_level(advisory: dict) -> str:
+    risk_level = advisory.get("risk_level")
+    if isinstance(risk_level, str):
+        normalized = risk_level.strip().upper()
+        if normalized in {"LOW", "MEDIUM", "HIGH"}:
+            return normalized
+
+    content = advisory.get("content")
+    if isinstance(content, str):
+        match = re.search(r"RISK:\s*(LOW|MEDIUM|HIGH)", content, re.IGNORECASE)
+        if match:
+            return match.group(1).upper()
+
+    return "UNKNOWN"
+
+
+def _warden_activity_category(advisory: dict) -> str:
+    """Classify a warden decision into the stacked-bar components."""
+    should_advise = advisory.get("should_advise")
+    risk_level = _normalize_warden_risk_level(advisory)
+    if should_advise is True:
+        if risk_level == "HIGH":
+            return "HIGH"
+        if risk_level != "LOW":
+            return "MEDIUM"
+    return "inactive"
+
+
+def _linked_advisory(
+    *,
+    advisory_by_turn: dict[int, dict],
+    message_turn: int | None,
+    requester_message_index: int,
+    is_boardroom: bool,
+) -> dict | None:
+    """Find the advisory generated after a requester message."""
+    candidates: list[int] = []
+    if message_turn is not None:
+        if is_boardroom:
+            candidates.append(message_turn if message_turn > 0 else 1)
+            candidates.append(message_turn + 1)
+        else:
+            candidates.append(message_turn + 1)
+            candidates.append(message_turn)
+    candidates.append(requester_message_index)
+
+    seen: set[int] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        advisory = advisory_by_turn.get(candidate)
+        if advisory is not None:
+            return advisory
+    return None
+
+
+def _warden_activity_by_speaker(logs: list[dict]) -> dict[str, dict[str, int]]:
+    """Count warden high/medium/inactive decisions after requester messages."""
+    counts = {
+        speaker: {"total": 0, "inactive": 0, "MEDIUM": 0, "HIGH": 0}
+        for speaker in SPEAKER_ORDER
+    }
+
+    for log in logs:
+        if not _has_warden(log):
+            continue
+
+        speaker = _log_speaker(log)
+        if speaker not in SPEAKER_ORDER:
+            continue
+
+        advisories = log.get("warden_advisories")
+        conversation = log.get("conversation")
+        if not isinstance(advisories, list) or not isinstance(conversation, list):
+            continue
+
+        advisory_by_turn: dict[int, dict] = {}
+        for advisory in advisories:
+            if not isinstance(advisory, dict):
+                continue
+            advisory_turn = _extract_turn_value(advisory.get("turn"))
+            if advisory_turn is None:
+                continue
+            advisory_by_turn[advisory_turn] = advisory
+        if not advisory_by_turn:
+            continue
+
+        requester_message_index = 0
+        is_boardroom = _is_boardroom_log(log)
+        for item in conversation:
+            if not isinstance(item, dict) or item.get("speaker") != speaker:
+                continue
+            requester_message_index += 1
+            advisory = _linked_advisory(
+                advisory_by_turn=advisory_by_turn,
+                message_turn=_extract_turn_value(item.get("turn")),
+                requester_message_index=requester_message_index,
+                is_boardroom=is_boardroom,
+            )
+            if advisory is None:
+                continue
+
+            category = _warden_activity_category(advisory)
+            counts[speaker]["total"] += 1
+            counts[speaker][category] += 1
+
+    return counts
 
 
 def _split_logs_by_speaker(logs: list[dict]) -> dict[str, list[dict]]:
@@ -2644,6 +2785,101 @@ def plot_warden_ai_index(logs: list[dict], *, save_output: bool = False) -> None
     _show_plotly_figure(fig, "warden_ai_index", save_output)
 
 
+def plot_warden_activity_breakdown(
+    logs: list[dict], *, save_output: bool = False
+) -> None:
+    """Plot stacked percentages of warden decisions after requester messages."""
+    counts = _warden_activity_by_speaker(logs)
+    if not any(counts[speaker]["total"] > 0 for speaker in SPEAKER_ORDER):
+        print("No requester messages with linked warden decisions found.")
+        return
+
+    speaker_labels = {
+        "adversary": "Adversary",
+        "benign_agent": "Benign Agent",
+    }
+    x_labels = [speaker_labels[speaker] for speaker in SPEAKER_ORDER]
+    component_specs = [
+        ("inactive", "Inactive", COLOR_GREY),
+        ("MEDIUM", "Medium Risk", COLOR_YELLOW),
+        ("HIGH", "High Risk", COLOR_ROSE),
+    ]
+
+    fig = go.Figure()
+    for component, label, color in component_specs:
+        values: list[float] = []
+        custom_data: list[list[int]] = []
+        text: list[str] = []
+        for speaker in SPEAKER_ORDER:
+            total = counts[speaker]["total"]
+            component_count = counts[speaker][component]
+            rate = component_count / total if total > 0 else 0.0
+            values.append(rate)
+            custom_data.append([component_count, total])
+            text.append(f"{rate:.0%}" if total > 0 and rate >= 0.04 else "")
+
+        fig.add_trace(
+            go.Bar(
+                name=label,
+                x=x_labels,
+                y=values,
+                marker=dict(color=color, line=dict(color="black", width=1)),
+                customdata=custom_data,
+                text=text,
+                textposition="inside",
+                textfont=dict(size=18, color="black"),
+                hovertemplate=(
+                    "%{x}<br>"
+                    f"Decision: {label}<br>"
+                    "Messages: %{customdata[0]} / %{customdata[1]}<br>"
+                    "Share: %{y:.1%}<extra></extra>"
+                ),
+            )
+        )
+
+    y_tick_values = [step / 100 for step in range(0, 101, 20)]
+    fig.update_yaxes(
+        range=[0, 1],
+        tickvals=y_tick_values,
+        ticktext=[str(int(value * 100)) for value in y_tick_values],
+        title_text="Requester Messages (%)",
+        title_font=dict(size=18),
+        tickfont=dict(size=18),
+        showgrid=True,
+        gridcolor="#D9D9D9",
+        gridwidth=1,
+        zeroline=True,
+        zerolinecolor="#D9D9D9",
+    )
+    fig.update_xaxes(
+        title_text="Interaction Type",
+        title_font=dict(size=18),
+        tickfont=dict(size=18),
+        showgrid=False,
+    )
+    fig.update_layout(
+        barmode="stack",
+        showlegend=True,
+        height=500,
+        width=760,
+        margin=dict(t=70, b=90, l=90, r=40),
+        legend=dict(
+            orientation="h",
+            x=0.5,
+            xanchor="center",
+            y=1.04,
+            yanchor="bottom",
+            font=dict(size=18),
+        ),
+        hoverlabel=dict(font_size=18),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(color="black", size=18),
+    )
+
+    _show_plotly_figure(fig, "warden_activity_breakdown", save_output)
+
+
 def plot_outcome_breakdown(logs: list[dict], *, save_output: bool = False) -> None:
     """Plot stacked bar of outcome types per scenario (adversary runs)."""
     adversary_logs = [log for log in logs if _log_speaker(log) == "adversary"]
@@ -2787,6 +3023,14 @@ if __name__ == "__main__":
         help="Show warden score vs model intelligence index score",
     )
     parser.add_argument(
+        "--warden-activity-breakdown",
+        action="store_true",
+        help=(
+            "Show stacked percentages of high-risk, medium-risk, and inactive "
+            "warden decisions after adversary vs benign-agent messages"
+        ),
+    )
+    parser.add_argument(
         "--outcome-breakdown",
         action="store_true",
         help="Show stacked outcome counts per scenario for adversary runs",
@@ -2834,5 +3078,7 @@ if __name__ == "__main__":
         plot_scenario_warden_comparison_by_target(logs, save_output=save_output)
     if args.warden_ai_index or show_all:
         plot_warden_ai_index(logs, save_output=save_output)
+    if args.warden_activity_breakdown or show_all:
+        plot_warden_activity_breakdown(logs, save_output=save_output)
     if args.outcome_breakdown or show_all:
         plot_outcome_breakdown(logs, save_output=save_output)
