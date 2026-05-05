@@ -55,6 +55,8 @@ HEATMAP_CMAP = LinearSegmentedColormap.from_list(
 FIG_DPI = 200
 BAR_WIDTH = 0.35
 BAR_PERCENT_LABEL_FONTSIZE = 13.5
+FIG8_PERCENT_LABEL_FONTSIZE = 11.25
+FIG8_LEGEND_FONTSIZE = 18.15
 SELECTED_FIG_XTICK_FONTSIZE = 13.0
 SELECTED_FIG_AXIS_LABEL_FONTSIZE = 14.52
 DEFAULT_TAGS = {
@@ -1173,14 +1175,20 @@ def fig_profile_vulnerability(
         for i, (r, h) in enumerate(zip(rates, hi_abs)):
             ax.text(
                 x[i] + offset, h + 2.5, f"{r:.1f}%",
-                ha="center", fontsize=BAR_PERCENT_LABEL_FONTSIZE,
+                ha="center", fontsize=FIG8_PERCENT_LABEL_FONTSIZE,
                 fontweight="bold",
             )
 
     ax.set_xticks(x)
     ax.set_xticklabels(profile_labels, fontsize=8)
-    ax.set_xlabel("Target Vulnerability Profile")
-    ax.set_ylabel("Adversary Success Rate (%)")
+    ax.set_xlabel(
+        "Target Vulnerability Profile",
+        fontsize=SELECTED_FIG_AXIS_LABEL_FONTSIZE,
+    )
+    ax.set_ylabel(
+        "Adversary Success Rate (%)",
+        fontsize=SELECTED_FIG_AXIS_LABEL_FONTSIZE,
+    )
     _maybe_set_title(
         ax,
         f"Profile Vulnerability × Warden ({ci_label})\n"
@@ -1188,7 +1196,7 @@ def fig_profile_vulnerability(
         show_titles,
     )
     ax.set_ylim(0, 90)
-    ax.legend(loc="upper right", framealpha=0.9)
+    ax.legend(loc="upper right", framealpha=0.9, fontsize=FIG8_LEGEND_FONTSIZE)
 
     _horizontal_grid_only(ax)
     sns.despine()

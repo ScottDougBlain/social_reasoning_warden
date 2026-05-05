@@ -62,6 +62,10 @@ COLOR_GREEN = "#117733"
 COLOR_ROSE = "#CC6677"
 COLOR_YELLOW = "#DDCC77"
 COLOR_GREY = "#B8B8B8"
+SCENARIO_WARDEN_AXIS_TITLE_FONTSIZE = 18
+SCENARIO_WARDEN_LEGEND_FONTSIZE = 18
+SCENARIO_WARDEN_TICK_FONTSIZE = 15.6
+SCENARIO_WARDEN_YTICK_STANDOFF = 10
 
 
 def _normalize_tags(tag: str | Iterable[str] | None) -> set[str] | None:
@@ -2382,28 +2386,39 @@ def plot_scenario_warden_comparison(
         ),
     ])
     fig.update_layout(
-        xaxis_title="Success Rate",
-        yaxis_title="Scenario",
         xaxis=dict(
+            title=dict(
+                text="Success Rate",
+                font=dict(size=SCENARIO_WARDEN_AXIS_TITLE_FONTSIZE),
+            ),
             range=[0, 1],
             tickformat=".0%",
+            tickfont=dict(size=SCENARIO_WARDEN_TICK_FONTSIZE),
             showgrid=True,
             gridcolor="rgba(128, 128, 128, 0.3)",
             gridwidth=1,
         ),
         yaxis=dict(
+            title=dict(
+                text="Scenario",
+                font=dict(size=SCENARIO_WARDEN_AXIS_TITLE_FONTSIZE),
+            ),
             tickvals=centers,
             ticktext=scenario_labels,
+            tickfont=dict(size=SCENARIO_WARDEN_TICK_FONTSIZE),
+            ticklabelposition="outside left",
+            ticklabelstandoff=SCENARIO_WARDEN_YTICK_STANDOFF,
             range=[-0.5, len(scenarios) - 0.5],
         ),
         barmode="group",
         height=520,
         width=1400,
-        margin=dict(l=140),
+        margin=dict(l=185),
+        legend=dict(font=dict(size=SCENARIO_WARDEN_LEGEND_FONTSIZE)),
         paper_bgcolor="white",
         plot_bgcolor="white",
     )
-    _show_plotly_figure(fig, "scenario_warden_comparison", save_output)
+    _show_plotly_figure(fig, "sim_real_comparison", save_output)
 
 
 def _scenario_warden_display_label(scenario: str) -> str:
@@ -3005,9 +3020,16 @@ if __name__ == "__main__":
         help="Show adversary-model x target-model adversary success-rate heatmap",
     )
     parser.add_argument(
-        "--scenario-warden-comparison",
+        "--sim-real-comparison",
+        dest="sim_real_comparison",
         action="store_true",
-        help="Show per-scenario adversary success rates for warden vs no-warden runs",
+        help="Show simulation-vs-real adversary success rates for warden vs no-warden runs",
+    )
+    parser.add_argument(
+        "--scenario-warden-comparison",
+        dest="sim_real_comparison",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--scenario-warden-comparison-by-target",
@@ -3072,7 +3094,7 @@ if __name__ == "__main__":
         plot_scenario_profile_heatmap(logs, save_output=save_output)
     if args.adversary_target_heatmap or show_all:
         plot_adversary_target_heatmap(logs, save_output=save_output)
-    if args.scenario_warden_comparison or show_all:
+    if args.sim_real_comparison or show_all:
         plot_scenario_warden_comparison(logs, save_output=save_output)
     if args.scenario_warden_comparison_by_target or show_all:
         plot_scenario_warden_comparison_by_target(logs, save_output=save_output)
