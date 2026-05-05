@@ -54,6 +54,9 @@ HEATMAP_CMAP = LinearSegmentedColormap.from_list(
 )
 FIG_DPI = 200
 BAR_WIDTH = 0.35
+BAR_PERCENT_LABEL_FONTSIZE = 13.5
+SELECTED_FIG_XTICK_FONTSIZE = 13.0
+SELECTED_FIG_AXIS_LABEL_FONTSIZE = 14.52
 DEFAULT_TAGS = {
     "dossier": "dossier_effect",
     "cap_asym": "cap_asym",
@@ -316,7 +319,7 @@ def fig_dossier_effect(
 
     em = None if use_raw else _load_emmeans("fig2_dossier_interaction")
 
-    rates, los, his, hi_abs, ns = [], [], [], [], []
+    rates, los, his, hi_abs = [], [], [], []
     if em:
         em_lookup = {(int(e["has_dossier"]), int(e["has_warden"])): e for e in em}
         for i, (label, filt) in enumerate(conditions):
@@ -331,7 +334,6 @@ def fig_dossier_effect(
             los.append((r - lo) * 100)
             his.append((hi - r) * 100)
             hi_abs.append(hi * 100)
-            ns.append(len(subset))
         ci_label = "GLME-adjusted"
     else:
         for label, filt in conditions:
@@ -341,7 +343,6 @@ def fig_dossier_effect(
             los.append((r - lo) * 100)
             his.append((hi - r) * 100)
             hi_abs.append(hi * 100)
-            ns.append(n)
         ci_label = "raw"
 
     fig, ax = plt.subplots(figsize=(7, 5))
@@ -364,8 +365,8 @@ def fig_dossier_effect(
     or_warden = _raw_odds_ratio(warden_yes, warden_no)
 
     ax.set_xticks(x)
-    ax.set_xticklabels([c[0] for c in conditions], fontsize=9)
-    ax.set_ylabel("Adversary Success Rate (%)")
+    ax.set_xticklabels([c[0] for c in conditions], fontsize=SELECTED_FIG_XTICK_FONTSIZE)
+    ax.set_ylabel("Adversary Success Rate (%)", fontsize=SELECTED_FIG_AXIS_LABEL_FONTSIZE)
     _maybe_set_title(
         ax,
         f"Dossier × Warden Interaction\n({ci_label} OR: dossier = {or_dossier:.2f}, warden = {or_warden:.3f})",
@@ -373,8 +374,11 @@ def fig_dossier_effect(
     )
     ax.set_ylim(0, 60)
 
-    for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
-        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
+    for i, (r, h) in enumerate(zip(rates, hi_abs)):
+        ax.text(
+            i, h + 2, f"{r:.1f}%",
+            ha="center", fontsize=BAR_PERCENT_LABEL_FONTSIZE,
+        )
 
     legend_handles = [
         Patch(facecolor=COLOR_ROSE, edgecolor="black", label="No Warden"),
@@ -418,7 +422,7 @@ def fig_capability_asymmetry(
 
     em = None if use_raw else _load_emmeans("fig3_capability_asymmetry")
 
-    rates, los, his, hi_abs, ns = [], [], [], [], []
+    rates, los, his, hi_abs = [], [], [], []
     if em:
         em_lookup = {e["warden_tier"]: e for e in em}
         for tier in tiers:
@@ -432,7 +436,6 @@ def fig_capability_asymmetry(
             los.append((r - lo) * 100)
             his.append((hi - r) * 100)
             hi_abs.append(hi * 100)
-            ns.append(len(subset))
         ci_label = "GLME-adjusted"
     else:
         for tier in tiers:
@@ -442,7 +445,6 @@ def fig_capability_asymmetry(
             los.append((r - lo) * 100)
             his.append((hi - r) * 100)
             hi_abs.append(hi * 100)
-            ns.append(n)
         ci_label = "raw"
 
     fig, ax = plt.subplots(figsize=(7, 5))
@@ -458,9 +460,9 @@ def fig_capability_asymmetry(
     or_overall = _raw_odds_ratio(warden_any, warden_none)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(tier_labels, fontsize=9)
-    ax.set_xlabel("Warden Capability Tier")
-    ax.set_ylabel("Adversary Success Rate (%)")
+    ax.set_xticklabels(tier_labels, fontsize=SELECTED_FIG_XTICK_FONTSIZE)
+    ax.set_xlabel("Warden Capability Tier", fontsize=SELECTED_FIG_AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel("Adversary Success Rate (%)", fontsize=SELECTED_FIG_AXIS_LABEL_FONTSIZE)
     _maybe_set_title(
         ax,
         f"Warden Capability Asymmetry\n({ci_label}, OR any-warden vs. none = {or_overall:.3f})",
@@ -468,8 +470,11 @@ def fig_capability_asymmetry(
     )
     ax.set_ylim(0, 60)
 
-    for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns)):
-        ax.text(i, h + 2, f"{r:.1f}%\nn={n}", ha="center", fontsize=9)
+    for i, (r, h) in enumerate(zip(rates, hi_abs)):
+        ax.text(
+            i, h + 2, f"{r:.1f}%",
+            ha="center", fontsize=BAR_PERCENT_LABEL_FONTSIZE,
+        )
 
     _horizontal_grid_only(ax)
     sns.despine()
@@ -910,7 +915,7 @@ def fig_warden_effect_both_by_requester(
         (False, "No Warden"),
         (True, "With Warden"),
     ]):
-        rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
+        rates, err_lo, err_hi, hi_abs = [], [], [], []
         for rt, _rt_label in requester_types:
             subset = [d for d in main if d["requester_type"] == rt
                       and d["has_warden"] == has_w]
@@ -924,7 +929,6 @@ def fig_warden_effect_both_by_requester(
             err_lo.append((r - lo) * 100)
             err_hi.append((hi - r) * 100)
             hi_abs.append(hi * 100)
-            ns_list.append(n)
 
         offset = (j - 0.5) * width
         ax.bar(
@@ -934,9 +938,9 @@ def fig_warden_effect_both_by_requester(
             edgecolor="black", linewidth=0.5,
         )
 
-        for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
-            ax.text(x[i] + offset, h + 2, f"{r:.1f}%\nn={n}",
-                    ha="center", fontsize=9)
+        for i, (r, h) in enumerate(zip(rates, hi_abs)):
+            ax.text(x[i] + offset, h + 2, f"{r:.1f}%",
+                    ha="center", fontsize=BAR_PERCENT_LABEL_FONTSIZE)
 
     adv_data = [d for d in main if d["requester_type"] == "adversary"]
     adv_w = [d for d in adv_data if d["has_warden"]]
@@ -944,8 +948,11 @@ def fig_warden_effect_both_by_requester(
     or_adv = _raw_odds_ratio(adv_w, adv_nw)
 
     ax.set_xticks(x)
-    ax.set_xticklabels([label for _rt, label in requester_types], fontsize=10)
-    ax.set_ylabel("Success Rate (%)")
+    ax.set_xticklabels(
+        [label for _rt, label in requester_types],
+        fontsize=SELECTED_FIG_XTICK_FONTSIZE,
+    )
+    ax.set_ylabel("Success Rate (%)", fontsize=SELECTED_FIG_AXIS_LABEL_FONTSIZE)
     _maybe_set_title(
         ax,
         f"Warden Effect: Adversary vs. Benign Agent ({ci_label})\n"
@@ -1143,7 +1150,7 @@ def fig_profile_vulnerability(
         (False, "No Warden", COLOR_ROSE),
         (True, "With Warden", COLOR_LIGHT_BLUE),
     ]):
-        rates, err_lo, err_hi, hi_abs, ns_list = [], [], [], [], []
+        rates, err_lo, err_hi, hi_abs = [], [], [], []
         for profile_name in profile_order:
             subset = bucketed.get((profile_name, has_w), [])
             e = em_lookup.get((profile_name, int(has_w)))
@@ -1156,7 +1163,6 @@ def fig_profile_vulnerability(
             err_lo.append((r - lo) * 100)
             err_hi.append((hi - r) * 100)
             hi_abs.append(hi * 100)
-            ns_list.append(n)
 
         offset = (j - 0.5) * width
         ax.bar(x + offset, rates, width, yerr=[err_lo, err_hi],
@@ -1164,11 +1170,12 @@ def fig_profile_vulnerability(
                error_kw=dict(capsize=4, capthick=1.2, elinewidth=1.2),
                edgecolor="black", linewidth=0.5)
 
-        for i, (r, h, n) in enumerate(zip(rates, hi_abs, ns_list)):
-            ax.text(x[i] + offset, h + 2.5, f"{r:.1f}%",
-                    ha="center", fontsize=8, fontweight="bold")
-            ax.text(x[i] + offset, h + 7, f"n={n}",
-                    ha="center", fontsize=7, color="0.35")
+        for i, (r, h) in enumerate(zip(rates, hi_abs)):
+            ax.text(
+                x[i] + offset, h + 2.5, f"{r:.1f}%",
+                ha="center", fontsize=BAR_PERCENT_LABEL_FONTSIZE,
+                fontweight="bold",
+            )
 
     ax.set_xticks(x)
     ax.set_xticklabels(profile_labels, fontsize=8)
