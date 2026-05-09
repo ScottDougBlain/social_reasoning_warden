@@ -2527,6 +2527,9 @@ def plot_scenario_warden_comparison(
             warden_y,
         )
     )
+    axis_title_font_size = SCENARIO_WARDEN_AXIS_TITLE_FONTSIZE * 1.5
+    tick_font_size = SCENARIO_WARDEN_TICK_FONTSIZE * 1.3
+    legend_font_size = SCENARIO_WARDEN_LEGEND_FONTSIZE * 1.5
 
     fig = go.Figure(data=[
         go.Bar(
@@ -2599,11 +2602,11 @@ def plot_scenario_warden_comparison(
         xaxis=dict(
             title=dict(
                 text="Success Rate",
-                font=dict(size=SCENARIO_WARDEN_AXIS_TITLE_FONTSIZE),
+                font=dict(size=axis_title_font_size),
             ),
             range=[0, 1],
             tickformat=".0%",
-            tickfont=dict(size=SCENARIO_WARDEN_TICK_FONTSIZE),
+            tickfont=dict(size=tick_font_size),
             showgrid=True,
             gridcolor="rgba(128, 128, 128, 0.3)",
             gridwidth=1,
@@ -2611,11 +2614,11 @@ def plot_scenario_warden_comparison(
         yaxis=dict(
             title=dict(
                 text="Scenario",
-                font=dict(size=SCENARIO_WARDEN_AXIS_TITLE_FONTSIZE),
+                font=dict(size=axis_title_font_size),
             ),
             tickvals=centers,
             ticktext=scenario_labels,
-            tickfont=dict(size=SCENARIO_WARDEN_TICK_FONTSIZE),
+            tickfont=dict(size=tick_font_size),
             ticklabelposition="outside left",
             ticklabelstandoff=SCENARIO_WARDEN_YTICK_STANDOFF,
             range=[-0.5, len(scenarios) - 0.5],
@@ -2624,7 +2627,7 @@ def plot_scenario_warden_comparison(
         height=520,
         width=1400,
         margin=dict(l=185),
-        legend=dict(font=dict(size=SCENARIO_WARDEN_LEGEND_FONTSIZE)),
+        legend=dict(font=dict(size=legend_font_size)),
         paper_bgcolor="white",
         plot_bgcolor="white",
     )
