@@ -1,4 +1,19 @@
-# Social Reasoning Warden
+# LLM Wardens: Mitigating Adversarial Persuasion with Third-Party Conversational Oversight
+
+Our paper is available on [arxiv](https://arxiv.org/abs/2605.08321). 
+
+Cite:
+
+@misc{wachowiak2026llmwardensmitigatingadversarial,
+      title={LLM Wardens: Mitigating Adversarial Persuasion with Third-Party Conversational Oversight}, 
+      author={Lennart Wachowiak and Scott D. Blain and David Williams-King and Samuele Marro},
+      year={2026},
+      eprint={2605.08321},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2605.08321}, 
+}
+
 
 **Can LLMs socially manipulate other LLMs — and can a "warden" agent stop them?**
 
@@ -78,7 +93,6 @@ All inferential results use **Generalized Linear Mixed-Effects Models** (GLME) w
 │   ├── runner.py                # Experiment orchestration, turn-taking, and logging
 │   ├── client.py                # OpenRouter chat client
 │   ├── profiles.py              # Lightweight five-factor profile utilities
-│   ├── profile_generator.py      # Profile generation utilities
 │   ├── agents/
 │   │   ├── adversary.py         # Hidden-goal requester agent
 │   │   ├── benign_agent.py      # Legitimate requester control
@@ -89,7 +103,6 @@ All inferential results use **Generalized Linear Mixed-Effects Models** (GLME) w
 │       └── experimental/        # 22 multi-target / board-style scenarios
 ├── prompts/
 │   ├── adversary/               # Adversary prompt variants
-│   ├── profiles/                # Profile prompt variants
 │   ├── warden/                  # Warden system prompt variants
 │   ├── target_system.yaml       # Target system prompt
 │   └── benign_agent_system.yaml # Base benign requester prompt
@@ -108,7 +121,10 @@ All inferential results use **Generalized Linear Mixed-Effects Models** (GLME) w
 │   └── lme_results.md           # Model summaries
 ├── logs/                        # JSON experiment logs (gitignored)
 ├── environment.yml              # Conda environment with Python and R dependencies
-└── requirements.txt
+├── pyproject.toml               # Python project dependencies
+├── uv.lock                      # Locked dependency versions
+├── .python-version              # Python version used by uv
+└── requirements.txt             # pip-compatible dependency export
 ```
 
 ---
@@ -117,7 +133,7 @@ All inferential results use **Generalized Linear Mixed-Effects Models** (GLME) w
 
 ### Prerequisites
 
-- Python 3.11+
+- Either [uv](https://docs.astral.sh/uv/getting-started/installation/) (manages Python and the project environment) or Python 3.12 with pip
 - API key for LLM usage (current implementation based on OpenRouter)
 - R with `lme4`, `emmeans`, `car`, and `lmerTest` (for statistical analysis only)
 
@@ -126,10 +142,34 @@ All inferential results use **Generalized Linear Mixed-Effects Models** (GLME) w
 ```bash
 git clone https://github.com/ScottDougBlain/social_reasoning_warden.git
 cd social_reasoning_warden
-python3 -m pip install -r requirements.txt
 ```
 
-`requirements.txt` includes both runtime dependencies and the Python-side analysis stack used by the plotting and export scripts. Alternatively you can use the `environment.yml` file to create a conda environment with all dependencies.
+Both uv and pip are supported. Choose either setup below.
+
+**With uv:**
+
+```bash
+uv sync
+source .venv/bin/activate
+```
+
+This creates `.venv`, installs the locked runtime and Python analysis dependencies from `uv.lock`, and activates the environment. uv downloads Python if needed.
+
+**With pip:**
+
+With Python 3.12 installed:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+For either setup, run `source .venv/bin/activate` again in each new terminal session.
+
+R and its packages must be installed separately for statistical analysis; `environment.yml` provides an alternative Conda setup including R.
+
+`pyproject.toml` and `uv.lock` define the uv environment. `requirements.txt` remains available for pip-based installations.
 
 Create a `.env` file with your API key(s):
 
@@ -139,23 +179,25 @@ OPENROUTER_API_KEY=sk-or-...
 
 ### Running Experiments
 
+With your environment activated, the commands below work with either installation method.
+
 ```bash
 # Basic adversary vs target with warden
-python3 main.py --scenario file_access_password
+python main.py --scenario file_access_password
 
 # Disable target profiles
-python3 main.py --scenario file_access_password --target-profiles no
+python main.py --scenario file_access_password --target-profiles no
 
 # Full factorial sweep across the 14 benchmark scenarios
-python3 main.py --scenario all_test --requester-type both --warden both \
+python main.py --scenario all_test --requester-type both --warden both \
   --experiment-rounds 5 --tag my_experiment
 
 # Share the same generated profile with target, adversary, and warden
-python3 main.py --target-profiles yes --adversary-profile-access yes \
+python main.py --target-profiles yes --adversary-profile-access yes \
   --warden-profile-access yes --profile-seed 42 --tag profile_access
 
 # Profiles are generated on the fly; reuse a seed for reproducible rounds
-python3 main.py --target-profiles yes --profile-seed 123
+python main.py --target-profiles yes --profile-seed 123
 
 ```
 
@@ -164,8 +206,8 @@ python3 main.py --target-profiles yes --profile-seed 123
 The top-level replication scripts rerun the exact command batches used for the logged model-family experiments:
 
 ```bash
-./replicate_within_family_runs.sh  # Within-family sweeps for Gemma, Gemini, Mistral, Llama, Qwen, GPT, and Claude
-./replicate_across_family_runs.sh  # Across-family discovery grid, selected across-family runs, and skeptical ablations
+bash replicate_within_family_runs.sh  # Within-family sweeps for Gemma, Gemini, Mistral, Llama, Qwen, GPT, and Claude
+bash replicate_across_family_runs.sh  # Across-family discovery grid, selected across-family runs, and skeptical ablations
 ```
 
 Both scripts run from the repository root, stop on the first failing command, and require the same API credentials as `main.py`.
