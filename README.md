@@ -1,19 +1,20 @@
 # LLM Wardens: Mitigating Adversarial Persuasion with Third-Party Conversational Oversight
 
-Our paper is available on [arxiv](https://arxiv.org/abs/2605.08321). 
+Our paper is available on [arXiv](https://arxiv.org/abs/2605.08321).
 
-Cite:
+**Citation**
 
+```bibtex
 @misc{wachowiak2026llmwardensmitigatingadversarial,
-      title={LLM Wardens: Mitigating Adversarial Persuasion with Third-Party Conversational Oversight}, 
-      author={Lennart Wachowiak and Scott D. Blain and David Williams-King and Samuele Marro},
-      year={2026},
-      eprint={2605.08321},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2605.08321}, 
+  title         = {LLM Wardens: Mitigating Adversarial Persuasion with Third-Party Conversational Oversight},
+  author        = {Lennart Wachowiak and Scott D. Blain and David Williams-King and Samuele Marro},
+  year          = {2026},
+  eprint        = {2605.08321},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG},
+  url           = {https://arxiv.org/abs/2605.08321}
 }
-
+```
 
 **Can LLMs socially manipulate other LLMs — and can a "warden" agent stop them?**
 
